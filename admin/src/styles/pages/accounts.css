@@ -1,0 +1,499 @@
+/* accounts page: nested account/save cards (approved mockup accounts-nested-saves)
+   + accounts mobile view (same nested structure, mobile-first) */
+.admin-account-mobile-list,
+.admin-mobile-list-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* v2 真卡片列表: 卡距 14px (mockup .m-acc-card 的 margin-bottom 口径, 移到容器 gap) */
+.admin-account-mobile-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-mobile-list-heading,
+.admin-mobile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-mobile-list-item-clickable {
+  cursor: pointer;
+}
+
+/* 关闭安卓浏览器的合成器级点按高亮层(维护者 Edge 安卓真机证实): 高亮是半透明
+   overlay, 盖住整卡连内部子卡/按钮一起染色, 非 CSS :hover, hover 闸门管不着,
+   必须在元素上显式置透明。桌面无此概念, 零影响 */
+.acc-card,
+.save-sub,
+.admin-mobile-list-item-clickable {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* hover 仅限真实鼠标设备（维护者指定）: 触摸屏点按会粘滞 :hover 导致整卡变色。
+   双层闸门: (hover: hover) 媒体查询 + html:not(.has-touch) —— 部分触屏浏览器
+   (维护者 iQOO) 会把媒体查询判真, main.tsx 在首次 touchstart 挂的 has-touch
+   作最终兜底 */
+@media (hover: hover) {
+  html:not(.has-touch) .admin-mobile-list-item-clickable:hover,
+  html:not(.has-touch) .admin-mobile-list-item-clickable:focus-visible {
+    background: var(--hover);
+    outline: 2px solid var(--water);
+    outline-offset: -2px;
+  }
+}
+
+.admin-mobile-detail-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.admin-mobile-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-mobile-detail-list span {
+  color: var(--ink-soft);
+}
+
+/* kv 值壳（账号页嵌套稿）: 恢复正文色, 行首标签仍吃上面的软色; 徽章自带上色不受影响 */
+.admin-mobile-detail-list .acc-kv-value {
+  color: var(--ink);
+}
+
+/* kv 值: 名称/徽章 或 设备 pill 组, 可换行不撑破 */
+.acc-kv-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.admin-mobile-actions {
+  margin-top: 10px;
+  /* 维护者方案A: <375 允许折行(基础 wrap 来自上方共享规则)——360 档三按钮 nowrap 的
+     最小内容会顶破展开面板; ≥375 恢复「等分铺满一排不折行」(维护者 2026-09-29 指定) */
+}
+
+.admin-mobile-actions .ant-btn {
+  flex: none;
+  min-width: 0;
+  white-space: nowrap;
+  justify-content: center;
+}
+
+/* 账号页操作行: 编辑占主(grow), 当前/切换与[…] 恒定紧凑 — 两平台同形态 */
+.admin-account-actions .act-edit {
+  flex: 1 1 auto;
+}
+
+.admin-account-actions .ant-btn:not(.act-edit) {
+  flex: none;
+}
+
+/* ── 账号卡 + 内嵌存档子卡 (mockup accounts-nested-saves) ──────────────────── */
+
+.admin-acc-list {
+  display: grid;
+  gap: 16px;
+}
+
+/* 账号卡(父): th-bg 抬升面, 与 Card 面板区分层 */
+.acc-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--th-bg);
+  /* 点空白展开存档列表（维护者指定） */
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+@media (hover: hover) {
+  html:not(.has-touch) .acc-card:hover,
+  html:not(.has-touch) .acc-card:focus-visible {
+    background: var(--hover);
+    border-color: var(--line-strong);
+  }
+}
+
+.acc-id {
+  font-weight: 800;
+  /* 移动 13.5 → 桌面 15 (mockup 两面板) */
+  font-size: 13.5px;
+}
+
+.acc-note {
+  color: var(--ink-soft);
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acc-actions {
+  margin-left: auto;
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+/* kv 行: 84px 标签列 (mockup .kv) */
+.acc-kv {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 4px 10px;
+  font-size: 12.5px;
+}
+
+.acc-k {
+  color: var(--ink-soft);
+}
+
+.acc-v {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.acc-kv-name {
+  font-weight: 700;
+}
+
+.acc-devices {
+  gap: 4px;
+}
+
+/* 嵌套区: 点「存档数 N」在账号卡内部展开/收起。独立面板底色(--hover)与账号信息区(th-bg)
+   分层（维护者指定）, 存档子卡(stat-bg)再浮一层 */
+.acc-save-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--hover);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+/* 新建存档垫在子卡列表末尾, 不随 grid 拉伸满宽 */
+/* 维护者方案A: 面板子项不带自动最小尺寸(min-width:auto), 360 档子卡最小内容
+   不再顶破 grid 轨道越出面板边线 */
+.acc-save-list > * {
+  min-width: 0;
+}
+
+/* 存档数切换钮: 独立整行左右撑满（维护者指定, 跨 kv 两列; 移动 detail-list 同构） */
+/* 存档子卡: stat-bg 凹陷面, 比账号卡再深一层 (mockup .save-sub panel-sub) */
+.save-sub {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--stat-bg);
+  /* 点空白进入玩家详情（维护者指定） */
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+@media (hover: hover) {
+  html:not(.has-touch) .save-sub:hover,
+  html:not(.has-touch) .save-sub:focus-visible {
+    background: var(--th-bg);
+    border-color: var(--line-strong);
+  }
+}
+
+.save-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.save-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 名字列: 当前存档徽标叠在名字上方（维护者指定, 横排会与「切换」争宽度导致换行） */
+.save-name-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.save-name-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.save-meta {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+/* 存档子卡第一行右端单键「切换」 (mockup 规格: 行1末尾仅切换, 当前存档禁用);
+   放不下时自然换行仍靠右 */
+/* 喜爱角色头像 (mockup .av-img): 首字占位打底, character_avatar 立绘铺满,
+   加载失败由 onError 加 broken 类隐藏 — 同 TimeControl admin-char-avatar 惯例。
+   移动 40×40 → 桌面 ≥768 44×44, 圆角 8px。背景透明（维护者指定）, 立绘未覆盖/加载前仅见首字占位。 */
+.av-img {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.av-img-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.av-img-picture-broken {
+  display: none;
+}
+
+/* ── 账号卡两套布局 v2 (mockup accounts-two-layouts) ─────────────────────────
+   标题栏=账号#id+备注+新建存档(右); 身份行=头像+名称+存档id+设备(+存档数+…);
+   存档子卡单行=头像+名字+#存档id+meta + 当前/切换合体 + 编辑 + […] */
+.acc-titlebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.acc-id-chip {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.acc-titlebar .acc-actions {
+  margin-left: auto;
+}
+
+.acc-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--stat-bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.acc-identity-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.acc-identity-name {
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.acc-identity-meta {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.acc-count-toggle {
+  flex: none;
+}
+
+.acc-bottom-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.acc-bottom-row .acc-count-toggle {
+  flex: 1 1 auto;
+}
+
+.acc-bottom-row .admin-more-btn {
+  flex: none;
+}
+
+/* 存档子卡信息列: 名字+#存档id 一行, meta 第二行 */
+.save-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.save-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.save-id {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+/* 当前标识: 与同排按钮同族同尺寸, 绿描边+浅绿底作状态提示(维护者指定: 不用置灰) */
+.save-current-btn {
+  color: var(--wind);
+  border-color: var(--wind);
+  background: var(--ok-bg);
+  cursor: default;
+}
+
+/* antd 的 default 按钮状态规则特异性(0,4,0)高于单类名, hover/active 会把上面的绿
+   刷回白底黑字(主题令牌只管 antd 自身配色, 够不到自定义绿)。镜像 antd 的选择器
+   结构钉回同组绿值, 静止/hover/active 视觉恒定 —— 与 theme.tsx 钉 default 钮
+   hover 不变色的机制一致; 恒色也顺带免疫触摸屏的粘滞 :hover */
+.save-current-btn:not(:disabled):not(.ant-btn-disabled):hover,
+.save-current-btn:not(:disabled):not(.ant-btn-disabled):active,
+.save-current-btn:not(:disabled):not(.ant-btn-disabled):focus-visible {
+  color: var(--wind);
+  border-color: var(--wind);
+  background: var(--ok-bg);
+}
+
+
+
+/* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
+   reads as a game-console panel */
+.admin-accounts-card .ant-card-head-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-accounts-card .ant-card-head-title::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--star);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+
+/* accounts: 存档名 links into 玩家详情 with the water data-link voice (mockup .save-link) */
+.admin-save-link {
+  color: var(--water);
+}
+
+.admin-save-link:hover {
+  text-decoration: underline;
+}
+
+/* 绑定设备: 真实设备码 mono 只读 (mockup 规格 — 不可修改, 与账号备注是两个概念) */
+.acc-dev-code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+/* 卡头账号备注 (mockup .acc-note 点击可修改): 灰字 + 虚线下划线提示可点,
+   与可交互的 admin-save-link 区分 */
+.acc-note-edit {
+  color: var(--ink-soft);
+  text-decoration: underline dashed var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.acc-note-edit:hover,
+.acc-note-edit:focus-visible {
+  color: var(--ink);
+}
+
+/* 备注铅笔提示: 跟随文字色, 悬停时随文字提亮 */
+.acc-note-pencil {
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+/* 备注编辑态 (维护者指定: input 样式不变 + 失焦保存): 原生无边框 input,
+   字号/颜色与静态灰字完全一致, 视觉上只是原位变成可输入, 不出现输入框外框与按钮 */
+.acc-note-input {
+  width: 120px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.acc-note-input::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.55;
+}
+
+/* 卡头「…」更多操作按钮 (mockup .more-btn): 删除账号收进菜单 */
+.admin-more-btn {
+  color: var(--ink-soft);
+  letter-spacing: 2px;
+}
+
+/* 存档子卡第二行操作 (mockup .save-ops2): 编辑·复制·导出·删除 左对齐 */
+/* 卡头头像 (账号卡=当前存档喜爱角色): 移动 36, 桌面随 ≥768 媒体查询升 44 */
+.acc-top .av-img {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+}
+
+/* 桌面 ≥768 微调: 账号卡/头像升到 mockup 桌面尺寸, 卡距略收 */
+@media (min-width: 768px) {
+  .acc-card {
+    padding: 14px;
+  }
+
+  .acc-identity {
+    padding: 12px;
+  }
+
+  .acc-id {
+    font-size: 15px;
+  }
+
+  .av-img {
+    width: 44px;
+    height: 44px;
+  }
+}

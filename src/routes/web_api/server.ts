@@ -14,9 +14,11 @@ import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getActivePlayerId, getAdminPlayerSelectionState, setActivePlayerId, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { getEffectiveVersion } from "../../lib/version";
-import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
+import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance"
+import { buildAdminActivityTimeline } from "../../lib/admin-activity";
 import { buildAdminContentStatus } from "../../lib/admin-content-status";
 import { getRankDegree } from "../../lib/stamina";
+import { getFavoriteCharacterIdSync } from "../../lib/profileFavorite";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import type { CnRuntimeConfig } from "../../runtime/config";
 import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
@@ -210,6 +212,14 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         })
     })
 
+    fastify.get("/clairvoyance/activity", async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.status(200).send({
+            cdnVersion: getEffectiveVersion(),
+            baseline: "fixed-cn-final",
+            ...buildAdminActivityTimeline(getServerDate()),
+        })
+    })
+
     // === Account list (JSON, for admin SPA) ===
 
     fastify.get("/accounts", async (_request: FastifyRequest, reply: FastifyReply) => {
@@ -254,8 +264,12 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
                         name: player.name,
                         degreeId: player.degreeId,
                         rank: getRankDegree(player.rankPoint),
+                        characterCount: player.characterCount,
+                        lastLoginTime: player.lastLoginTime.toISOString(),
                         isDefault: defaultPid === player.id,
                         isActive: activePlayerId === player.id,
+                        // 只读投影: 游戏内收藏编队主角色（存档子卡头像, task-38）
+                        favoriteCharacterId: getFavoriteCharacterIdSync(player.id),
                     }
                 }),
                 playerIds
@@ -426,29 +440,23 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         for (const a of allAccounts) {
             if (getAccountPlayersSync(a.id).includes(pid)) { accountId = a.id; break }
         }
+        // 单存档账号不允许通过删除存档间接删号(维护者指定): 破坏性必须与按钮语义对齐,
+        // 删号(含设备绑定解绑)只能走显式的 deleteAccount; UI 禁用是引导, 这里是兜底
         if (accountId && getAccountPlayersSync(accountId).length <= 1) {
-            deletePlayerSync(pid)
-            deleteAccountSync(accountId)
-            try {
-                const db = require("../../data/db").getDb()
-                db.prepare(`DELETE FROM device_bindings WHERE account_id = ?`).run(accountId)
-            } catch (_) {}
-            try {
-                const { readState, writeState } = require("../../data/activeAccount")
-                const state = readState()
-                delete state.defaultPlayers[accountId]
-                writeState(state)
-            } catch (_) {}
-        } else {
-            deletePlayerSync(pid)
+            if (wantsJson(request)) {
+                return reply.status(400).send({ error: "该账号仅剩这一个存档，请使用删除账号" })
+            }
+            return reply.redirect('/player')
+        }
+        deletePlayerSync(pid)
+        if (accountId) {
             const remainingPlayerIds = getAccountPlayersSync(accountId)
             if (getAccountDefaultPlayer(accountId) === pid && remainingPlayerIds.length > 0) {
                 saveAccountDefaultPlayer(accountId, remainingPlayerIds[0])
             }
         }
-        const accountAlsoDeleted = accountId && getAccountPlayersSync(accountId).length === 0
         if (getActivePlayerId() === pid) setActivePlayerId(null)
-        if (wantsJson(request)) return reply.send({ ok: true, deleted: pid, accountAlsoDeleted: !!accountAlsoDeleted })
+        if (wantsJson(request)) return reply.send({ ok: true, deleted: pid, accountAlsoDeleted: false })
         return reply.redirect('/player')
     })
 

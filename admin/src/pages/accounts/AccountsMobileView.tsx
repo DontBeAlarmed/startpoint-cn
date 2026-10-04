@@ -3,222 +3,249 @@ import {
     Button,
     Dropdown,
     Empty,
-    Input,
-    List,
     Modal,
-    Popconfirm,
-    Space,
-    Tag,
     Typography,
 } from "antd"
-import { ArrowLeft, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 
-import type { AccountRow, PlayerBrief } from "./types"
+import type { AccountRow } from "./types"
+import { FavoriteAvatar, defaultPlayerAvatarId } from "./FavoriteAvatar"
 
 interface AccountsMobileViewProps {
     accounts: readonly AccountRow[]
     selectedAccount: AccountRow | undefined
     loading: boolean
-    renamePending: boolean
     onSelectAccount: (accountId: number) => void
-    onBack: () => void
     onOpenPlayer: (playerId: number) => void
     onNewSave: (accountId: number) => Promise<unknown>
     onDeleteAccount: (accountId: number) => Promise<unknown>
     onActivateSave: (playerId: number) => Promise<unknown>
     onCloneSave: (playerId: number, accountId: number) => Promise<unknown>
     onDeleteSave: (playerId: number) => Promise<unknown>
-    onRenameSave: (playerId: number, name: string) => Promise<unknown>
-    onRenameDevice: (deviceId: number, name: string) => Promise<unknown>
+    onUpdateNote: (accountId: number, note: string) => Promise<unknown>
 }
 
 export function AccountsMobileView({
     accounts,
     selectedAccount,
     loading,
-    renamePending,
     onSelectAccount,
-    onBack,
     onOpenPlayer,
     onNewSave,
     onDeleteAccount,
     onActivateSave,
     onCloneSave,
     onDeleteSave,
-    onRenameSave,
-    onRenameDevice,
+    onUpdateNote,
 }: AccountsMobileViewProps) {
-    const [renamingSaveId, setRenamingSaveId] = useState<number | null>(null)
-    const [saveName, setSaveName] = useState("")
-    const [renamingDeviceId, setRenamingDeviceId] = useState<number | null>(null)
-    const [deviceName, setDeviceName] = useState("")
+    const [noteEditId, setNoteEditId] = useState<number | null>(null)
+    const [noteDraft, setNoteDraft] = useState("")
+    const [noteOriginal, setNoteOriginal] = useState("")
+    const [noteSaving, setNoteSaving] = useState(false)
+    const selectedAccountId = selectedAccount?.id ?? null
 
-    const submitSaveName = async (playerId: number) => {
-        await onRenameSave(playerId, saveName)
-        setRenamingSaveId(null)
+    // 失焦保存（维护者指定）: 与原值相同只退编辑态不发请求; 关编辑态按账号守卫,
+    // 防止保存期间用户已打开另一张卡的编辑态被误关
+    const submitNote = async (accountId: number) => {
+        if (noteSaving) return
+        setNoteSaving(true)
+        try {
+            await onUpdateNote(accountId, noteDraft)
+            setNoteEditId(current => (current === accountId ? null : current))
+        } finally {
+            setNoteSaving(false)
+        }
     }
-    const submitDeviceName = async (deviceId: number) => {
-        await onRenameDevice(deviceId, deviceName)
-        setRenamingDeviceId(null)
+
+    const commitNote = (accountId: number) => {
+        if (noteDraft === noteOriginal) { setNoteEditId(null); return }
+        void submitNote(accountId)
     }
-    const confirmDeleteSave = (player: PlayerBrief) => {
+
+    // 账号级「…」菜单: 删除账号(原样确认)
+    const confirmDeleteAccount = (accountId: number) => {
         Modal.confirm({
-            title: `删除存档 ${player.id}？`,
-            content: "删除后无法恢复。",
-            okText: "删除",
+            title: `删除账号 ${accountId} 及所有存档？`,
+            okText: "确认",
             cancelText: "取消",
             okButtonProps: { danger: true },
-            onOk: () => onDeleteSave(player.id),
+            onOk: () => onDeleteAccount(accountId),
         })
     }
 
-    if (selectedAccount) {
+    const moreActionsMenu = (accountId: number) => ({
+        items: [{ key: "delete-account", danger: true, label: "删除账号" }],
+        onClick: ({ key }: { key: string }) => {
+            if (key === "delete-account") confirmDeleteAccount(accountId)
+        },
+    })
+
+    // 存档级「…」菜单: 复制/删除
+    const saveMoreMenu = (account: AccountRow, player: AccountRow["players"][number]) => ({
+        items: [
+            { key: "clone", label: "复制" },
+            // 单存档账号不可删存档(维护者指定): 只能走显式的删除账号
+            {
+                key: "delete",
+                danger: true,
+                label: account.players.length <= 1 ? "删除（账号仅剩这一个存档）" : "删除",
+                disabled: account.players.length <= 1,
+            },
+        ],
+        onClick: ({ key }: { key: string }) => {
+            if (key === "clone") void onCloneSave(player.id, account.id)
+            if (key === "delete") {
+                Modal.confirm({
+                    title: `删除存档 ${player.id}？`,
+                    okText: "确认",
+                    cancelText: "取消",
+                    okButtonProps: { danger: true },
+                    onOk: () => onDeleteSave(player.id),
+                })
+            }
+        },
+    })
+
+    // 账号备注行内编辑（卡头「点击可修改」）: 编辑态规范与桌面一致（维护者指定）—
+    // 点击进入编辑态, input 样式与静态灰字完全一致, 失焦保存(无确定/取消按钮),
+    // Enter 同保存, Escape 放弃
+    const renderNote = (account: AccountRow) => {
+        if (noteEditId !== account.id) {
+            return (
+                <a
+                    className="acc-note acc-note-edit"
+                    title="修改账号备注"
+                    onClick={() => {
+                        setNoteEditId(account.id)
+                        setNoteOriginal(account.adminNote ?? "")
+                        setNoteDraft(account.adminNote ?? "")
+                    }}
+                >
+                    {account.adminNote ?? "添加备注"}
+                    <Pencil size={12} className="acc-note-pencil" />
+                </a>
+            )
+        }
         return (
-            <div className="admin-account-mobile-list">
-                <div className="admin-mobile-view-toolbar">
-                    <Button icon={<ArrowLeft size={16} />} onClick={onBack}>返回账号列表</Button>
-                    <Button type="primary" icon={<Plus size={16} />} onClick={() => onNewSave(selectedAccount.id)}>
-                        新建存档
-                    </Button>
-                </div>
-                {selectedAccount.players.length === 0 ? <Empty description="暂无存档" /> : (
-                    <List
-                        dataSource={selectedAccount.players}
-                        renderItem={player => (
-                            <List.Item
-                                className="admin-mobile-list-item admin-mobile-list-item-clickable"
-                                onClick={() => onOpenPlayer(player.id)}
-                            >
-                                <div className="admin-mobile-list-content">
-                                    {renamingSaveId === player.id ? (
-                                        <div
-                                            className="admin-mobile-inline-editor"
-                                            onClick={event => event.stopPropagation()}
-                                            onKeyDown={event => event.stopPropagation()}
-                                        >
-                                            <Input
-                                                value={saveName}
-                                                maxLength={64}
-                                                onChange={event => setSaveName(event.target.value)}
-                                                onPressEnter={() => submitSaveName(player.id)}
-                                            />
-                                            <Button type="primary" loading={renamePending} onClick={() => submitSaveName(player.id)}>确定</Button>
-                                            <Button onClick={() => setRenamingSaveId(null)}>取消</Button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="admin-mobile-list-heading">
-                                                <Typography.Text strong>{player.name}</Typography.Text>
-                                                <Typography.Text>Rank {player.rank}</Typography.Text>
-                                            </div>
-                                            <Typography.Text type="secondary">存档 #{player.id}</Typography.Text>
-                                            <div className="admin-mobile-tags">
-                                                {player.isDefault && <Tag color="blue">账号默认</Tag>}
-                                                {player.isActive && <Tag color="green">当前活动</Tag>}
-                                            </div>
-                                            <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
-                                                <Button type="primary" icon={<Pencil size={15} />} onClick={() => onOpenPlayer(player.id)}>
-                                                    编辑存档
-                                                </Button>
-                                                <Dropdown
-                                                    trigger={["click"]}
-                                                    menu={{
-                                                        items: [
-                                                            { key: "activate", label: "设为默认并切换", disabled: player.isDefault && player.isActive },
-                                                            { key: "rename", label: "重命名" },
-                                                            { key: "clone", label: "复制" },
-                                                            { key: "delete", label: "删除", danger: true },
-                                                        ],
-                                                        onClick: ({ key, domEvent }) => {
-                                                            domEvent.stopPropagation()
-                                                            if (key === "activate") void onActivateSave(player.id)
-                                                            if (key === "rename") {
-                                                                setRenamingSaveId(player.id)
-                                                                setSaveName(player.name)
-                                                            }
-                                                            if (key === "clone") void onCloneSave(player.id, selectedAccount.id)
-                                                            if (key === "delete") confirmDeleteSave(player)
-                                                        },
-                                                    }}
-                                                >
-                                                    <Button icon={<Ellipsis size={16} />} aria-label={`存档 ${player.name} 的更多操作`} />
-                                                </Dropdown>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </List.Item>
-                        )}
-                    />
-                )}
-            </div>
+            <input
+                className="acc-note-input"
+                autoFocus
+                value={noteDraft}
+                maxLength={64}
+                placeholder="账号备注"
+                onChange={event => setNoteDraft(event.target.value)}
+                onBlur={() => commitNote(account.id)}
+                onKeyDown={event => {
+                    if (event.key === "Enter") commitNote(account.id)
+                    if (event.key === "Escape") setNoteEditId(null)
+                }}
+            />
         )
     }
 
+    // 存档子卡: 头像+名字+#存档id+meta + 右端 当前/切换合体标识; 编辑(占主)+[…](复制/删除)
+    const renderSaveSub = (account: AccountRow, player: AccountRow["players"][number]) => (
+        <div
+            className="save-sub admin-mobile-list-item-clickable"
+            key={player.id}
+            onClick={event => {
+                // 仅点卡片本体(空白)进详情
+                if (event.target !== event.currentTarget) return
+                onOpenPlayer(player.id)
+            }}
+        >
+            <div className="save-head">
+                <FavoriteAvatar characterId={player.favoriteCharacterId} name={player.name} />
+                <span className="save-info">
+                    <span className="save-name-line">
+                        <span className="save-name">{player.name}</span>
+                        <span className="save-id admin-mono">#存档 {player.id}</span>
+                    </span>
+                    <span className="save-meta">Lv {player.rank} · {player.characterCount} 角色</span>
+                </span>
+            </div>
+            <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
+                {/* 当前/切换合体标识在编辑按钮前(维护者指定); 当前=按钮同高的绿徽章 */}
+                {player.isDefault
+                    ? <Button className="save-current-btn" onClick={event => event.stopPropagation()}>当前</Button>
+                    : (
+                        <Button
+                            aria-label="切换存档"
+                            onClick={() => void onActivateSave(player.id)}
+                        >切换</Button>
+                    )}
+                <Button className="act-edit" icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
+                <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
+                    <Button className="admin-more-btn" aria-label="更多操作">…</Button>
+                </Dropdown>
+            </div>
+        </div>
+    )
+
+    // 账号卡（每账号一张真卡片）: 标题行=账号#id+备注+新建存档(右);
+    // 内部=当前存档(头像+名) / 绑定设备 / 存档数N+[…]; 展开平铺存档子卡
     return (
         <div className="admin-account-mobile-list">
-            <List
-                loading={loading}
-                dataSource={[...accounts]}
-                locale={{ emptyText: "暂无账号" }}
-                renderItem={account => (
-                    <List.Item className="admin-mobile-list-item">
-                        <div className="admin-mobile-list-content">
-                            <div className="admin-mobile-list-heading">
-                                <Typography.Text strong>账号 #{account.id}</Typography.Text>
-                                <Typography.Text>{account.saveCount} 个存档</Typography.Text>
+            {loading ? (
+                <Typography.Text type="secondary">加载中...</Typography.Text>
+            ) : accounts.length === 0 ? (
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无账号" />
+            ) : (
+                accounts.map(account => {
+                    const expanded = selectedAccountId === account.id
+                    return (
+                        <div
+                            className="acc-card"
+                            key={account.id}
+                            onClick={event => {
+                                // 仅点卡片本体(空白)展开存档列表
+                                if (event.target !== event.currentTarget) return
+                                onSelectAccount(account.id)
+                            }}
+                        >
+                            <div className="acc-titlebar">
+                                <span className="acc-id-chip admin-mono">账号 #{account.id}</span>
+                                {renderNote(account)}
+                                <span className="acc-actions">
+                                    <Button type="primary" icon={<Plus size={14} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
+                                </span>
                             </div>
-                            <div className="admin-mobile-detail-list">
-                                <div><span>默认存档</span><strong>{account.defaultPlayerName ?? "无"}</strong></div>
-                                <div><span>绑定设备</span><strong>{account.devices.length || "无"}</strong></div>
+                            <div className="acc-identity">
+                                <FavoriteAvatar
+                                    characterId={defaultPlayerAvatarId(account)}
+                                    name={account.defaultPlayerName ?? `#${account.id}`}
+                                />
+                                <span className="acc-identity-info">
+                                    <span className="acc-identity-name">{account.defaultPlayerName ?? "无存档"}</span>
+                                    <span className="acc-identity-meta">
+                                        {account.defaultPlayerId !== null && <span className="admin-mono">#存档 {account.defaultPlayerId} · </span>}
+                                        绑定设备 {account.devices.length === 0 ? "无" : account.devices.map(device => device.deviceId).join(", ")}
+                                    </span>
+                                </span>
                             </div>
-                            {account.devices.length > 0 && (
-                                <Space direction="vertical" size={6} className="admin-mobile-device-list">
-                                    {account.devices.map(device => renamingDeviceId === device.deviceId ? (
-                                        <div className="admin-mobile-inline-editor" key={device.deviceId}>
-                                            <Input
-                                                value={deviceName}
-                                                maxLength={64}
-                                                placeholder={`设备 ${device.deviceId}`}
-                                                onChange={event => setDeviceName(event.target.value)}
-                                                onPressEnter={() => submitDeviceName(device.deviceId)}
-                                            />
-                                            <Button type="primary" loading={renamePending} onClick={() => submitDeviceName(device.deviceId)}>确定</Button>
-                                            <Button onClick={() => setRenamingDeviceId(null)}>取消</Button>
-                                        </div>
-                                    ) : (
-                                        <div className="admin-mobile-device" key={device.deviceId}>
-                                            <Tag>{device.name ?? `设备 ${device.deviceId}`}</Tag>
-                                            <Button
-                                                type="text"
-                                                icon={<Pencil size={14} />}
-                                                aria-label="修改设备名称"
-                                                onClick={() => {
-                                                    setRenamingDeviceId(device.deviceId)
-                                                    setDeviceName(device.name ?? "")
-                                                }}
-                                            />
-                                        </div>
-                                    ))}
-                                </Space>
-                            )}
-                            <div className="admin-mobile-actions">
-                                <Button type="primary" onClick={() => onSelectAccount(account.id)}>管理存档</Button>
-                                <Button icon={<Plus size={15} />} onClick={() => onNewSave(account.id)}>新建存档</Button>
-                                <Popconfirm
-                                    title={`删除账号 ${account.id} 及所有存档？`}
-                                    okText="删除"
-                                    cancelText="取消"
-                                    okButtonProps={{ danger: true }}
-                                    onConfirm={() => onDeleteAccount(account.id)}
+                            <div className="acc-bottom-row">
+                                <Button
+                                    className="acc-count-toggle"
+                                    aria-expanded={expanded}
+                                    onClick={() => onSelectAccount(account.id)}
                                 >
-                                    <Button danger icon={<Trash2 size={15} />} aria-label={`删除账号 ${account.id}`} />
-                                </Popconfirm>
+                                    存档数 {account.players.length} {expanded ? "▴" : "▾"}
+                                </Button>
+                                <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
+                                    <Button className="admin-more-btn" aria-label="更多操作">…</Button>
+                                </Dropdown>
                             </div>
+                            {expanded && (
+                                <div className="acc-save-list">
+                                    {account.players.length === 0
+                                        ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无存档" />
+                                        : account.players.map(player => renderSaveSub(account, player))}
+                                </div>
+                            )}
                         </div>
-                    </List.Item>
-                )}
-            />
+                    )
+                })
+            )}
         </div>
     )
 }

@@ -1,0 +1,260 @@
+/* time page hero: the big virtual clock IS the editor — 年/月/日/时/分/秒 digits are
+   direct inputs wearing the clock type (approved mockup time-v2). Mobile-first:
+   segments stack vertically each with its own unit character, centered; ≥768px they
+   join ONE non-wrapping line and shrink via flex so the clock never overflows. */
+.admin-hero.admin-time-hero {
+  padding: 18px 16px 16px;
+}
+
+.admin-time-hero-in {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-time-hero-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-time-hero-head {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.admin-time-hero-head-em {
+  color: var(--water);
+}
+
+/* 窄屏头部（ADD-1/G3）：左「标题 + 点击数字修改链接」、右「跟随系统时间按钮」两端对齐；
+   细分隔线之后是「时间设置」小节行（左标签、右状态徽章），再进数字编辑区。≥768px 该块
+   整体还原为单行标题、右侧块并入时钟下方 F2 同行（见 .admin-time-hero-sub）。 */
+.admin-time-hero-headrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-time-hero-headblock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-time-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: none;
+}
+
+.admin-time-hero-rule {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* 「时间设置」小节行（G3，维护者 2026-09-29 指定）：flex 两端对齐 — 左标签、右
+   「自定义模拟/跟随系统」状态徽章；整行在 ≥768px 随桌面还原一起隐藏（桌面徽章在 sub 行） */
+.admin-time-hero-section {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.admin-time-hero-clockzone {
+  display: flex;
+  justify-content: center;
+  /* 底部留白加大, 让时间设置区与下方说明拉开突出层级 (维护者 2026-09-29) */
+  padding: 12px 0 18px;
+}
+
+.admin-time-hero-digits {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--ink);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* 与总览页时钟同款: 视宽自适应 + 永不折行 (维护者 2026-09-29 风格统一) */
+  font-size: clamp(18px, 7.4vw, 32px);
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 日期一行 + 时间一行, 居中排布 */
+.admin-time-hero-digits-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0 16px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.admin-time-hero-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-time-hero-seg {
+  min-width: 0;
+  width: 2.6ch;
+  padding: 0 3px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.admin-time-hero-seg-year {
+  width: 4.8ch;
+}
+
+.admin-time-hero-seg:hover {
+  border-color: var(--line);
+}
+
+.admin-time-hero-seg:focus {
+  outline: none;
+  border-color: var(--star);
+  background: var(--stat-bg);
+}
+
+.admin-time-hero-seg:disabled {
+  opacity: 0.6;
+}
+
+.admin-time-hero-unit {
+  color: var(--ink-soft);
+  font-size: 0.5em;
+  font-weight: 400;
+}
+
+/* 窄屏 sub 行（ADD-1）：UTC/Unix 行 + ↑/↓ 提示行，纵向堆叠居中；桌面专用的
+   状态徽章+跟随系统按钮组（submode）在窄屏隐藏（窄屏徽章在「时间设置」小节行） */
+.admin-time-hero-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  text-align: center;
+}
+
+.admin-time-hero-submode {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-time-hero-sub .admin-mono {
+  overflow-wrap: anywhere;
+}
+
+.admin-time-hero-sub .ant-btn {
+  flex: 0 0 auto;
+}
+
+.admin-time-hero-hint {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+@media (min-width: 768px) {
+  .admin-hero.admin-time-hero {
+    padding: 22px 30px 18px;
+  }
+
+  /* 桌面: 时钟永远单行 — flex-shrink 让段收窄而不是撑破容器; 行容器摊平, 字号与总览页时钟一致 */
+  .admin-time-hero-digits {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 0;
+    font-size: 38px;
+  }
+
+  .admin-time-hero-digits-row {
+    display: contents;
+  }
+
+  .admin-time-hero-cell {
+    display: contents;
+  }
+
+  .admin-time-hero-seg {
+    flex: 0 1 86px;
+    width: auto;
+    padding: 0 4px;
+  }
+
+  .admin-time-hero-seg-year {
+    flex: 0 1 118px;
+    width: auto;
+  }
+
+  .admin-time-hero-unit {
+    flex: none;
+    padding: 0 3px;
+  }
+
+  /* 桌面还原 F2 同行方案：标题行回到「标题 · 点击数字修改」单行，右侧块/分隔线/
+     「时间设置」小节标签撤掉，徽章+按钮并入时钟下方 sub 行 */
+  .admin-time-hero-headblock {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .admin-time-hero-side,
+  .admin-time-hero-rule,
+  .admin-time-hero-section {
+    display: none;
+  }
+
+  .admin-time-hero-sub {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px 12px;
+    text-align: left;
+  }
+
+  .admin-time-hero-submode {
+    display: flex;
+  }
+
+  .admin-time-hero-sub .admin-time-hero-hint {
+    order: 1;
+  }
+
+  .admin-time-hero-sub .admin-mono {
+    order: 2;
+  }
+}

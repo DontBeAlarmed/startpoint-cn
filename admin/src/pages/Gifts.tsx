@@ -3,19 +3,17 @@ import {
     Alert,
     Button,
     Card,
-    Popconfirm,
     Space,
-    Table,
-    Tag,
+    Typography,
     message,
 } from "antd"
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { ApiError, apiDelete, apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 import GiftEditor from "../features/gifts/GiftEditor"
-import GiftRedemptions from "../features/gifts/GiftRedemptions"
+import { GiftsCardView } from "../features/gifts/GiftsCardView"
 import type { AdminGiftRow, GiftPage } from "../features/gifts/types"
 
 function invalidateGifts(queryClient: ReturnType<typeof useQueryClient>, id?: number) {
@@ -25,12 +23,17 @@ function invalidateGifts(queryClient: ReturnType<typeof useQueryClient>, id?: nu
     }
 }
 
-function rewardSummary(row: AdminGiftRow): string {
-    return row.rewards.map(reward => {
-        const objectText = reward.typeId === null ? "" : ` #${reward.typeId}`
-        return `${reward.type}${objectText} x${reward.number}`
-    }).join(", ")
+interface CharacterLookupRow {
+    readonly name: string
+    readonly title: string
 }
+
+interface EquipmentLookupRow {
+    readonly name: string
+}
+
+type CharacterLookup = Record<string, CharacterLookupRow>
+type EquipmentLookup = Record<string, EquipmentLookupRow>
 
 export default function Gifts() {
     const queryClient = useQueryClient()
@@ -38,12 +41,31 @@ export default function Gifts() {
     const [pageSize, setPageSize] = useState(20)
     const [editorGift, setEditorGift] = useState<AdminGiftRow | null>(null)
     const [editorOpen, setEditorOpen] = useState(false)
-    const [redemptionGift, setRedemptionGift] = useState<AdminGiftRow | null>(null)
+    // 领取记录内嵌在对应礼包卡内展开(同账号页存档列表模式), 单开互斥
+    const [expandedGiftId, setExpandedGiftId] = useState<number | null>(null)
 
     const gifts = useQuery({
         queryKey: ["adminGifts", page, pageSize],
         queryFn: () => apiGet<GiftPage>(`/api/gifts?page=${page}&pageSize=${pageSize}`),
     })
+
+    // 奖励对象名称化：与邮件/玩家详情共用 /api/lookup 只读接口（queryKey 同 Mail 模式）。
+    const { data: itemLookup = {} } = useQuery({
+        queryKey: ["mailAttachmentLookup", 1],
+        queryFn: () => apiGet<Record<string, string>>("/api/lookup/items"),
+        staleTime: Infinity,
+    })
+    const { data: characterLookup = {} } = useQuery({
+        queryKey: ["mailAttachmentLookup", 5],
+        queryFn: () => apiGet<CharacterLookup>("/api/lookup/characters"),
+        staleTime: Infinity,
+    })
+    const { data: equipmentLookup = {} } = useQuery({
+        queryKey: ["mailAttachmentLookup", 6],
+        queryFn: () => apiGet<EquipmentLookup>("/api/lookup/equipment"),
+        staleTime: Infinity,
+    })
+    const rewardLookups = { items: itemLookup, characters: characterLookup, equipment: equipmentLookup }
 
     const start = useMutation({
         mutationFn: (row: AdminGiftRow) => apiPost<AdminGiftRow>(`/api/gifts/${row.id}/start`, { revision: row.revision }),
@@ -75,7 +97,7 @@ export default function Gifts() {
         mutationFn: (row: AdminGiftRow) => apiDelete<{ ok: boolean }>(`/api/gifts/${row.id}?revision=${row.revision}`),
         onSuccess: (_result, row) => {
             message.success("礼包已删除")
-            setRedemptionGift(current => current?.id === row.id ? null : current)
+            setExpandedGiftId(current => current === row.id ? null : current)
             invalidateGifts(queryClient)
         },
         onError: (error: Error) => {
@@ -85,23 +107,25 @@ export default function Gifts() {
         },
     })
 
+    // 启停进行中的礼包 id: 卡片状态钮按行显示 loading, 防连点触发误报 409
+    const togglingGiftId = start.isPending
+        ? start.variables?.id ?? null
+        : stop.isPending
+            ? stop.variables?.id ?? null
+            : null
+
+    const refresh = () => {
+        queryClient.invalidateQueries({ queryKey: ["adminGifts"] })
+        queryClient.invalidateQueries({ queryKey: ["adminGiftRedemptions"] })
+    }
+
     return (
         <AdminPage
-            eyebrow="OPERATIONS"
+            eyebrow="GIFTS"
             title="礼包"
             description="维护公共兑换 code 和奖励定义；领取记录只用于运营查看。"
-            actions={(
-                <Button
-                    type="primary"
-                    icon={<Plus size={16} />}
-                    onClick={() => {
-                        setEditorGift(null)
-                        setEditorOpen(true)
-                    }}
-                >
-                    新建礼包
-                </Button>
-            )}
+            onRefresh={refresh}
+            refreshing={gifts.isFetching}
         >
             <Space direction="vertical" size="large" className="admin-stack">
                 {gifts.isError && (
@@ -112,124 +136,54 @@ export default function Gifts() {
                         action={<Button onClick={() => gifts.refetch()}>重试</Button>}
                     />
                 )}
-                <Card title="公共礼包" className="admin-table-card">
-                    <Table<AdminGiftRow>
-                        rowKey="id"
+                {/* 2026-10-04 卡片化改造: 双视口统一卡片(同账号页 acc-card 结构),
+                    领取记录内嵌进对应礼包卡展开; 原桌面表格/移动 List 撤销 */}
+                <Card
+                    title="公共礼包"
+                    className="admin-mobile-list-card"
+                    extra={(
+                        <Button
+                            type="primary"
+                            size="small"
+                            icon={<Plus size={14} />}
+                            onClick={() => {
+                                setEditorGift(null)
+                                setEditorOpen(true)
+                            }}
+                        >
+                            新建礼包
+                        </Button>
+                    )}
+                >
+                    <GiftsCardView
+                        rows={gifts.data?.rows ?? []}
                         loading={gifts.isLoading}
-                        dataSource={gifts.data?.rows ?? []}
-                        scroll={{ x: "max-content" }}
-                        locale={{ emptyText: "暂无礼包" }}
-                        pagination={{
-                            current: page,
-                            pageSize,
-                            total: gifts.data?.totalCount ?? 0,
-                            showSizeChanger: true,
-                            onChange: (nextPage, nextPageSize) => {
-                                setPage(nextPage)
-                                setPageSize(nextPageSize)
-                            },
+                        page={page}
+                        pageSize={pageSize}
+                        totalCount={gifts.data?.totalCount ?? 0}
+                        rewardLookups={rewardLookups}
+                        expandedGiftId={expandedGiftId}
+                        onToggleExpand={id => setExpandedGiftId(current => current === id ? null : id)}
+                        onPageChange={(nextPage, nextPageSize) => {
+                            setPage(nextPage)
+                            setPageSize(nextPageSize)
                         }}
-                        columns={[
-                            { title: "Code", dataIndex: "code", width: 180 },
-                            {
-                                title: "状态",
-                                dataIndex: "status",
-                                width: 90,
-                                render: (_, row) => (
-                                    <Tag color={row.status === "active" ? "green" : "default"}>
-                                        {row.status === "active" ? "启用" : "停止"}
-                                    </Tag>
-                                ),
-                            },
-                            {
-                                title: "奖励",
-                                dataIndex: "rewards",
-                                width: 280,
-                                render: (_, row) => rewardSummary(row),
-                            },
-                            { title: "奖励版本", dataIndex: "rewardRevision", width: 100 },
-                            { title: "版本", dataIndex: "revision", width: 80 },
-                            { title: "已领取", dataIndex: "redemptionCount", width: 90 },
-                            {
-                                title: "更新时间",
-                                dataIndex: "updatedAt",
-                                width: 190,
-                                render: value => new Date(value).toLocaleString("zh-CN"),
-                            },
-                            {
-                                title: "操作",
-                                fixed: "right",
-                                width: 250,
-                                render: (_, row) => {
-                                    if (row.status === "stopped") return (
-                                        <Space>
-                                            <Button
-                                                size="small"
-                                                loading={start.isPending && start.variables?.id === row.id}
-                                                onClick={() => start.mutate(row)}
-                                            >
-                                                启动
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                icon={<Pencil size={15} />}
-                                                onClick={() => {
-                                                    setEditorGift(row)
-                                                    setEditorOpen(true)
-                                                }}
-                                            >
-                                                编辑
-                                            </Button>
-                                            <Popconfirm
-                                                title="删除这个礼包？"
-                                                description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
-                                                okText="删除"
-                                                cancelText="取消"
-                                                okButtonProps={{ danger: true }}
-                                                onConfirm={() => remove.mutate(row)}
-                                            >
-                                                <Button danger size="small" icon={<Trash2 size={15} />}>
-                                                    删除
-                                                </Button>
-                                            </Popconfirm>
-                                            <Button
-                                                size="small"
-                                                icon={<Eye size={15} />}
-                                                onClick={() => setRedemptionGift(row)}
-                                            >
-                                                记录
-                                            </Button>
-                                        </Space>
-                                    )
-                                    return (
-                                        <Space>
-                                            <Button
-                                                size="small"
-                                                loading={stop.isPending && stop.variables?.id === row.id}
-                                                onClick={() => stop.mutate(row)}
-                                            >
-                                                {row.status === "active" ? "停止" : "启动"}
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                icon={<Eye size={15} />}
-                                                onClick={() => setRedemptionGift(row)}
-                                            >
-                                                记录
-                                            </Button>
-                                        </Space>
-                                    )
-                                },
-                            },
-                        ]}
+                        onStart={row => start.mutateAsync(row)}
+                        onStop={row => stop.mutateAsync(row)}
+                        onEdit={row => {
+                            setEditorGift(row)
+                            setEditorOpen(true)
+                        }}
+                        onDelete={row => remove.mutateAsync(row)}
+                        togglingGiftId={togglingGiftId}
                     />
                 </Card>
-                {redemptionGift && (
-                    <GiftRedemptions
-                        gift={redemptionGift}
-                        onClose={() => setRedemptionGift(null)}
-                    />
-                )}
+                <div className="admin-page-note admin-page-note-footer">
+                    <Typography.Text strong>礼包维护须知</Typography.Text>
+                    <Typography.Text type="secondary">
+                        删除礼包不可恢复，会清除全部领取记录，同 code 重建后可重新领取；生效中的礼包编辑/删除会置灰并提示需先停用。
+                    </Typography.Text>
+                </div>
             </Space>
             <GiftEditor
                 gift={editorGift}

@@ -1,0 +1,26 @@
+/* misc: shared form-section tail + AntD modal skin (kept in source order) */
+/* forms: sections are flat 「标题行 + 内容区」 groups — the same voice as .admin-dash-section,
+   the card/modal border is the only strong separator, sections rely on whitespace alone */
+.admin-form-section {
+  min-width: 0;
+}
+
+.admin-form-section + .admin-form-section {
+  margin-top: 20px;
+}
+
+.admin-form-section > .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+/* modals share the bordered panel voice of .ant-card; modals portal to body, so the rule is unscoped */
+.ant-modal .ant-modal-content {
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+/* the modal header never carries its own surface — the content background shows through */
+.ant-modal .ant-modal-header {
+  background: transparent;
+}

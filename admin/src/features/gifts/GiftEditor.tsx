@@ -1,9 +1,10 @@
 import { useEffect } from "react"
 import { Button, Form, Input, InputNumber, Modal, Select, Space, message } from "antd"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 
 import { apiGet, apiPatch, apiPost } from "../../api/client"
+import { giftRewardChipText } from "./rewardDisplay"
 import {
     GIFT_REWARD_TYPES,
     type AdminGiftRow,
@@ -130,116 +131,135 @@ export default function GiftEditor({ gift, open, onClose, onSaved }: GiftEditorP
             okButtonProps={{ disabled: isActive }}
             onCancel={onClose}
             onOk={() => form.submit()}
-            width={880}
+            width="min(92vw, 880px)"
             destroyOnClose
         >
             <Form form={form} layout="vertical" disabled={isActive} onFinish={values => save.mutate(values)}>
-                <Form.Item
-                    name="code"
-                    label="礼包 code"
-                    required
-                    rules={[{ required: true, message: "请输入礼包 code" }]}
-                >
-                    <Input maxLength={20} value={code} autoComplete="off" />
-                </Form.Item>
-                <Form.Item name="note" label="备注">
-                    <Input.TextArea rows={3} maxLength={512} />
-                </Form.Item>
+                <div className="admin-form-section">
+                    <div className="admin-form-section-title">礼包信息</div>
+                    <Form.Item
+                        name="code"
+                        label="礼包 code"
+                        required
+                        rules={[{ required: true, message: "请输入礼包 code" }]}
+                    >
+                        <Input maxLength={20} value={code} autoComplete="off" />
+                    </Form.Item>
+                    <Form.Item name="note" label="备注">
+                        <Input.TextArea rows={3} maxLength={512} />
+                    </Form.Item>
+                </div>
 
-                <Form.List name="rewards"
-                    rules={[{
-                        validator: (_, value) => {
-                            if (!value || value.length < 1) {
-                                return Promise.reject(new Error("至少需要 1 条奖励"))
-                            }
-                            if (value.length > 20) {
-                                return Promise.reject(new Error("最多只能添加 20 条奖励"))
-                            }
-                            return Promise.resolve()
-                        },
-                    }]}
-                >
-                    {(fields, { add, remove }, { errors }) => (
-                        <>
-                            {fields.map(field => {
-                                const reward = rewards?.[field.name]
-                                const type = reward?.type
-                                const showTypeId = requiresTypeId(type)
-                                return (
-                                    <Space key={field.key} align="baseline" className="gift-reward-row">
-                                        <Form.Item
-                                            name={[field.name, "type"]}
-                                            label="奖励类型"
-                                            rules={[{ required: true, message: "请选择奖励类型" }]}
-                                        >
-                                            <Select
-                                                options={GIFT_REWARD_TYPES.map(({ value, label }) => ({ value, label }))}
-                                                onChange={next => changeRewardType(field.name, next)}
-                                                style={{ width: 150 }}
-                                            />
-                                        </Form.Item>
-                                        {showTypeId && (
+                <div className="admin-form-section">
+                    <div className="admin-form-section-title">奖励</div>
+                    <Form.List name="rewards"
+                        rules={[{
+                            validator: (_, value) => {
+                                if (!value || value.length < 1) {
+                                    return Promise.reject(new Error("至少需要 1 条奖励"))
+                                }
+                                if (value.length > 20) {
+                                    return Promise.reject(new Error("最多只能添加 20 条奖励"))
+                                }
+                                return Promise.resolve()
+                            },
+                        }]}
+                    >
+                        {(fields, { add, remove }, { errors }) => (
+                            <>
+                                {fields.map(field => {
+                                    const reward = rewards?.[field.name]
+                                    const type = reward?.type
+                                    const showTypeId = requiresTypeId(type)
+                                    const chipText = reward
+                                        ? giftRewardChipText(
+                                            { type: reward.type, typeId: reward.typeId ?? null, number: reward.number },
+                                            { items: itemLookup, characters: characterLookup, equipment: equipmentLookup },
+                                        )
+                                        : "-"
+                                    return (
+                                        <div key={field.key} className="gift-chip-row">
+                                            <div className="gift-chip-head">
+                                                <span className="gift-chip-text">{chipText}</span>
+                                                <Button
+                                                    type="text"
+                                                    danger
+                                                    size="small"
+                                                    disabled={fields.length <= 1}
+                                                    onClick={() => remove(field.name)}
+                                                >
+                                                    ✕ 移除
+                                                </Button>
+                                            </div>
+                                            <Space align="baseline" className="gift-reward-row">
                                             <Form.Item
-                                                name={[field.name, "typeId"]}
-                                                label="奖励对象"
-                                                rules={[{ required: true, message: "请选择奖励对象" }]}
+                                                name={[field.name, "type"]}
+                                                label="奖励类型"
+                                                rules={[{ required: true, message: "请选择奖励类型" }]}
                                             >
                                                 <Select
-                                                    showSearch
-                                                    optionFilterProp="label"
-                                                    options={type === 1
-                                                        ? Object.entries(itemLookup).map(([id, name]) => ({
-                                                            value: Number(id),
-                                                            label: `${name} #${id}`,
-                                                        }))
-                                                        : type === 5
-                                                            ? Object.entries(characterLookup).map(([id, row]) => ({
-                                                                value: Number(id),
-                                                                label: `${row.name} ${row.title} #${id}`,
-                                                            }))
-                                                            : Object.entries(equipmentLookup).map(([id, row]) => ({
-                                                                value: Number(id),
-                                                                label: `${row.name} #${id}`,
-                                                            }))}
-                                                    placeholder="请选择"
-                                                    style={{ width: 240 }}
+                                                    options={GIFT_REWARD_TYPES.map(({ value, label }) => ({ value, label }))}
+                                                    onChange={next => changeRewardType(field.name, next)}
+                                                    style={{ width: 150 }}
                                                 />
                                             </Form.Item>
-                                        )}
-                                        <Form.Item
-                                            name={[field.name, "number"]}
-                                            label="数量"
-                                            rules={[{ required: true, message: "请输入数量" }]}
-                                        >
-                                            <InputNumber
-                                                min={1}
-                                                max={type === 5 || type === 6 ? 1 : 2147483647}
-                                                precision={0}
-                                                style={{ width: 110 }}
-                                            />
-                                        </Form.Item>
-                                        <Button
-                                            type="text"
-                                            danger
-                                            icon={<Trash2 size={15} />}
-                                            disabled={fields.length <= 1}
-                                            onClick={() => remove(field.name)}
-                                            aria-label="移除奖励"
-                                        />
-                                    </Space>
-                                )
-                            })}
-                            <Form.ErrorList errors={errors} />
-                            <Button
-                                icon={<Plus size={15} />}
-                                disabled={fields.length >= 20}
-                                onClick={() => add({ type: 8, typeId: null, number: 100 })}
-                            >
-                                添加奖励
-                            </Button>
-                        </>
-                    )}
-                </Form.List>
+                                            {showTypeId && (
+                                                <Form.Item
+                                                    name={[field.name, "typeId"]}
+                                                    label="奖励对象"
+                                                    rules={[{ required: true, message: "请选择奖励对象" }]}
+                                                >
+                                                    <Select
+                                                        showSearch
+                                                        optionFilterProp="label"
+                                                        options={type === 1
+                                                            ? Object.entries(itemLookup).map(([id, name]) => ({
+                                                                value: Number(id),
+                                                                label: `${name} #${id}`,
+                                                            }))
+                                                            : type === 5
+                                                                ? Object.entries(characterLookup).map(([id, row]) => ({
+                                                                    value: Number(id),
+                                                                    label: `${row.name} ${row.title} #${id}`,
+                                                                }))
+                                                                : Object.entries(equipmentLookup).map(([id, row]) => ({
+                                                                    value: Number(id),
+                                                                    label: `${row.name} #${id}`,
+                                                                }))}
+                                                        placeholder="请选择"
+                                                        style={{ width: 240 }}
+                                                    />
+                                                </Form.Item>
+                                            )}
+                                            <Form.Item
+                                                name={[field.name, "number"]}
+                                                label="数量"
+                                                rules={[{ required: true, message: "请输入数量" }]}
+                                            >
+                                                <InputNumber
+                                                    min={1}
+                                                    max={type === 5 || type === 6 ? 1 : 2147483647}
+                                                    precision={0}
+                                                    style={{ width: 110 }}
+                                                />
+                                            </Form.Item>
+                                            </Space>
+                                        </div>
+                                    )
+                                })}
+                                <Form.ErrorList errors={errors} />
+                                <Button
+                                    icon={<Plus size={15} />}
+                                    className="gift-add-reward"
+                                    disabled={fields.length >= 20}
+                                    onClick={() => add({ type: 8, typeId: null, number: 100 })}
+                                >
+                                    添加奖励
+                                </Button>
+                            </>
+                        )}
+                    </Form.List>
+                </div>
             </Form>
         </Modal>
     )

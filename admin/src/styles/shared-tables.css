@@ -1,0 +1,36 @@
+/* shared table card / action row patterns */
+.admin-table-card .ant-card-body,
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table-wrap .ant-table-wrapper {
+  min-width: 100%;
+}
+
+.admin-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-action-row .ant-btn {
+  flex: 0 0 auto;
+}
+
+.admin-clickable-table-row {
+  cursor: pointer;
+}
+
+/* 移动优先: 窄屏收紧表格 cell 内边距, 多列数据表可读面积最大化;
+   桌面在 min-width 放宽回舒适值 (维护者 2026-09-30 反馈: 390 下前方内容被挤压) */
+.admin-table-card .ant-table-cell {
+  padding-inline: 8px;
+}
+
+@media (min-width: 768px) {
+  .admin-table-card .ant-table-cell {
+    padding-inline: 16px;
+  }
+}

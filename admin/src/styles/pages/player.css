@@ -1,0 +1,324 @@
+/* player detail: edit/read Descriptions share the muted label voice of the old inline editors */
+.admin-detail-descriptions .ant-descriptions-item-label {
+  color: var(--ink-soft);
+}
+
+/* player detail: labeled input grid cells for the resource/account editors */
+.admin-edit-grid-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-edit-grid-label {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* player detail: 存档身份 hero (approved mockup player-v2) — 顶行(当前存档徽章居左 /
+   账号 id 居右) + 大名行 + 更新时间行, 导入/导出并排居右。Mobile-first。 */
+.admin-hero-id {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+/* 顶行: 归一「当前存档」徽章居左, 账号 id 居右(维护者指定); 徽章缺席时账号 id 仍居右 */
+.admin-hero-topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-hero-account {
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.admin-hero-id-name {
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.admin-hero-id-pid {
+  color: var(--ink-soft);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-hero-id-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 6px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* each badge/信息段 is an unbreakable unit; the row itself wraps as whole units */
+.admin-hero-id-info > span {
+  white-space: nowrap;
+}
+
+.admin-hero-ops {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 9px;
+  flex: none;
+}
+
+/* 改名行内编辑(与账号备注同规范): 原生无边框 input, 视觉即原粗体存档名, 单行不换行 */
+.admin-hero-rename-input {
+  width: min(420px, 100%);
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+@media (min-width: 768px) {
+  .admin-hero-rename-input {
+    font-size: 30px;
+  }
+}
+
+.admin-hero-ops .ant-btn {
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .admin-hero-id-name {
+    font-size: 30px;
+  }
+
+  .admin-hero-id-pid {
+    font-size: 16px;
+  }
+
+  .admin-hero-id-info {
+    flex-wrap: nowrap;
+  }
+}
+
+/* player detail: 资源编辑 left-right icon input tiles (approved mockup player-v2) —
+   fixed 52px icon+label column on the left, centered numeric input + per-field save
+   affordance on the right. Mobile-first: one tile per row below 768px, two above. */
+.admin-res-card .ant-card-head-wrapper {
+  flex-wrap: wrap;
+}
+
+.admin-res-card .ant-card-extra {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
+.admin-card-note {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.admin-res-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+  min-width: 0;
+}
+
+.admin-res-tile {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 10px 13px;
+  background: var(--stat-bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.admin-res-ic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  width: 52px;
+}
+
+.admin-res-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  stroke: var(--star-deep);
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+html[data-theme="dark"] .admin-res-icon {
+  stroke: var(--star);
+}
+
+.admin-res-lv {
+  color: var(--thunder);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme="dark"] .admin-res-lv {
+  color: var(--star);
+}
+
+.admin-res-label {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.admin-res-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-res-control .ant-input-number {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.admin-res-control .ant-input-number-input {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (min-width: 768px) {
+  .admin-res-card .ant-card-head-wrapper {
+    flex-wrap: nowrap;
+  }
+
+  .admin-res-card .ant-card-extra {
+    flex-basis: auto;
+    margin-left: auto;
+  }
+
+  .admin-res-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+/* player detail: 危险操作 toolbar parked at the page bottom (approved mockup player-v2
+   maintainer correction) — strong-bordered panel strip shared with .toolbar voice.
+   Two rows: label + 兜底说明, then controls (3x加速 Switch / 教程步骤 / 5 个回退按钮). */
+.admin-danger-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  padding: 11px 14px;
+  background: var(--panel);
+  border: 2px solid var(--line-strong);
+  border-radius: 14px;
+}
+
+.admin-danger-bar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+
+.admin-danger-bar-label {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.admin-danger-bar-desc {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-danger-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-danger-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-danger-control-label {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.admin-danger-control-hint {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.admin-danger-control .ant-input-number {
+  width: 90px;
+}
+
+/* player detail: tab tables read fully centered (approved mockup player-v2 全页签拟真:
+   th/td text-align center). Scoped to this page's tabs card only — every other admin
+   table keeps its left-align reading semantics. */
+.admin-player-tabs .ant-table th,
+.admin-player-tabs .ant-table td {
+  text-align: center;
+}
+
+/* player detail: 角色预览表头像列 — 复用 character_avatar 端点(immutable 内容寻址),
+   onError 加 broken 类隐藏, 单元格留空 */
+.admin-char-avatar-cell {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  object-position: top;
+}
+
+.admin-char-avatar-cell-broken {
+  display: none;
+}

@@ -1,0 +1,96 @@
+/* mail page: type group + deep polish (审查稿 five-pages-review #p-mail) */
+.admin-mail-type-group {
+  display: grid;
+  /* min(120px, 100%) 防止单列下 radio 组溢出视口(360px 实测) */
+  grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.admin-mail-type-group .admin-mail-type-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  height: auto;
+  padding: 6px 10px;
+  border-inline-start-width: 1px;
+  border-radius: 6px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+}
+
+.admin-mail-type-group .admin-mail-type-option::before {
+  display: none !important;
+}
+
+/* ── mail deep polish ───────────────────────────────────────────────────────
+   attachment summary chip: 所见即所发 — the same quiet chip voice as the
+   approved review mockup (star square + 类型·对象·数量). The two-column
+   mail grid is mobile-first: form above history on narrow screens, form
+   left / history right at ≥768px (审查稿 five-pages-review #p-mail). */
+.admin-attach-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--th-bg);
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+.admin-attach-chip-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--star);
+  opacity: .85;
+}
+
+.admin-attach-summary-hint {
+  font-size: 12px;
+}
+
+/* 维护者 2026-09-30: 群发记录不与发送表单并列, 保持上下结构 (仅保留纵向 stack) */
+.admin-mail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.admin-mail-grid-col {
+  min-width: 0;
+}
+
+/* mail history expanded row: quiet snapshot panel + 复制重发 (prefill only,
+   never auto-send) */
+.admin-mail-history-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.admin-mail-history-detail .ant-descriptions {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.admin-mail-history-detail .ant-btn {
+  flex: none;
+}

@@ -13,6 +13,7 @@ import getDatabase, {
 } from "./data";
 import { ServerTimeService } from "./runtime/server-time/service";
 import { getContentSnapshot, initializeContentSnapshot } from "./content/runtime/content-snapshot";
+import { resolveCnCdnRoot } from "./content/paths";
 import { createContentLifecycleDependencies } from "./modes/cn-lifecycle";
 import { listLoadedModeIdentities } from "./modes/registry";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
@@ -297,6 +298,15 @@ fastify.register(indexWebApiPlugin, {
     getMultiManagementService: () => multiManagementService,
     getRuntimeConfig: () => startupRuntimeConfig,
     serverTimeService,
+    // Lazy: CDN_DIR may resolve to a directory that only exists under the
+    // local asset mode; avatar requests degrade to 404 when it is absent.
+    getAvatarCdnRoot: () => {
+        try {
+            return resolveCnCdnRoot(process.env.CDN_DIR ?? ".cdn", projectRoot);
+        } catch {
+            return null;
+        }
+    },
 });
 fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 

@@ -1,0 +1,66 @@
+/* ── settings deep polish ───────────────────────────────────────────────────
+   unsaved dot + saved flash live beside the card titles (审查稿 #p-settings:
+   ● 未保存 / 已保存 ✓ 2s); the default save card shows the template save's own
+   stats (等级/角色数/装备数) as three quiet stat tiles. Mobile-first: the
+   3-col tile grid also fits narrow screens (tiles are small). */
+.admin-settings-card-title {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-dirty-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--thunder);
+}
+
+.admin-saved-flash {
+  flex: none;
+  margin-left: 8px;
+  color: var(--wind);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-default-save-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-width: 420px;
+  margin-bottom: 4px;
+}
+
+.admin-default-save-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--th-bg);
+  text-align: center;
+}
+
+.admin-default-save-stat-label {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.admin-default-save-stat-value {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 设置卡片: 标题永不换行, 超长省略号截断 (维护者 2026-09-30: 状态徽章已移出标题区) */
+.admin-stack .ant-card-head-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

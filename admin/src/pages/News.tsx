@@ -3,25 +3,30 @@ import {
     Alert,
     Button,
     Card,
-    Popconfirm,
     Space,
-    Switch,
-    Table,
-    Tag,
+    Typography,
     message,
 } from "antd"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { ApiError, apiDelete, apiGet, apiPatch } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 import NewsEditor from "../features/news/NewsEditor"
+import { NewsCardView } from "../features/news/NewsCardView"
 import type { AdminNewsRow, NewsPage } from "../features/news/types"
 
 const CATEGORY_LABELS: Record<AdminNewsRow["category"], string> = {
     1: "主题",
     2: "活动",
     3: "问题",
+}
+
+// 分类语义色（审查稿 #p-news：主题=水蓝 / 活动=风绿 / 问题=雷黄）。
+const CATEGORY_BADGE_CLASS: Record<AdminNewsRow["category"], string> = {
+    1: "admin-badge-info",
+    2: "admin-badge-ok",
+    3: "admin-badge-warn",
 }
 
 function invalidateNews(queryClient: ReturnType<typeof useQueryClient>, id?: number) {
@@ -85,16 +90,17 @@ export default function News() {
         setEditorOpen(true)
     }
 
+    const refresh = () => {
+        queryClient.invalidateQueries({ queryKey: ["adminNews"] })
+    }
+
     return (
         <AdminPage
-            eyebrow="OPERATIONS"
+            eyebrow="NEWS"
             title="公告"
             description="维护客户端的主题公告、活动通知和问题公告；系统类别暂缓。"
-            actions={(
-                <Button type="primary" icon={<Plus size={16} />} onClick={openCreate}>
-                    新建公告
-                </Button>
-            )}
+            onRefresh={refresh}
+            refreshing={news.isFetching}
         >
             <Space direction="vertical" size="large" className="admin-stack">
                 {news.isError && (
@@ -105,85 +111,41 @@ export default function News() {
                         action={<Button onClick={() => news.refetch()}>重试</Button>}
                     />
                 )}
-                <Card title="普通公告" className="admin-table-card">
-                    <Table<AdminNewsRow>
-                        rowKey="id"
+                {/* 2026-10-04 卡片化改造: 双视口统一卡片(同礼包/账号页 acc-card 结构),
+                    启用标识收敛到启停按钮; 原桌面表格/移动 List 撤销 */}
+                <Card
+                    title="普通公告"
+                    className="admin-mobile-list-card"
+                    extra={(
+                        <Button type="primary" size="small" icon={<Plus size={14} />} onClick={openCreate}>
+                            新建公告
+                        </Button>
+                    )}
+                >
+                    <NewsCardView
+                        rows={news.data?.rows ?? []}
                         loading={news.isLoading}
-                        dataSource={news.data?.rows ?? []}
-                        scroll={{ x: "max-content" }}
-                        locale={{ emptyText: "暂无公告" }}
-                        pagination={{
-                            current: page,
-                            pageSize,
-                            total: news.data?.totalCount ?? 0,
-                            showSizeChanger: true,
-                            onChange: (nextPage, nextPageSize) => {
-                                setPage(nextPage)
-                                setPageSize(nextPageSize)
-                            },
+                        page={page}
+                        pageSize={pageSize}
+                        totalCount={news.data?.totalCount ?? 0}
+                        categoryLabels={CATEGORY_LABELS}
+                        categoryBadgeClass={CATEGORY_BADGE_CLASS}
+                        onPageChange={(nextPage, nextPageSize) => {
+                            setPage(nextPage)
+                            setPageSize(nextPageSize)
                         }}
-                        columns={[
-                            { title: "标题", dataIndex: "title", width: 260 },
-                            {
-                                title: "分类",
-                                dataIndex: "category",
-                                width: 100,
-                                render: (category: AdminNewsRow["category"]) => (
-                                    <Tag>{CATEGORY_LABELS[category]}</Tag>
-                                ),
-                            },
-                            {
-                                title: "发布时间",
-                                dataIndex: "publishedAtReal",
-                                width: 190,
-                                render: value => new Date(value).toLocaleString("zh-CN"),
-                            },
-                            { title: "标签", dataIndex: "label", width: 80, align: "right" },
-                            { title: "缩略图", dataIndex: "thumbnail", width: 90, align: "right" },
-                            {
-                                title: "状态",
-                                width: 110,
-                                render: (_, row) => (
-                                    <Switch
-                                        checked={row.enabled}
-                                        checkedChildren="启用"
-                                        unCheckedChildren="停用"
-                                        loading={toggle.isPending && toggle.variables?.id === row.id}
-                                        onChange={() => toggle.mutate(row)}
-                                    />
-                                ),
-                            },
-                            {
-                                title: "操作",
-                                fixed: "right",
-                                width: 180,
-                                render: (_, row) => (
-                                    <Space>
-                                        <Button
-                                            size="small"
-                                            icon={<Pencil size={15} />}
-                                            onClick={() => openEdit(row)}
-                                        >
-                                            编辑
-                                        </Button>
-                                        <Popconfirm
-                                            title="删除这条公告？"
-                                            description="此操作会物理删除公告，且无法恢复。"
-                                            okText="删除"
-                                            cancelText="取消"
-                                            okButtonProps={{ danger: true }}
-                                            onConfirm={() => remove.mutate(row)}
-                                        >
-                                            <Button danger size="small" icon={<Trash2 size={15} />}>
-                                                删除
-                                            </Button>
-                                        </Popconfirm>
-                                    </Space>
-                                ),
-                            },
-                        ]}
+                        onEdit={openEdit}
+                        onDelete={row => remove.mutateAsync(row)}
+                        onToggle={row => toggle.mutateAsync(row)}
+                        togglingId={toggle.isPending ? toggle.variables?.id ?? null : null}
                     />
                 </Card>
+                <div className="admin-page-note admin-page-note-footer">
+                    <Typography.Text strong>公告维护须知</Typography.Text>
+                    <Typography.Text type="secondary">
+                        删除公告为物理删除且无法恢复；公告内容使用客户端 RichText 标签，不支持属性和外部链接。
+                    </Typography.Text>
+                </div>
             </Space>
             <NewsEditor
                 news={editorNews}

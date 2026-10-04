@@ -1,5 +1,5 @@
 import { ReactNode, useMemo, useState } from "react"
-import { Card, Form, Select, InputNumber, Input, Button, message, Alert, Typography, Radio, Modal, Descriptions, Table, Tag, Space } from "antd"
+import { Card, Form, Select, InputNumber, Input, Button, message, Alert, Typography, Radio, Modal, Descriptions, Table, Space } from "antd"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
@@ -138,6 +138,7 @@ export default function Mail() {
     const [form] = Form.useForm()
     const type = Form.useWatch("type", form)
     const typeId = Form.useWatch("type_id", form)
+    const number = Form.useWatch("number", form)
     const targetMode: TargetMode = Form.useWatch("targetMode", form) ?? "all"
     const needsId = requiresTypeId(type)
     const attachmentEndpoint = lookupEndpoint(type)
@@ -145,9 +146,9 @@ export default function Mail() {
     // 预览确认：暂存待发送的表单值 + 计算好的对象描述/角色数
     const [confirm, setConfirm] = useState<null | { values: any; count: number; targetText: string; attachmentText: string }>(null)
 
-    const { data: accounts = [] } = useQuery({ queryKey: ["accounts"], queryFn: () => apiGet<AccountRow[]>("/api/server/accounts") })
-    const { data: players = [] } = useQuery({ queryKey: ["players"], queryFn: () => apiGet<PlayerBrief[]>("/api/player") })
-    const { data: history = [] } = useQuery({ queryKey: ["mailHistory"], queryFn: () => apiGet<MailRecord[]>("/api/mail/history") })
+    const { data: accounts = [], isFetching: accountsFetching } = useQuery({ queryKey: ["accounts"], queryFn: () => apiGet<AccountRow[]>("/api/server/accounts") })
+    const { data: players = [], isFetching: playersFetching } = useQuery({ queryKey: ["players"], queryFn: () => apiGet<PlayerBrief[]>("/api/player") })
+    const { data: history = [], isFetching: historyFetching } = useQuery({ queryKey: ["mailHistory"], queryFn: () => apiGet<MailRecord[]>("/api/mail/history") })
     const { data: attachmentLookup, isLoading: attachmentLoading, isError: attachmentError } = useQuery({
         queryKey: ["mailAttachmentLookup", type],
         queryFn: () => apiGet<AttachmentLookup>(attachmentEndpoint!),
@@ -167,6 +168,32 @@ export default function Mail() {
     )
 
     const totalSaves = accounts.reduce((n, a) => n + a.saveCount, 0)
+
+    // 附件摘要：发送前所见即所发（类型 + 对象名 + 数量）
+    const attachmentSummary = type == null
+        ? null
+        : `${TYPE_LABEL[type] ?? type} · ${attachmentTitle(type, typeId, attachmentLookup) || "未选对象"} × ${number ?? 1}`
+
+    // 复制重发：按历史记录预填当前表单，不自动发送
+    const prefillFromHistory = (record: MailRecord) => {
+        form.setFieldsValue({
+            type: record.type,
+            type_id: requiresTypeId(record.type) ? record.typeId ?? undefined : undefined,
+            number: record.number,
+            subject: record.subject ?? undefined,
+            expirationDays: record.expirationDays ?? 31,
+        })
+        form.validateFields(["type", "type_id", "number", "subject", "expirationDays"]).catch(() => {})
+        message.info("已按该条记录预填表单，请确认后手动发送")
+    }
+
+    const refresh = () => {
+        qc.invalidateQueries({ queryKey: ["accounts"] })
+        qc.invalidateQueries({ queryKey: ["players"] })
+        qc.invalidateQueries({ queryKey: ["mailHistory"] })
+        qc.invalidateQueries({ queryKey: ["mailAttachmentLookup"] })
+        qc.invalidateQueries({ queryKey: ["itemMaxCounts"] })
+    }
 
     const send = useMutation({
         mutationFn: (v: any) => apiPost<SendResult>("/api/mail/send", {
@@ -217,187 +244,236 @@ export default function Mail() {
             eyebrow="MAIL"
             title="邮件"
             description="按全体、账号或单个存档发送附件邮件。高风险发送动作会先展示目标和附件摘要。"
+            onRefresh={refresh}
+            refreshing={accountsFetching || playersFetching || historyFetching}
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            <Card title="发送邮件" className="admin-form-panel">
+            <div className="admin-mail-grid">
+                <div className="admin-mail-grid-col">
+                    <Card title="发送邮件">
                 <Alert type={targetMode === "all" ? "warning" : "info"} showIcon style={{ marginBottom: 16 }}
                     message={
                         targetMode === "all" ? `将向全体 ${totalSaves} 个存档发送同一封邮件`
                             : targetMode === "account" ? "将向所选账号下的所有存档发送邮件"
                                 : "将向所选的单个存档发送邮件"
                     } />
+                {attachmentSummary && (
+                    <div className="admin-attach-summary">
+                        <span className="admin-attach-chip">
+                            <span className="admin-attach-chip-dot" />
+                            附件摘要：{attachmentSummary}
+                        </span>
+                        <Text type="secondary" className="admin-attach-summary-hint">所见即所发</Text>
+                    </div>
+                )}
                 <Form form={form} layout="vertical" onFinish={openConfirm} initialValues={{ number: 1, expirationDays: 31, targetMode: "all" }}>
-                    <Form.Item name="targetMode" label="发送对象">
-                        <Radio.Group optionType="button" buttonStyle="solid">
-                            <Radio.Button value="all">全体存档</Radio.Button>
-                            <Radio.Button value="account">指定账号</Radio.Button>
-                            <Radio.Button value="player">指定存档</Radio.Button>
-                        </Radio.Group>
-                    </Form.Item>
-
-                    {targetMode === "account" && (
-                        <Form.Item name="accountId" label="选择账号" rules={[{ required: true, message: "请选择账号" }]}>
-                            <Select
-                                showSearch
-                                placeholder="选择账号"
-                                optionFilterProp="label"
-                                options={accounts.map(a => ({
-                                    value: a.id,
-                                    label: `账号 #${a.id}（${a.saveCount} 个存档${a.defaultPlayerName ? `，生效：${a.defaultPlayerName}` : ""}）`,
-                                }))}
-                                notFoundContent="暂无账号"
-                            />
+                    <div className="admin-form-section">
+                        <div className="admin-form-section-title">收件人</div>
+                        <Form.Item name="targetMode" label="发送对象">
+                            <Radio.Group optionType="button" buttonStyle="solid">
+                                <Radio.Button value="all">全体存档</Radio.Button>
+                                <Radio.Button value="account">指定账号</Radio.Button>
+                                <Radio.Button value="player">指定存档</Radio.Button>
+                            </Radio.Group>
                         </Form.Item>
-                    )}
 
-                    {targetMode === "player" && (
-                        <Form.Item name="playerId" label="选择存档" rules={[{ required: true, message: "请选择存档" }]}>
-                            <Select
-                                showSearch
-                                placeholder="选择存档"
-                                optionFilterProp="label"
-                                options={players.map(p => ({ value: p.id, label: `${p.name}（#${p.id}）` }))}
-                                notFoundContent="暂无存档"
-                            />
+                        {targetMode === "account" && (
+                            <Form.Item name="accountId" label="选择账号" rules={[{ required: true, message: "请选择账号" }]}>
+                                <Select
+                                    showSearch
+                                    placeholder="选择账号"
+                                    optionFilterProp="label"
+                                    options={accounts.map(a => ({
+                                        value: a.id,
+                                        label: `账号 #${a.id}（${a.saveCount} 个存档${a.defaultPlayerName ? `，生效：${a.defaultPlayerName}` : ""}）`,
+                                    }))}
+                                    notFoundContent="暂无账号"
+                                />
+                            </Form.Item>
+                        )}
+
+                        {targetMode === "player" && (
+                            <Form.Item name="playerId" label="选择存档" rules={[{ required: true, message: "请选择存档" }]}>
+                                <Select
+                                    showSearch
+                                    placeholder="选择存档"
+                                    optionFilterProp="label"
+                                    options={players.map(p => ({ value: p.id, label: `${p.name}（#${p.id}）` }))}
+                                    notFoundContent="暂无存档"
+                                />
+                            </Form.Item>
+                        )}
+                    </div>
+
+                    <div className="admin-form-section">
+                        <div className="admin-form-section-title">附件</div>
+                        <Form.Item name="type" label="附件类型" rules={[{ required: true, message: "请选择附件类型" }]}>
+                            <Radio.Group
+                                className="admin-mail-type-group"
+                                optionType="button"
+                                buttonStyle="solid"
+                                onChange={(event) => {
+                                    const nextRule = getMailAttachmentRule(event.target.value, null)
+                                    form.setFieldsValue({
+                                        type_id: undefined,
+                                        number: nextRule.max === 1 ? 1 : 1,
+                                    })
+                                    form.validateFields(["type_id", "number"]).catch(() => {})
+                                }}
+                            >
+                                {MAIL_TYPES.map(t => (
+                                    <Radio.Button key={t.value} value={t.value} className="admin-mail-type-option">
+                                        {t.label}
+                                    </Radio.Button>
+                                ))}
+                            </Radio.Group>
                         </Form.Item>
-                    )}
 
-                    <Form.Item name="type" label="附件类型" rules={[{ required: true, message: "请选择附件类型" }]}>
-                        <Radio.Group
-                            className="admin-mail-type-group"
-                            optionType="button"
-                            buttonStyle="solid"
-                            onChange={(event) => {
-                                const nextRule = getMailAttachmentRule(event.target.value, null)
-                                form.setFieldsValue({
-                                    type_id: undefined,
-                                    number: nextRule.max === 1 ? 1 : 1,
-                                })
-                                form.validateFields(["type_id", "number"]).catch(() => {})
-                            }}
-                        >
-                            {MAIL_TYPES.map(t => (
-                                <Radio.Button key={t.value} value={t.value} className="admin-mail-type-option">
-                                    {t.label}
-                                </Radio.Button>
-                            ))}
-                        </Radio.Group>
-                    </Form.Item>
+                        {needsId && (
+                            <Form.Item
+                                name="type_id"
+                                label="附件"
+                                rules={[
+                                    {
+                                        validator: async (_, value) => {
+                                            if (attachmentError) throw new Error("附件索引加载失败，无法发送")
+                                            if (value == null) throw new Error("请选择附件")
+                                        },
+                                    },
+                                ]}
+                                extra="输入完整 ID 或中文名称搜索；数字查询按完整 ID 精确匹配，避免误选相近编号。"
+                            >
+                                <Select
+                                    showSearch
+                                    allowClear
+                                    placeholder={`搜索${TYPE_LABEL[type] ?? ""}名称或 ID…`}
+                                    loading={attachmentLoading}
+                                    disabled={attachmentError}
+                                    options={attachmentOptions}
+                                    filterOption={filterAttachmentOption}
+                                    optionLabelProp="titleText"
+                                    notFoundContent={attachmentLoading ? "正在加载附件索引" : "没有匹配附件"}
+                                    onChange={(nextTypeId) => {
+                                        const nextRule = getMailAttachmentRule(type, nextTypeId)
+                                        const currentNumber = form.getFieldValue("number") ?? 1
+                                        form.setFieldValue("number", Math.min(currentNumber, nextRule.max))
+                                        form.validateFields(["number"]).catch(() => {})
+                                    }}
+                                />
+                            </Form.Item>
+                        )}
 
-                    {needsId && (
                         <Form.Item
-                            name="type_id"
-                            label="附件"
+                            name="number"
+                            label="数量"
                             rules={[
+                                { required: true, message: "请输入数量" },
                                 {
                                     validator: async (_, value) => {
-                                        if (attachmentError) throw new Error("附件索引加载失败，无法发送")
-                                        if (value == null) throw new Error("请选择附件")
+                                        if (value == null) throw new Error("请输入数量")
+                                        if (value < quantityRule.min || value > quantityRule.max) {
+                                            throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
+                                        }
                                     },
                                 },
                             ]}
-                            extra="输入完整 ID 或中文名称搜索；数字查询按完整 ID 精确匹配，避免误选相近编号。"
+                            extra={`${quantityRule.label}：${quantityRule.min}-${quantityRule.max}。${quantityRule.reason}`}
                         >
-                            <Select
-                                showSearch
-                                allowClear
-                                placeholder="输入 ID 或名称搜索附件"
-                                loading={attachmentLoading}
-                                disabled={attachmentError}
-                                options={attachmentOptions}
-                                filterOption={filterAttachmentOption}
-                                optionLabelProp="titleText"
-                                notFoundContent={attachmentLoading ? "正在加载附件索引" : "没有匹配附件"}
-                                onChange={(nextTypeId) => {
-                                    const nextRule = getMailAttachmentRule(type, nextTypeId)
-                                    const currentNumber = form.getFieldValue("number") ?? 1
-                                    form.setFieldValue("number", Math.min(currentNumber, nextRule.max))
-                                    form.validateFields(["number"]).catch(() => {})
-                                }}
+                            <InputNumber
+                                style={{ width: "100%" }}
+                                min={quantityRule.min}
+                                max={quantityRule.max}
+                                disabled={quantityRule.max === 1}
                             />
                         </Form.Item>
-                    )}
+                    </div>
 
-                    <Form.Item
-                        name="number"
-                        label="数量"
-                        rules={[
-                            { required: true, message: "请输入数量" },
-                            {
-                                validator: async (_, value) => {
-                                    if (value == null) throw new Error("请输入数量")
-                                    if (value < quantityRule.min || value > quantityRule.max) {
-                                        throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
-                                    }
-                                },
-                            },
-                        ]}
-                        extra={`${quantityRule.label}：${quantityRule.min}-${quantityRule.max}。${quantityRule.reason}`}
-                    >
-                        <InputNumber
-                            style={{ width: "100%" }}
-                            min={quantityRule.min}
-                            max={quantityRule.max}
-                            disabled={quantityRule.max === 1}
-                        />
-                    </Form.Item>
+                    <div className="admin-form-section">
+                        <div className="admin-form-section-title">正文</div>
+                        <Form.Item name="subject" label="标题（可选）">
+                            <Input maxLength={64} showCount placeholder="留空使用游戏默认" />
+                        </Form.Item>
 
-                    <Form.Item name="subject" label="标题（可选）">
-                        <Input maxLength={64} showCount placeholder="留空使用游戏默认" />
-                    </Form.Item>
+                        <Form.Item name="description" label="正文（可选）">
+                            <TextArea rows={3} maxLength={512} showCount placeholder="留空使用游戏默认" />
+                        </Form.Item>
 
-                    <Form.Item name="description" label="正文（可选）">
-                        <TextArea rows={3} maxLength={512} showCount placeholder="留空使用游戏默认" />
-                    </Form.Item>
-
-                    <Form.Item
-                        name="expirationDays"
-                        label="有效天数"
-                        rules={[
-                            { required: true, message: "请输入有效天数" },
-                            { type: "number", min: 1, max: 3650, message: "有效天数需在 1-3650 之间" },
-                        ]}
-                        extra="到期后邮件会在打开邮箱或领取时自动删除。"
-                    >
-                        <InputNumber style={{ width: "100%" }} min={1} max={3650} precision={0} />
-                    </Form.Item>
+                        <Form.Item
+                            name="expirationDays"
+                            label="有效天数"
+                            rules={[
+                                { required: true, message: "请输入有效天数" },
+                                { type: "number", min: 1, max: 3650, message: "有效天数需在 1-3650 之间" },
+                            ]}
+                            extra="到期后邮件会在打开邮箱或领取时自动删除。"
+                        >
+                            <InputNumber style={{ width: "100%" }} min={1} max={3650} precision={0} />
+                        </Form.Item>
+                    </div>
 
                     <Form.Item>
-                        <Space wrap>
+                        <div className="admin-action-row">
                             <Button type="primary" htmlType="submit">发送</Button>
                             <Text type="secondary">发送后无法撤回，请确认附件 ID</Text>
-                        </Space>
+                        </div>
                     </Form.Item>
                 </Form>
-            </Card>
+                    </Card>
+                </div>
+                <div className="admin-mail-grid-col">
+                    <Card title="最近群发记录" className="admin-table-card">
+                        <Table<MailRecord & { key: number }>
+                            rowKey="key"
+                            size="small"
+                            pagination={false}
+                            dataSource={history.map((h, i) => ({ ...h, key: i }))}
+                            locale={{ emptyText: "暂无记录" }}
+                            scroll={{ x: "max-content" }}
+                            tableLayout="fixed"
+                            expandable={{
+                                expandedRowRender: r => (
+                                    <div className="admin-mail-history-detail">
+                                        <Descriptions column={1} size="small">
+                                            <Descriptions.Item label="目标摘要">{r.target}</Descriptions.Item>
+                                            <Descriptions.Item label="附件快照">
+                                                {`${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`}
+                                            </Descriptions.Item>
+                                            {r.subject && <Descriptions.Item label="标题">{r.subject}</Descriptions.Item>}
+                                            <Descriptions.Item label="发送数">{r.sent}</Descriptions.Item>
+                                            <Descriptions.Item label="有效期">{String(r.expirationDays ?? 31)} 天</Descriptions.Item>
+                                        </Descriptions>
+                                        <Button size="small" onClick={() => prefillFromHistory(r)}>复制重发</Button>
+                                    </div>
+                                ),
+                            }}
+                            columns={[
+                                { title: "时间", dataIndex: "time", width: 160, responsive: ["sm"] as any },
+                                { title: "对象", dataIndex: "target" },
+                                {
+                                    title: "附件", key: "attach",
+                                    render: (_: unknown, r) => `${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`,
+                                },
+                                { title: "发送数", dataIndex: "sent", width: 80, responsive: ["sm"] as any, render: (n: number) => <span className="admin-badge-info">{n}</span> },
+                                { title: "有效期", dataIndex: "expirationDays", width: 90, responsive: ["sm"] as any, render: (n: number) => String(n ?? 31) + " 天" },
+                            ]}
+                        />
+                    </Card>
+                </div>
+            </div>
 
             <ScheduledResourceRules players={players} />
-
-            <Card title="最近群发记录" size="small" className="admin-table-card">
-                <Table<MailRecord & { key: number }>
-                    rowKey="key"
-                    size="small"
-                    pagination={false}
-                    dataSource={history.map((h, i) => ({ ...h, key: i }))}
-                    locale={{ emptyText: "暂无记录" }}
-                    scroll={{ x: "max-content" }}
-                    columns={[
-                        { title: "时间", dataIndex: "time", width: 160 },
-                        { title: "对象", dataIndex: "target" },
-                        {
-                            title: "附件", key: "attach",
-                            render: (_: unknown, r) => `${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`,
-                        },
-                        { title: "发送数", dataIndex: "sent", width: 80, render: (n: number) => <Tag color="blue">{n}</Tag> },
-                        { title: "有效期", dataIndex: "expirationDays", width: 90, render: (n: number) => String(n ?? 31) + " 天" },
-                    ]}
-                />
-            </Card>
+            <div className="admin-page-note admin-page-note-footer">
+                <Text strong>发送须知</Text>
+                <Text type="secondary">
+                    发送成功后会保留发送对象设置并清空附件与文案；邮件一旦送达无法撤回，群发前请在确认弹窗中核对目标和附件摘要。
+                </Text>
+            </div>
         </Space>
 
             <Modal
                 open={!!confirm}
                 title="确认群发"
+                width="min(92vw, 560px)"
                 onOk={() => confirm && send.mutate(confirm.values)}
                 onCancel={() => setConfirm(null)}
                 okText="确认发送"
@@ -407,7 +483,7 @@ export default function Mail() {
             >
                 {confirm && (
                     <>
-                        <Descriptions column={1} size="small" bordered>
+                        <Descriptions column={1} size="small" bordered className="admin-detail-descriptions">
                             <Descriptions.Item label="发送对象">{confirm.targetText}</Descriptions.Item>
                             <Descriptions.Item label="角色数量">{confirm.count} 个</Descriptions.Item>
                             <Descriptions.Item label="附件">{confirm.attachmentText}</Descriptions.Item>

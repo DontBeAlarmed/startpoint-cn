@@ -1,0 +1,348 @@
+/* clairvoyance pool rows read as game-console pool cards (approved mockup time-v2):
+   stat-bg box + wrapping top row (池名 / 上线状态徽章 / 起止时间 / 剩余天数), tags below.
+   Mobile-first: the top row wraps freely; 剩余天数 only pushes right on desktop. */
+.admin-clairvoyance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--stat-bg);
+}
+
+.admin-pool-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.admin-pool-name {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.admin-pool-win {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.admin-pool-remaining {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+/* 方案 A 千里眼卡头（设计稿 clairvoyance-tab-design.html）：
+   标题恒为「千里眼」+ Segmented 视图切换（toolbar 语义）；CDN 徽章仍在 extra 侧。
+   Segmented 选中态（白底+微投影）走 antd 组件 token，此处只管卡头布局：
+   标题工具行可换行（390 窄屏 Segmented 落到标题下方），head title 放开裁剪保住焦点环。 */
+.admin-clairvoyance-card .ant-card-head-title {
+  overflow: visible;
+}
+
+.admin-clairvoyance-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.admin-clairvoyance-head-title {
+  font-weight: 800;
+}
+
+/* UP 角色搜索框: 窄屏全宽, 桌面收窄到搜索框的自然宽度 (mockup .search) */
+.admin-time-search {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .admin-pool-remaining {
+    margin-left: auto;
+  }
+
+  .admin-time-search {
+    max-width: 420px;
+  }
+}
+
+/* 触屏 ± 步进器 (粗指针设备的时间编辑, 桌面隐藏) */
+.admin-time-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px 0 2px;
+}
+
+.admin-time-stepper-btn {
+  min-width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.admin-time-stepper-label {
+  min-width: 3em;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+/* 千里眼 UP 角色头像条目 (头像块占两行 | 右上 id 灰 / 右下 角色名) */
+.admin-char-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-char-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+/* 头像块与游戏原生 square_132_132 同为正方形 — 零裁切零遮挡 (维护者 2026-09-30) */
+.admin-char-avatar {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--water-soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+/* CDN 归档立绘铺满头像块；加载失败由 onError 加 broken 类隐藏，露出首字占位 */
+.admin-char-avatar-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.admin-char-avatar-image-broken {
+  display: none;
+}
+
+.admin-char-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-char-id {
+  color: var(--ink-soft);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.admin-char-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* 千里眼搜索结果: 关联池两行条目(名称+徽章 / 起止), 取代单行长 Tag */
+.admin-search-gacha-list {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.admin-search-gacha-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.admin-search-gacha-row:first-child {
+  border-top: 0;
+}
+
+.admin-search-gacha-name {
+  font-weight: 600;
+}
+
+.admin-search-gacha-period {
+  margin-left: auto;
+  color: var(--ink-soft);
+}
+
+/* 大池 UP 条目折叠/展开按钮 (维护者 2026-09-30: +N 可展开) */
+.admin-char-expand {
+  align-self: center;
+  justify-self: start;
+  padding: 0 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.admin-char-expand:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+/* ── 时间线统一单列列表（维护者指定 timeline-unified-list.html）──────────────
+   行1 标题|#id(|活动类型徽章) · 行2 时间+状态 · 行3 内容(仅卡池: UP 角色芯片行) */
+.admin-tl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-tl-item {
+  min-width: 0;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.admin-tl-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.admin-tl-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 13.5px;
+}
+
+.admin-tl-id {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.admin-tl-time {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 7px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.admin-tl-body {
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.admin-tl-up-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-tl-up-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 3px;
+  background: var(--stat-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.admin-tl-up-av {
+  position: relative;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--water-soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.admin-tl-up-av-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.admin-tl-up-av-broken {
+  display: none;
+}
+
+.admin-tl-up-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.admin-tl-up-id {
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.admin-tl-up-name {
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.admin-tl-pagination {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+/* 活动类型徽章: 每族一色(故事=紫 讨伐=红 大型=星黄 通关/累计/登录=绿 未识别=info蓝) */
+.admin-tl-family-story { color: #c297ff; border-color: #c297ff; background: rgba(194, 151, 255, 0.1); }
+.admin-tl-family-battle { color: #ff7b72; border-color: #ff7b72; background: rgba(255, 123, 114, 0.1); }
+.admin-tl-family-large { color: #ffd335; border-color: #ffd335; background: rgba(255, 211, 53, 0.1); }
+.admin-tl-family-clear { color: #7ee787; border-color: #7ee787; background: rgba(126, 231, 135, 0.1); }
+.admin-tl-family-other { color: var(--info); border-color: var(--info); background: var(--info-bg); }

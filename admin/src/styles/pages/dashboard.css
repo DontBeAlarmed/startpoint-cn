@@ -1,0 +1,232 @@
+/* dashboard: every card interior reads as the same flat 「标题行 + 内容区」 section pattern —
+   the card border is the only strong separator, sections rely on whitespace alone */
+.admin-dash-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.admin-dash-section {
+  min-width: 0;
+}
+
+/* flat section titles share one voice across dashboard and every form (类名各自保留) */
+.admin-dash-section-title,
+.admin-form-section-title {
+  margin-bottom: 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.admin-dash-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* dashboard: card titles and inline statistics join the type ladder —
+   card title 14/800 below the page title, statistics share the band value scale */
+.admin-dash-card .ant-card-head-title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.admin-dash-section .ant-statistic-content {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* dashboard: 「详细信息」 collapsible — information-type fields (联机地址, 内容摘要,
+   来源与存储, Snapshot 中已声明补丁) live here, collapsed by default, per approved
+   review draft v3. Summary is one quiet row; the body stacks four titled sections,
+   each a single horizontal wrapping row of label+value items. */
+.admin-details {
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.admin-details-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-details-arrow {
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+
+.admin-details[open] > .admin-details-summary .admin-details-arrow {
+  transform: rotate(90deg);
+}
+
+.admin-details-star {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: var(--star);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+
+.admin-details-hint {
+  flex-basis: 100%;
+  margin-left: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 400;
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .admin-details-hint {
+    flex-basis: auto;
+    margin-left: auto;
+    text-align: right;
+  }
+}
+
+.admin-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.admin-details-section {
+  min-width: 0;
+}
+
+.admin-details-section-title {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.admin-details-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 34px;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.admin-details-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-details-item-key {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+.admin-details-item-value {
+  min-width: 0;
+  font-weight: 600;
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+}
+
+/* details rows: long identifiers (地址、sha256 摘要、ZIP 计数) read as quiet mono
+   data that may break anywhere instead of overflowing the row */
+.admin-details-item .admin-mono {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* dashboard: C 图标卡格 icon feature tiles — each fact reads as one small elevated tile:
+   centered big star-stroke icon on top, small soft label, prominent value.
+   Tile anatomy follows the approved mockup (elevated bg + 1px line + 11px radius).
+   Mobile-first: two wrapped columns below 768px; 4-up (5-up for .admin-feats-5) rows above. */
+.admin-feats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  min-width: 0;
+}
+
+.admin-feat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 8px;
+  text-align: center;
+  background: var(--th-bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.admin-feat-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 0 auto 6px;
+  stroke: var(--star-deep);
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+html[data-theme="dark"] .admin-feat-icon {
+  stroke: var(--star);
+}
+
+.admin-feat-label {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.admin-feat-value {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* 联机状态 5 块窄屏 2 列排布: 末块(兼容拒绝/暂无记录)横跨整行撑满底部（维护者指定） */
+.admin-feats-5 > :last-child {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 768px) {
+  .admin-feats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .admin-feats.admin-feats-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  /* 桌面 5 列单排, 末块不跨 */
+  .admin-feats-5 > :last-child {
+    grid-column: auto;
+  }
+}

@@ -1,0 +1,311 @@
+/* ── news deep polish ───────────────────────────────────────────────────────
+   editor modal: left form / right client-like phone preview. Mobile-first:
+   the preview column is hidden by default and restored at ≥768px
+   (审查稿 five-pages-review #p-news: <768px 时预览区隐藏; task-33 E3 #31 将
+   原 @media (max-width: 767px) 段重构为「默认隐藏 + min-width 恢复」).
+   The preview column keeps a visually-hidden sandbox iframe as the
+   raw-content mirror (anchor: 空 sandbox 预览不变). */
+.news-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  min-width: 0;
+}
+
+.news-editor-form-col {
+  min-width: 0;
+}
+
+.news-editor-preview-col {
+  min-width: 0;
+  display: none;
+}
+
+.news-editor-raw-frame {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .news-editor-grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+  }
+
+  .news-editor-preview-col {
+    display: block;
+  }
+}
+
+/* news phone mock: 客户端拟真 — rounded handset frame, banner thumb, rendered
+   RichText body and the quiet date footer from the approved mockup */
+.news-phone {
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  padding: 14px 12px;
+  background: var(--panel);
+}
+
+.news-phone-title {
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.news-phone .news-phone-thumb {
+  width: 100%;
+  height: 70px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+
+.news-phone-body {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.news-preview-li {
+  padding-left: 14px;
+  position: relative;
+}
+
+.news-preview-li::before {
+  content: "•";
+  position: absolute;
+  left: 2px;
+}
+
+.news-preview-hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 8px 0;
+}
+
+.news-phone-sep {
+  border-top: 1px solid var(--line);
+  margin: 12px 0 8px;
+}
+
+.news-phone-foot {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+/* news list thumbnail cell: 实图化 (img, cover, fixed small size); the same
+   cell doubles as the phone banner when given .news-phone-thumb */
+.admin-news-thumb {
+  display: inline-block;
+  width: 52px;
+  height: 30px;
+  border-radius: 6px;
+  object-fit: cover;
+  vertical-align: middle;
+  background: var(--th-bg);
+}
+
+.admin-news-thumb:not(img) {
+  border: 1px solid var(--line);
+}
+
+/* ── news body toolbar: 光标处插入白名单 RichText 片段 ──────────────────────
+   textarea 仍是唯一事实源；按钮只写入文本，不引入编辑器库。mousedown
+   preventDefault 保持 textarea 焦点与选区可见。 */
+.news-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.news-toolbar-btn {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.news-toolbar-btn:hover,
+.news-toolbar-btn-active {
+  border-color: var(--line-strong);
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.news-toolbar-color-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.news-toolbar-palette {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.news-toolbar-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.news-toolbar-swatch:hover {
+  border-color: var(--ink);
+}
+
+/* news editor: 写法速查 — preview 列空位处的轻量教程卡 (维护者 2026-09-30) */
+.news-editor-guide {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--th-bg);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+.news-editor-guide-title {
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.news-editor-guide-row b {
+  color: var(--ink);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+}
+
+.news-editor-guide-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 11.5px;
+}
+
+
+
+/* ── news card view (卡片化改造, 双视口统一, 同礼包/账号页 acc-card) ──────────
+   标题行 = 两行标题块(分类徽章+标题 / 发布时间[+标签]) + 状态钮(生效中/已停用);
+   配图为右半渐隐背景层(见 .news-card-bg), 缩略图不再单独出现 */
+
+
+.news-card-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.news-card-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.news-card-title {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 700;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.news-card-time {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 配图作卡片背景: 只占右半边, 左缘渐隐融入卡底(维护者指定) */
+.news-card {
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.news-card-bg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.news-card-bg .admin-news-thumb {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  object-fit: cover;
+  opacity: 0.4;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 55%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 55%);
+}
+
+/* 卡片内容浮于背景层之上 */
+.news-card .acc-titlebar {
+  position: relative;
+  z-index: 1;
+}
+
+/* 三钮(启停/编辑/删除)位置: 移动端独占最下一排, 桌面端右侧一簇(维护者指定) */
+.news-card-actions {
+  flex: 0 0 100%;
+  margin-left: 0;
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (min-width: 768px) {
+  .news-card-actions {
+    flex: none;
+    margin-left: auto;
+    margin-top: 0;
+    justify-content: flex-end;
+  }
+}

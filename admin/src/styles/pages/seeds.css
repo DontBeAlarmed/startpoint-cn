@@ -1,0 +1,72 @@
+/* ── batch 4: seeds 页专属 ───────────────────────────────────────────────────
+   seeds: catalog stat row borrows the dashboard .admin-stat-band voice — flat
+   label-over-value facts, no boxes (本机隔离 >0 reads in thunder via
+   .admin-seed-stat-alert). Mobile-first: inherits the band's 2-col grid on
+   narrow screens; four equal columns at desktop (dashboard default is five). */
+@media (min-width: 768px) {
+  .admin-seed-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.admin-seed-stat-alert {
+  color: var(--thunder);
+}
+
+/* ── batch 4: seeds deep polish ─────────────────────────────────────────────
+   构成占比: 3★/4★/5★ 三色堆叠条 + 百分比小字（审查稿 #p-seeds — colors mirror
+   the mockup: 水蓝/星黄/火红); header gains 最后刷新 clock + 30s 自动 badge. */
+.admin-seed-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-seed-ratio {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 150px;
+}
+
+.admin-seed-ratio-bar {
+  display: flex;
+  width: 100%;
+  max-width: 150px;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.admin-seed-ratio-text {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.admin-seed-quarantine-tags {
+  margin-top: 4px;
+}
+
+/* seeds: Catalog 移动卡片 (<768 卡片视图, 桌面表格) */
+.admin-seed-catalog-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-seed-catalog-card {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--th-bg);
+}
+
+.admin-seed-catalog-card .admin-seed-ratio {
+  margin: 8px 0;
+}

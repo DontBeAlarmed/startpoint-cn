@@ -1,0 +1,352 @@
+/* shared app shell & page primitives (sider, brand, topbar, page header, toolbar) */
+.admin-app {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.admin-sider {
+  background: var(--panel) !important;
+  border-inline-end: 1px solid var(--line);
+}
+
+.admin-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 72px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-brand-copy {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 2px solid var(--star);
+  background: var(--brand-chip);
+  box-shadow: 3px 3px 0 var(--water);
+}
+
+.admin-brand-mark img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
+
+.admin-brand-title {
+  display: block;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-brand-subtitle {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ant-layout-sider-collapsed .admin-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.ant-layout-sider-collapsed .admin-brand-copy {
+  display: none;
+}
+
+.admin-menu {
+  padding: 10px 8px;
+  background: transparent;
+  border-inline-end: 0 !important;
+}
+
+.admin-menu .ant-menu-item {
+  height: 40px;
+  margin-inline: 0;
+  border-radius: 6px;
+}
+
+.admin-menu .ant-menu-item-selected, .admin-sider .ant-menu-light .ant-menu-item-selected { color: var(--ink); background: linear-gradient(90deg, rgba(255, 211, 53, 0.16), rgba(255, 211, 53, 0.04)); font-weight: 700; }
+
+.admin-sider .ant-menu-item-selected::before {
+    content: ""; position: absolute; left: -14px; top: 5px; bottom: 5px; width: 5px;
+    background: var(--star); border: 1.5px solid var(--ink); border-radius: 4px;
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  /* 移动优先（task-33 E3 #30）：窄屏为默认，桌面值在文件尾 min-width 块回升 */
+  min-height: 52px;
+  padding: 0 12px;
+  gap: 10px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent) !important;
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.admin-topbar-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-content {
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  /* 移动优先（task-33 E3 #30）：窄屏为默认，桌面值在文件尾 min-width 块回升 */
+  padding: 14px 12px 20px;
+}
+
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-page-header {
+  display: grid;
+  /* 移动优先（task-33 E3 #30）：窄屏单列、顶对齐；桌面双列在文件尾 min-width 块回升 */
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: start;
+  padding-block: 2px 4px;
+}
+
+/* 页头: eyebrow + [标题|刷新icon|其余操作] 一行（维护者指定: 刷新紧跟标题） */
+.admin-page-header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.admin-page-heading {
+  display: flex;
+  /* flex:1 占满除刷新 icon 外的整行, 标题行内 margin-left:auto 的操作钮才能钉到右端 */
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-page-refresh {
+  flex: none;
+  /* 紧跟标题: 抵消 antd Title 右侧字距, 缩小尺寸贴近文字 */
+  margin-left: -8px;
+  height: 28px;
+  width: 28px;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.admin-page-refresh:hover,
+.admin-page-refresh:focus-visible {
+  color: var(--ink);
+}
+
+.admin-page-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  margin-bottom: 7px;
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  color: var(--thunder);
+  background: var(--warn-bg);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.admin-page-title-row {
+  display: flex;
+  /* 维护者指定: 标题与操作是同一盒子的两端——放得下同排(操作钉右),
+     放不下时操作整组折到下一行居右, 标题恢复全宽不再被挤成省略号 */
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.admin-page-title-row .admin-page-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-page-title {
+  margin: 0 !important;
+  color: var(--ink) !important;
+  /* 移动优先（task-33 E3 #30）：窄屏 21px；桌面 24px 在文件尾 min-width 块回升 */
+  font-size: 21px !important;
+  line-height: 1.2 !important;
+}
+
+.admin-page-description {
+  max-width: 760px;
+  margin-top: 7px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.admin-page-actions {
+  display: flex;
+  /* 动作组单独居右; 折到下一行时 margin-left:auto 继续钉住右端 */
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.admin-page-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 页脚注变体: 页面级须知统一沉底(维护者 2026-10-04), 页面顶部仅保留一句描述 */
+.admin-page-note-footer {
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+}
+
+.admin-stack {
+  width: 100%;
+}
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* 移动优先（task-33 E3 #30）：窄屏拉伸对齐；桌面 center 在文件尾 min-width 块回升 */
+  align-items: stretch;
+}
+
+/* 窄屏工具行控件不超出容器（task-33 E3 #30 自 max-width 媒体查询整条迁入，
+   桌面 flex-wrap 布局下无行为差异）；桌面值无需回升 */
+.admin-toolbar > *,
+.admin-toolbar .ant-segmented,
+.admin-toolbar .ant-btn,
+.admin-toolbar .ant-input-affix-wrapper {
+  max-width: 100%;
+}
+
+.admin-toolbar .ant-input-affix-wrapper,
+.admin-toolbar .ant-input-number,
+.admin-toolbar .ant-picker {
+  max-width: 100%;
+}
+
+.multi-compatibility-differences {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.multi-compatibility-difference {
+  display: grid;
+  /* 移动优先（task-33 E3 #30）：窄屏单列；桌面两列在文件尾 min-width 块回升 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.multi-compatibility-values {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.multi-compatibility-value {
+  display: grid;
+  /* 移动优先（task-33 E3 #30）：窄屏标签/值堆叠；桌面 36px 标签列在文件尾 min-width 块回升 */
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ── 桌面回升（task-33 E3 #30）：原 @media (max-width: 767px) 段内规则的
+   桌面值改写至此；窄屏默认值已并入上方各 base 规则，两侧渲染等价 ── */
+@media (min-width: 768px) {
+  .admin-topbar {
+    min-height: 56px;
+    padding: 0 18px;
+  }
+
+  .admin-content {
+    padding: 22px;
+  }
+
+  .admin-page-header {
+    align-items: start;
+  }
+
+  .admin-page-title {
+    font-size: 24px !important;
+  }
+
+  .admin-toolbar {
+    align-items: center;
+  }
+
+  .multi-compatibility-difference {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  }
+
+  .multi-compatibility-value {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+}
+
+/* 移动卡片列表卡（<768 断点分支专用组件，规则为纯 base，无需桌面回升；
+   task-33 E3 #30 自 max-width 媒体查询迁入） */
+.admin-mobile-list-card .ant-card-head {
+  padding-inline: 14px;
+}
+
+.admin-mobile-list-card .ant-card-body {
+  padding: 12px;
+}
+

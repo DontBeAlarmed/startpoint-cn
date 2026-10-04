@@ -1,0 +1,41 @@
+/* base: fonts, design tokens (light/dark), element reset */
+@font-face {
+  font-family: "AdminMono";
+  src: local("SF Mono"), local("Menlo"), local("Consolas");
+}
+
+:root {
+    /* 浅色层底/描边族: 降饱和淡蓝(维护者 2026-10-04 选定方案 D, 原冷调淡蓝降约 80% 蓝味;
+       对比稿 admin-ui-mockups/light-card-palette-comparison.html#desat), 暗色模式不受影响 */
+    --bg:#F5F6F9; --panel:#FFFFFF; --line:#DFE3E9; --line-strong:#C6CDD8;
+    --ink:#1F2D4D; --ink-soft:#5A6B8C;
+    --star:#FFD335; --star-deep:#EAB308; --sky:#4FA8E8; --water:#2E7FD6;
+    --water-soft:#9cc3ec;
+    --fire:#E8544A; --wind:#2FA85C; --thunder:#D99A00;
+    --ok-bg:#EAF8F0; --info-bg:#EAF3FC; --warn-bg:#FFF8E4; --fire-bg:#FBEDEB;
+    --hover:#EEF0F4; --stat-bg:#FBFCFD; --th-bg:#F4F6F9;
+    --brand-chip: #1F2D4D;
+    --radius: 12px;
+}
+
+html[data-theme="dark"] {
+    --bg:#0D1117; --panel:#161B22; --line:#30363D; --line-strong:#3D444D;
+    --ink:#E6EDF3; --ink-soft:#8B949E;
+    --brand-chip: #0B0F14;
+    --star:#FFD335; --star-deep:#8A6D00;
+    --water:#5AA7E8; --water-soft:#2E5F8F; --wind:#4ED47E; --thunder:#FFC53D; --fire:#FF8577;
+    --ok-bg: rgba(78, 212, 126, 0.12); --info-bg: rgba(90, 167, 232, 0.12);
+    --warn-bg: rgba(255, 197, 61, 0.1); --fire-bg: rgba(232, 84, 74, 0.14);
+    --hover:#1F262E; --stat-bg:#10151C; --th-bg:#21262D;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  color: var(--ink);
+  background: var(--bg);
+}

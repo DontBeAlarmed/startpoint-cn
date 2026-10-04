@@ -1,0 +1,261 @@
+/* gifts editor reward rows (Form.List): controls must wrap as whole units on narrow
+   screens — with a 奖励对象 select (240px) in the row, nowrap overflows the modal edge
+   (实测 390px: row 584px / right 626px). Mobile-first base wrap; desktop modal
+   (min(92vw, 880px)) fits one line so the wrap never triggers there. row-gap 0 keeps
+   the vertical rhythm on form-item margins. */
+.gift-reward-row {
+  flex-wrap: wrap;
+  column-gap: 8px;
+  row-gap: 0;
+}
+
+/* gifts: reward text and redemption snapshots read as quiet mono data */
+.gift-reward-summary {
+  color: var(--ink-soft);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/* ── gifts deep polish ──────────────────────────────────────────────────────
+   reward chips (卡片奖励行 + 编辑器奖励行头部): the quiet chip voice from
+   the approved review mockup (#p-gifts) — star tile + 类型·对象名 ×数量;
+   卡片视图全量平铺单行滚动(超出左右滑), 不再折叠。 */
+.gift-reward-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.gift-reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--th-bg);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.gift-reward-chip::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--star);
+  opacity: .85;
+}
+
+/* editor reward rows: each Form.List entry reads as a chip card — resolved
+   名称 headline (所见即所存) above the same in-place type/object/number
+   controls; Form.List 结构与锚点不动，仅视觉重组 */
+.gift-chip-row {
+  min-width: 0;
+  padding: 8px 10px 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--stat-bg);
+}
+
+.gift-chip-row + .gift-chip-row {
+  margin-top: 8px;
+}
+
+.gift-chip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.gift-chip-text {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.gift-chip-head .ant-btn {
+  flex: none;
+  padding-inline: 4px;
+}
+
+.gift-add-reward.ant-btn {
+  /* 与上方奖励卡片间距(维护者两次指出间隔丢失: chip 卡间距/此处, 显式钉住) */
+  margin-top: 10px;
+  border-style: dashed;
+  color: var(--ink-soft);
+}
+
+.gift-redemption-filters {
+  width: 100%;
+}
+
+.gift-redemption-snapshot {
+  margin: 0;
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+/* news/gifts ops tables: the action column stays on one line — mobile-first: cells wrap
+   freely below 768px, the action row freezes to a single line above (删除按钮纪律:
+   桌面操作列不换行) */
+@media (min-width: 768px) {
+  .admin-ops-table .admin-action-row {
+    flex-wrap: nowrap;
+  }
+}
+
+/* ── gifts card view (卡片化改造, 同账号页 acc-card 结构) ────────────────────
+   标题行(code chip + 更新时间 + 状态钮 生效中/已停用 + 编辑/删除) /
+   奖励 chips / meta(奖励版本/版本/更新时间) / 记录内嵌展开区。
+   卡片外壳直接复用 accounts.css 的 .acc-card/.acc-titlebar/.acc-bottom-row。 */
+.gift-card-code {
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  /* 礼包码即卡片标题(无名称字段), 用标题级字重而不是 id-chip 的 11.5px 灰字 */
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* grid 项 min-width:auto 会让内嵌记录表的 max-content 宽度撑爆 360px 视口
+   (账号页同款问题), 卡片项必须允许收缩, 表格交给自身横向滚动 */
+.gift-card {
+  min-width: 0;
+}
+
+.gift-card-chips {
+  margin-top: 2px;
+  /* 奖励 chips 全量平铺单行, 超出左右滚动(维护者 2026-10-04: 双端统一滚动形式,
+     不再用 +N 折叠); 滚动条隐藏 —— 触屏滑动/触控板横滚, 视觉上无轨 */
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+
+.gift-card-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.gift-card-chips .gift-reward-chip {
+  flex: none;
+}
+
+/* 2026-10-04 专项整理: 标题两行 — 第一行 code, 第二行更新时间; 右侧启停按钮 */
+.gift-card-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gift-card-time {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.gift-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.gift-card-meta > span {
+  white-space: nowrap;
+}
+
+/* meta + 记录/编辑/删除: 移动端上下两行, 桌面端并排一行(维护者指定: 桌面操作
+   不单独占行上移一级) */
+.gift-card-infoline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 6px;
+}
+
+/* 底行: 记录折叠占满空余, 其余按钮(编辑/删除)不挤占 */
+.gift-card .acc-bottom-row .ant-btn:not(.acc-count-toggle) {
+  flex: none;
+}
+
+@media (min-width: 768px) {
+  .gift-card-infoline {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .gift-card-infoline .acc-bottom-row {
+    margin-left: auto;
+    margin-top: 0;
+    flex: none;
+  }
+
+  /* 桌面并排时记录折叠钮不占满空余(移动端保持占满) */
+  .gift-card .acc-bottom-row .acc-count-toggle {
+    flex: 0 0 auto;
+  }
+}
+
+/* 记录内嵌展开区: 顶部分隔线与卡内 padding 对齐; 表格横向滚动由 scroll.x 承担 */
+.gift-card-records {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.gift-redemption-embed {
+  display: grid;
+  /* 隐式 auto 列会按最宽内容(记录表 max-content)取宽撑爆卡片, 钉成容器宽单列 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.gift-redemption-embed .gift-redemption-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.gift-redemption-embed .gift-redemption-filters .ant-input {
+  flex: 1 1 200px;
+  min-width: min(200px, 100%);
+}
+
+/* 生效中的礼包: 编辑/删除常驻但锁定 —— 置灰不可用, 点击提示需先停用(维护者指定);
+   antd 状态规则特异性更高, 镜像选择器把三态钉回灰色 */
+.gift-card-btn-locked,
+.gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):hover,
+.gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):active,
+.gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):focus-visible {
+  color: var(--ink-soft);
+  border-color: var(--line);
+  background: transparent;
+  cursor: not-allowed;
+}
