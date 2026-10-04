@@ -251,25 +251,10 @@ export default function Mail() {
             <div className="admin-mail-grid">
                 <div className="admin-mail-grid-col">
                     <Card title="发送邮件">
-                <Alert type={targetMode === "all" ? "warning" : "info"} showIcon style={{ marginBottom: 16 }}
-                    message={
-                        targetMode === "all" ? `将向全体 ${totalSaves} 个存档发送同一封邮件`
-                            : targetMode === "account" ? "将向所选账号下的所有存档发送邮件"
-                                : "将向所选的单个存档发送邮件"
-                    } />
-                {attachmentSummary && (
-                    <div className="admin-attach-summary">
-                        <span className="admin-attach-chip">
-                            <span className="admin-attach-chip-dot" />
-                            附件摘要：{attachmentSummary}
-                        </span>
-                        <Text type="secondary" className="admin-attach-summary-hint">所见即所发</Text>
-                    </div>
-                )}
                 <Form form={form} layout="vertical" onFinish={openConfirm} initialValues={{ number: 1, expirationDays: 31, targetMode: "all" }}>
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">收件人</div>
-                        <Form.Item name="targetMode" label="发送对象">
+                        <Form.Item name="targetMode">
                             <Radio.Group optionType="button" buttonStyle="solid">
                                 <Radio.Button value="all">全体存档</Radio.Button>
                                 <Radio.Button value="account">指定账号</Radio.Button>
@@ -277,8 +262,11 @@ export default function Mail() {
                             </Radio.Group>
                         </Form.Item>
 
+                        {targetMode === "all" && (
+                            <div className="mail-cover-note">覆盖范围: 全体 {totalSaves} 个存档(含今后新增)</div>
+                        )}
                         {targetMode === "account" && (
-                            <Form.Item name="accountId" label="选择账号" rules={[{ required: true, message: "请选择账号" }]}>
+                            <Form.Item name="accountId" rules={[{ required: true, message: "请选择账号" }]}>
                                 <Select
                                     showSearch
                                     placeholder="选择账号"
@@ -293,7 +281,7 @@ export default function Mail() {
                         )}
 
                         {targetMode === "player" && (
-                            <Form.Item name="playerId" label="选择存档" rules={[{ required: true, message: "请选择存档" }]}>
+                            <Form.Item name="playerId" rules={[{ required: true, message: "请选择存档" }]}>
                                 <Select
                                     showSearch
                                     placeholder="选择存档"
@@ -307,7 +295,7 @@ export default function Mail() {
 
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">附件</div>
-                        <Form.Item name="type" label="附件类型" rules={[{ required: true, message: "请选择附件类型" }]}>
+                        <Form.Item name="type" rules={[{ required: true, message: "请选择附件类型" }]}>
                             <Radio.Group
                                 className="admin-mail-type-group"
                                 optionType="button"
@@ -329,94 +317,127 @@ export default function Mail() {
                             </Radio.Group>
                         </Form.Item>
 
-                        {needsId && (
-                            <Form.Item
-                                name="type_id"
-                                label="附件"
-                                rules={[
-                                    {
-                                        validator: async (_, value) => {
-                                            if (attachmentError) throw new Error("附件索引加载失败，无法发送")
-                                            if (value == null) throw new Error("请选择附件")
+                        {needsId ? (
+                            <div className="mail-inline-row">
+                                <Form.Item
+                                    name="type_id"
+                                    rules={[
+                                        {
+                                            validator: async (_, value) => {
+                                                if (attachmentError) throw new Error("附件索引加载失败，无法发送")
+                                                if (value == null) throw new Error("请选择附件")
+                                            },
                                         },
-                                    },
-                                ]}
-                                extra="输入完整 ID 或中文名称搜索；数字查询按完整 ID 精确匹配，避免误选相近编号。"
-                            >
-                                <Select
-                                    showSearch
-                                    allowClear
-                                    placeholder={`搜索${TYPE_LABEL[type] ?? ""}名称或 ID…`}
-                                    loading={attachmentLoading}
-                                    disabled={attachmentError}
-                                    options={attachmentOptions}
-                                    filterOption={filterAttachmentOption}
-                                    optionLabelProp="titleText"
-                                    notFoundContent={attachmentLoading ? "正在加载附件索引" : "没有匹配附件"}
-                                    onChange={(nextTypeId) => {
-                                        const nextRule = getMailAttachmentRule(type, nextTypeId)
-                                        const currentNumber = form.getFieldValue("number") ?? 1
-                                        form.setFieldValue("number", Math.min(currentNumber, nextRule.max))
-                                        form.validateFields(["number"]).catch(() => {})
-                                    }}
-                                />
-                            </Form.Item>
+                                    ]}
+                                    style={{ flex: "1 1 auto", marginBottom: 0 }}
+                                >
+                                    <Select
+                                        showSearch
+                                        allowClear
+                                        placeholder={`搜索${TYPE_LABEL[type] ?? ""}名称或 ID…`}
+                                        loading={attachmentLoading}
+                                        disabled={attachmentError}
+                                        options={attachmentOptions}
+                                        filterOption={filterAttachmentOption}
+                                        optionLabelProp="titleText"
+                                        notFoundContent={attachmentLoading ? "正在加载附件索引" : "没有匹配附件"}
+                                        onChange={(nextTypeId) => {
+                                            const nextRule = getMailAttachmentRule(type, nextTypeId)
+                                            const currentNumber = form.getFieldValue("number") ?? 1
+                                            form.setFieldValue("number", Math.min(currentNumber, nextRule.max))
+                                            form.validateFields(["number"]).catch(() => {})
+                                        }}
+                                    />
+                                </Form.Item>
+                                <span className="mail-inlbl">数量:</span>
+                                <Form.Item
+                                    name="number"
+                                    rules={[
+                                        { required: true, message: "请输入数量" },
+                                        {
+                                            validator: async (_, value) => {
+                                                if (value == null) throw new Error("请输入数量")
+                                                if (value < quantityRule.min || value > quantityRule.max) {
+                                                    throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
+                                                }
+                                            },
+                                        },
+                                    ]}
+                                    style={{ marginBottom: 0, width: 110 }}
+                                >
+                                    <InputNumber
+                                        min={quantityRule.min}
+                                        max={quantityRule.max}
+                                        disabled={quantityRule.max === 1}
+                                    />
+                                </Form.Item>
+                            </div>
+                        ) : (
+                            <div className="mail-inline-row">
+                                <span className="mail-inlbl">数量:</span>
+                                <Form.Item
+                                    name="number"
+                                    rules={[
+                                        { required: true, message: "请输入数量" },
+                                        {
+                                            validator: async (_, value) => {
+                                                if (value == null) throw new Error("请输入数量")
+                                                if (value < quantityRule.min || value > quantityRule.max) {
+                                                    throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
+                                                }
+                                            },
+                                        },
+                                    ]}
+                                    style={{ marginBottom: 0, width: 130 }}
+                                >
+                                    <InputNumber
+                                        min={quantityRule.min}
+                                        max={quantityRule.max}
+                                        disabled={quantityRule.max === 1}
+                                    />
+                                </Form.Item>
+                            </div>
                         )}
-
-                        <Form.Item
-                            name="number"
-                            label="数量"
-                            rules={[
-                                { required: true, message: "请输入数量" },
-                                {
-                                    validator: async (_, value) => {
-                                        if (value == null) throw new Error("请输入数量")
-                                        if (value < quantityRule.min || value > quantityRule.max) {
-                                            throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
-                                        }
-                                    },
-                                },
-                            ]}
-                            extra={`${quantityRule.label}：${quantityRule.min}-${quantityRule.max}。${quantityRule.reason}`}
-                        >
-                            <InputNumber
-                                style={{ width: "100%" }}
-                                min={quantityRule.min}
-                                max={quantityRule.max}
-                                disabled={quantityRule.max === 1}
-                            />
-                        </Form.Item>
                     </div>
 
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">正文</div>
-                        <Form.Item name="subject" label="标题（可选）">
-                            <Input maxLength={64} showCount placeholder="留空使用游戏默认" />
+                        <div className="mail-inline-row">
+                            <span className="mail-inlbl">标题:</span>
+                            <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
+                                <Input maxLength={64} showCount placeholder="可选,留空使用游戏默认" />
+                            </Form.Item>
+                        </div>
+                        <Form.Item name="description" style={{ marginBottom: 0 }}>
+                            <TextArea rows={3} maxLength={512} placeholder="可选,留空使用游戏默认" />
                         </Form.Item>
-
-                        <Form.Item name="description" label="正文（可选）">
-                            <TextArea rows={3} maxLength={512} showCount placeholder="留空使用游戏默认" />
-                        </Form.Item>
-
-                        <Form.Item
-                            name="expirationDays"
-                            label="有效天数"
-                            rules={[
-                                { required: true, message: "请输入有效天数" },
-                                { type: "number", min: 1, max: 3650, message: "有效天数需在 1-3650 之间" },
-                            ]}
-                            extra="到期后邮件会在打开邮箱或领取时自动删除。"
-                        >
-                            <InputNumber style={{ width: "100%" }} min={1} max={3650} precision={0} />
-                        </Form.Item>
+                        <div className="mail-inline-row" style={{ marginTop: 8 }}>
+                            <span className="mail-inlbl">有效期:</span>
+                            <Form.Item
+                                name="expirationDays"
+                                rules={[
+                                    { required: true, message: "请输入有效天数" },
+                                    { type: "number", min: 1, max: 3650, message: "有效天数需在 1-3650 之间" },
+                                ]}
+                                style={{ marginBottom: 0, width: 110 }}
+                            >
+                                <InputNumber min={1} max={3650} precision={0} />
+                            </Form.Item>
+                        </div>
                     </div>
 
-                    <Form.Item>
-                        <div className="admin-action-row">
-                            <Button type="primary" htmlType="submit">发送</Button>
-                            <Text type="secondary">发送后无法撤回，请确认附件 ID</Text>
-                        </div>
-                    </Form.Item>
+                    <div className="mail-send-summary">
+                        <span className="mail-inlbl">
+                            {targetMode === "all" ? "全体存档" : targetMode === "account" ? "指定账号" : "指定存档"}:
+                        </span>
+                        {attachmentSummary && (
+                            <span className="admin-attach-chip">
+                                <span className="admin-attach-chip-dot" />
+                                {attachmentSummary}
+                            </span>
+                        )}
+                    </div>
+                    <Button type="primary" htmlType="submit">发送</Button>
                 </Form>
                     </Card>
                 </div>
