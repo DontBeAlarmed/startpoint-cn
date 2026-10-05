@@ -95,7 +95,3 @@ Server Bundle 始终打包完整 `web/dist/`，manifest 固定为 `admin.require
 - 当前验收状态统一记录在[支持矩阵](../status/support-matrix.md)和[测试进度](../status/test-progress.md)。
 
 嵌入式打包规则见[Server Bundle](../runtime/server-bundle.md)。
-
-## 待执行专项
-
-- [壳内 WebView 存档导出无反应（服务端侧修复）](webview-save-export-fix.md)：admin 前端 + web_api 的待执行交接文档，壳（launcher）侧零改动。
