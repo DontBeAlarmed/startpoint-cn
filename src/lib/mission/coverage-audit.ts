@@ -122,7 +122,7 @@ function regularPartition(): MissionCoveragePartition {
     // 62/63/64/87/88/89（patternType 20 救援通关）由多人 finish 的救援计数
     // 生产者直接递增（见 rescue-battle-counters），属生产者支持而非 regular
     // computer 的 computed 集。
-    const producerBacked = missionKeys(1, [62, 63, 64, 87, 88, 89])
+    const producerBacked = missionKeys(1, [62, 63, 64, 87, 88, 89, 100])
     const automated = missionKeys(1, getRegularComputedMissionIds())
     for (const key of producerBacked) automated.add(key)
     return createPartition(

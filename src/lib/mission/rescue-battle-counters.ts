@@ -28,6 +28,7 @@ function rescueMissionRows(): readonly RescueMissionRow[] {
                 const kind = String(row[kindCol])
                 const id = Number(missionId)
                 if (!Number.isSafeInteger(id)) continue
+                if (String(row[2]) !== "20") continue
                 if (kind === "2" && String(row[11]) !== "(None)" && String(row[11]) !== "") {
                     rows.push({ missionId: id, category, rangeKind: 2, rank: Number(row[11]), eventId: null })
                 } else if (kind === "5" && String(row[8]) !== "") {
@@ -98,7 +99,8 @@ export function recordRescueBattleMissionCountersSync(
     for (const row of rescueMissionRows()) {
         const matched = row.rangeKind === 2
             ? (input.questCategory === 2 && row.rank !== null && row.rank === rank)
-            : (input.questCategory === 7 && row.eventId !== null && row.eventId === adventEventId)
+            : ((input.questCategory === 7 || input.questCategory === 8)
+                && row.eventId !== null && row.eventId === adventEventId)
         if (!matched) continue
         incrementPlayerCategoryMissionSync(playerId, row.category, row.missionId, 1)
     }

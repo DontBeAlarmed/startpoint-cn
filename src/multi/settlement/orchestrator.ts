@@ -416,12 +416,14 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         if (questAccomplished) {
             incrementPlayerQuestMultiClearSync(input.playerId, questCategory, questId)
         }
-        recordRescueBattleMissionCountersSync(input.playerId, {
-            rescue: storedQuest.rescueFragmentEligible === true,
-            newbieRescue: storedQuest.newbieRescueEligible === true,
-            questCategory,
-            questId,
-        })
+        if (questAccomplished) {
+            recordRescueBattleMissionCountersSync(input.playerId, {
+                rescue: storedQuest.rescueFragmentEligible === true,
+                newbieRescue: storedQuest.newbieRescueEligible === true,
+                questCategory,
+                questId,
+            })
+        }
         const rewardCharacterExpResult = givePlayerCharactersExpSync(
             input.playerId,
             partyCharacterIdsArray,
