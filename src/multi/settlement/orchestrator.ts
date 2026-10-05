@@ -417,6 +417,8 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             incrementPlayerQuestMultiClearSync(input.playerId, questCategory, questId)
         }
         if (questAccomplished) {
+            // cond92（新手组队）已实现但未经真实条件测试：需新手房主
+            // （RANK≤80 ∨ 建号≤30天）开房 + 真人 guest 参与，待验证。
             recordRescueBattleMissionCountersSync(input.playerId, {
                 rescue: storedQuest.rescueFragmentEligible === true,
                 newbieRescue: storedQuest.newbieRescueEligible === true,
