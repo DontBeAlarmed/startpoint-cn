@@ -241,3 +241,75 @@ export function buildSingleFinishResponse({
         "data": responseData,
     }
 }
+
+export interface StaleSingleFinishResponseInput {
+    readonly body: { viewer_id: number; category: number }
+    readonly dataHeaders: SingleFinishResponseHeaders
+    readonly player: SingleFinishResponseFinalPlayerProjection
+    readonly mailArrived: boolean
+}
+
+/**
+ * 旧局迟到的 finish（play_id 与当前活跃任务不一致）的幂等终态：完整响应形、
+ * clear_rank=0、零奖励、零写入 —— 客户端拿到 200 而不是把 400 渲染成 H400，
+ * 新一局的状态不受任何影响（2026-10-05 查证：原实现会用旧 body 结算新局）。
+ */
+export function buildStaleSingleFinishResponse({
+    body,
+    dataHeaders,
+    player,
+    mailArrived,
+}: StaleSingleFinishResponseInput): SingleFinishResponseEnvelope {
+    const responseData: SingleFinishResponseData = {
+        "user_info": {
+            "free_mana": player.freeMana,
+            "exp_pool": player.expPool,
+            "exp_pooled_time": player.expPooledTime,
+            "free_vmoney": player.freeVmoney,
+            "rank_point": player.rankPoint,
+            "degree_id": player.degreeId,
+            "stamina": player.stamina,
+            "stamina_heal_time": player.staminaHealTime,
+            "boost_point": player.boostPoint,
+            "boss_boost_point": player.bossBoostPoint,
+        },
+        "character_list": [],
+        "equipment_list": [],
+        "item_list": {},
+        "mission_info": [],
+        "mail_arrived": mailArrived,
+        "add_exp_list": [],
+        "bond_token_status_list": {},
+        "rewards": {
+            "overflow_pool_exp": 0,
+            "converted_pool_exp": 0,
+            "reward_pool_exp": 0,
+            "reward_mana": 0,
+            "field_mana": 0,
+        },
+        "old_high_score": 0,
+        "joined_character_id_list": [],
+        "before_rank_point": player.rankPoint,
+        "clear_rank": 0,
+        "drop_score_reward_ids": [],
+        "drop_rare_reward_ids": [],
+        "drop_additional_reward_ids": [],
+        "drop_periodic_reward_ids": [],
+        "category_id": body.category,
+        "start_time": dataHeaders.servertime,
+        "is_multi": "single",
+        "quest_name": "",
+        "raid_event": null,
+        "rush_event": null,
+        "carnival_event": null,
+        "score_attack_event": null,
+        "user_daily_challenge_point_list": [],
+        "presigned_quest_category": [],
+        "active_mission_list": [],
+        "degree_list": [],
+    }
+    return {
+        "data_headers": dataHeaders,
+        "data": responseData,
+    }
+}

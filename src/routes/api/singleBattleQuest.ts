@@ -27,7 +27,7 @@ import {
     validateSessionIdentity,
 } from "../../lib/quest/finish/session-validator"
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
-import { buildSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
+import { buildSingleFinishResponse, buildStaleSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
 import { settleMissionCategories } from "../../lib/mission"
 import type { MissionSettlementResult } from "../../lib/mission"
@@ -139,6 +139,44 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             "error": "Bad Request", "message": "Invalid viewer id."
         })
         const { playerId } = sessionResult
+
+        // 旧局迟到的 finish：play_id 与当前活跃任务不一致时返回幂等零奖励终态，
+        // 不结算、不删除活跃任务 —— 既避免把 400 渲染成 H400，也避免用旧 body
+        // 提前结算新一局（多人路径已有同型校验，单人路径此前缺失）。
+        const activeQuest = activeQuests[playerId]
+        if (activeQuest !== undefined && activeQuest.playId !== body.play_id) {
+            const stalePlayer = getPlayerSync(playerId)
+            if (stalePlayer === null) return reply.status(400).send({
+                "error": "Bad Request", "message": "Invalid viewer id.",
+            })
+            const staleGenerated = generateDataHeaders({ viewer_id: viewerId })
+            const staleServerTime = staleGenerated.servertime
+            if (typeof staleServerTime !== "number") {
+                throw new Error("Stale finish response headers are missing servertime.")
+            }
+            const staleHeaders: SingleFinishResponseHeaders = {
+                ...staleGenerated,
+                servertime: staleServerTime,
+            }
+            const staleResponse = buildStaleSingleFinishResponse({
+                body: { viewer_id: viewerId, category: body.category },
+                dataHeaders: staleHeaders,
+                player: {
+                    freeMana: stalePlayer.freeMana,
+                    expPool: stalePlayer.expPool,
+                    expPooledTime: realToVirtual(stalePlayer.expPooledTime),
+                    freeVmoney: stalePlayer.freeVmoney,
+                    rankPoint: stalePlayer.rankPoint,
+                    degreeId: stalePlayer.degreeId,
+                    stamina: stalePlayer.stamina,
+                    staminaHealTime: realToVirtual(stalePlayer.staminaHealTime),
+                    boostPoint: stalePlayer.boostPoint,
+                    bossBoostPoint: stalePlayer.bossBoostPoint,
+                },
+                mailArrived: getPlayerMailCountSync(playerId, true) > 0,
+            })
+            return reply.header("content-type", "application/x-msgpack").status(200).send(staleResponse)
+        }
 
         const finishResult = settleSingleBattleQuest({
             playerId,
