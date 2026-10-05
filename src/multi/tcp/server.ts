@@ -287,9 +287,26 @@ function handleConnection(
     }, context.handshakeTimeoutMs)
     handshakeTimer.unref()
 
+    // 每 tick 帧上限：单 socket 大批量帧不得独占事件循环
+    // （参考服 SESSION_MAX_FRAMES_PER_TICK 同款，128 帧/tick + setImmediate 让出）
+    const maxFramesPerTick = 128
+    let framesProcessedThisTick = 0
+    let rescheduleTick: NodeJS.Immediate | null = null
+
     const processBuffer = (): void => {
         if (protocolClosed || handshakePending !== null || !isAccepting(context, socket)) return
+        framesProcessedThisTick = 0
         while (isAccepting(context, socket) && buffer.includes("\0")) {
+            if (framesProcessedThisTick >= maxFramesPerTick) {
+                if (rescheduleTick === null) {
+                    rescheduleTick = setImmediate(() => {
+                        rescheduleTick = null
+                        processBuffer()
+                    })
+                }
+                return
+            }
+            framesProcessedThisTick += 1
             const index = buffer.indexOf("\0")
             const raw = buffer.substring(0, index)
             buffer = buffer.substring(index + 1)

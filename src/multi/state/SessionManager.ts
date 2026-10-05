@@ -199,15 +199,21 @@ export class SessionManager {
         timer = setTimeout(() => {
             if (timer === undefined
                 || this.battleHeartbeatTimers.get(client.connectionId) !== timer) return
-            this.battleHeartbeatTimers.delete(client.connectionId)
-            if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
-            const inactiveMs = getRealNowMs() - (this.battleLastActivityAt.get(client.connectionId) ?? 0)
-            if (inactiveMs < leaseMs) {
-                this.scheduleRenewableBattleHeartbeatLease(client, leaseMs, leaseMs - inactiveMs)
-                return
-            }
-            console.warn(`[BATTLE] ${this.battleConnectionPhase.get(client.connectionId) ?? "active"} connection lease expired: room=${client.roomNumber}`)
-            client.socket.destroy()
+            // setImmediate 复核：让已在内核等待的入站帧先于销毁被处理
+            // （参考服同款；防止到期帧与销毁竞态误杀刚恢复活跃的连接）
+            setImmediate(() => {
+                if (timer === undefined
+                    || this.battleHeartbeatTimers.get(client.connectionId) !== timer) return
+                this.battleHeartbeatTimers.delete(client.connectionId)
+                if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
+                const inactiveMs = getRealNowMs() - (this.battleLastActivityAt.get(client.connectionId) ?? 0)
+                if (inactiveMs < leaseMs) {
+                    this.scheduleRenewableBattleHeartbeatLease(client, leaseMs, leaseMs - inactiveMs)
+                    return
+                }
+                console.warn(`[BATTLE] ${this.battleConnectionPhase.get(client.connectionId) ?? "active"} connection lease expired: room=${client.roomNumber}`)
+                client.socket.destroy()
+            })
         }, Math.max(1, delayMs))
         timer.unref()
         this.battleHeartbeatTimers.set(client.connectionId, timer)
@@ -222,11 +228,17 @@ export class SessionManager {
         timer = setTimeout(() => {
             if (timer === undefined
                 || this.battleHeartbeatTimers.get(client.connectionId) !== timer) return
-            this.battleHeartbeatTimers.delete(client.connectionId)
-            if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
-            if (this.battleConnectionPhase.get(client.connectionId) !== "loading") return
-            console.warn(`[BATTLE] loading connection lease expired: room=${client.roomNumber}`)
-            client.socket.destroy()
+            // setImmediate 复核：SceneReady 帧可能已在本 tick 内核等待中
+            // （参考服同款），先让入站帧处理完再销毁
+            setImmediate(() => {
+                if (timer === undefined
+                    || this.battleHeartbeatTimers.get(client.connectionId) !== timer) return
+                this.battleHeartbeatTimers.delete(client.connectionId)
+                if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
+                if (this.battleConnectionPhase.get(client.connectionId) !== "loading") return
+                console.warn(`[BATTLE] loading connection lease expired: room=${client.roomNumber}`)
+                client.socket.destroy()
+            })
         }, leaseMs)
         timer.unref()
         this.battleHeartbeatTimers.set(client.connectionId, timer)
