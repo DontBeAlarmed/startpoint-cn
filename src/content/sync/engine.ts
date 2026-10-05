@@ -1,3 +1,5 @@
+import crypto from "node:crypto"
+import fs from "node:fs"
 import path from "node:path"
 
 import {
@@ -41,6 +43,7 @@ export type ContentSyncReason =
     | "generator-version"
     | "game-calendar"
     | "source-state"
+    | "server-source"
     | "table-registry"
     | "forced"
     | "up-to-date"
@@ -182,7 +185,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-function patchSourceDigest(scan: ContentTargetScan): `sha256:${string}` | null {
+export function patchSourceDigest(scan: ContentTargetScan): `sha256:${string}` | null {
     const manifests = (scan.patchManifests ?? []).map(manifest => ({
         targetVersion: manifest.targetVersion,
         relativePath: manifest.relativePath,
@@ -222,12 +225,46 @@ function summaryPatchSourceDigest(summary: unknown): `sha256:${string}` | null {
     return summary.patchSourceDigest as `sha256:${string}`
 }
 
-function decideReason(
+/**
+ * Server-scope tables (config.json 等) are authored repo files, not CDN
+ * extracts: their content can change without the asset version moving, and
+ * the version-gated sync would otherwise skip them forever (2026-10-05
+ * max_star_crumb incident). The digest folds their source bytes into the
+ * sync decision.
+ */
+export function serverSourceDigest(
+    projectRoot: string,
+    definitions: readonly TableSourceDefinition[],
+): `sha256:${string}` {
+    const entries = definitions
+        .filter(definition => definition.scope === "server")
+        .map(definition => definition.bundledPath)
+        .sort()
+        .map(bundledPath => ({
+            path: bundledPath,
+            sha256: crypto.createHash("sha256")
+                .update(fs.readFileSync(path.join(projectRoot, bundledPath)))
+                .digest("hex"),
+        }))
+    return `sha256:${crypto.createHash("sha256")
+        .update(canonicalJsonBuffer(entries))
+        .digest("hex")}`
+}
+
+function summaryServerSourceDigest(summary: unknown): `sha256:${string}` | null {
+    if (!isRecord(summary)
+        || typeof summary.serverSourceDigest !== "string"
+        || !/^sha256:[a-f0-9]{64}$/.test(summary.serverSourceDigest)) return null
+    return summary.serverSourceDigest as `sha256:${string}`
+}
+
+export function decideReason(
     mode: ContentSyncMode,
     scan: ContentTargetScan,
     current: CurrentRelease | null,
     generatorVersion: number,
     gameCalendar: GameCalendarPolicy,
+    projectRoot: string,
     definitions: readonly TableSourceDefinition[],
 ): ContentSyncReason {
     if (mode === "force") return "forced"
@@ -241,6 +278,9 @@ function decideReason(
         return "game-calendar"
     }
     if (summaryPatchSourceDigest(current.summary) !== patchSourceDigest(scan)) return "source-state"
+    if (summaryServerSourceDigest(current.summary) !== serverSourceDigest(projectRoot, definitions)) {
+        return "server-source"
+    }
     if (getReleaseTableRegistryError(current.manifest, definitions) !== null) return "table-registry"
     return "up-to-date"
 }
@@ -288,11 +328,12 @@ function validateBuiltTables(
     return values
 }
 
-function createSummary(
+export function createSummary(
     scan: ContentTargetScan,
     archiveSources: ReturnType<typeof createArchiveSourceManifest>,
     generatorVersion: number,
     tableCount: number,
+    serverSourceDigestValue: `sha256:${string}`,
 ): unknown {
     return {
         schemaVersion: CONTENT_SCHEMA_VERSION,
@@ -301,6 +342,7 @@ function createSummary(
         entityListsRelativePath: scan.entityListsRelativePath,
         archiveSources,
         patchSourceDigest: patchSourceDigest(scan),
+        serverSourceDigest: serverSourceDigestValue,
         counts: {
             archives: scan.archives.length,
             ignoredPaths: scan.ignoredPaths.length,
@@ -366,7 +408,7 @@ async function synchronize(
     }
     const catalogObject = await store.writeObject(catalog)
     const summaryObject = await store.writeObject(
-        createSummary(scan, archiveSources, generatorVersion, definitions.length),
+        createSummary(scan, archiveSources, generatorVersion, definitions.length, serverSourceDigest(projectRoot, definitions)),
     )
     const manifest = await store.writeRelease({
         schemaVersion: CONTENT_SCHEMA_VERSION,
@@ -418,7 +460,7 @@ export async function runContentSync(
     if (mode === "check") {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, projectRoot, definitions)
         return resultWithoutRelease("check", scan.targetVersion, current, reason)
     }
 
@@ -429,7 +471,7 @@ export async function runContentSync(
     try {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, projectRoot, definitions)
         if (reason === "up-to-date") {
             return resultWithoutRelease("skipped", scan.targetVersion, current, reason)
         }
