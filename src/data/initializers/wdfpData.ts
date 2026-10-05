@@ -1278,6 +1278,30 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+
+    // 铃铛招募（新手房主开随机招募 → 投递给在线可加入玩家）
+    database.prepare(`CREATE TABLE IF NOT EXISTS attention_recruitments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        attention_key TEXT NOT NULL UNIQUE,
+        room_number TEXT NOT NULL,
+        host_pid INTEGER NOT NULL,
+        host_viewer_id INTEGER NOT NULL,
+        category INTEGER NOT NULL,
+        quest_id INTEGER NOT NULL,
+        is_newbie_host INTEGER NOT NULL DEFAULT 0,
+        establisher_json TEXT NOT NULL DEFAULT '{}',
+        posted_at_ms INTEGER NOT NULL,
+        expires_at_ms INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open'
+    )`).run()
+    database.prepare(`CREATE TABLE IF NOT EXISTS attention_deliveries (
+        recruitment_id INTEGER NOT NULL,
+        viewer_id INTEGER NOT NULL,
+        state TEXT NOT NULL DEFAULT 'delivered',
+        acted_at_ms INTEGER,
+        PRIMARY KEY (recruitment_id, viewer_id)
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_active_quests (
         player_id INTEGER PRIMARY KEY,
         play_id TEXT NOT NULL,
