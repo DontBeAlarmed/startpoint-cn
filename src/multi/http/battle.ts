@@ -347,9 +347,10 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             settlementResult = runMultiplayerSettlementOrchestration(preparation.value);
         } catch (error) {
             if (error instanceof ActiveQuestSettlementConflictError) {
-                // 旧局迟到/重复 finish：幂等零奖励终态，不渲染 H400
+                // 旧局迟到/重复 finish：优先回放缓存响应，未命中回幂等零奖励终态
+                const cached = getCachedFinishResponse(viewerId, body.category, body.quest_id, body.play_id);
                 return reply.header("content-type", "application/x-msgpack").status(200).send(
-                    buildTerminalMultiFinishResponse(playerId, viewerId, body),
+                    cached ?? buildTerminalMultiFinishResponse(playerId, viewerId, body),
                 );
             }
             throw error;
@@ -411,6 +412,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             || !storedQuest
             || !storedQuest.isMulti
             || typeof storedQuest.roomNumber !== "string") {
+            // 成功 abort 后的重复提交：幂等无操作终态（与 finish 幂等主题一致）
+            if (typeof body.play_id === "string" && body.play_id.length > 0) {
+                return reply.header("content-type", "application/x-msgpack").status(200).send({
+                    "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                    "data": {},
+                })
+            }
             return reply.status(400).send({
                 "error": "Bad Request", "message": "No matching active quest to abort."
             })
@@ -425,6 +433,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             || storedQuest.questId !== abortQuestId
             || storedQuest.category !== abortCategory) {
             // play_id 不匹配的迟到 abort：幂等无操作终态，不渲染 H400、不动当前局
+            // play_id 不匹配的迟到 abort：幂等无操作终态，不渲染 H400、不动当前局
             return reply.header("content-type", "application/x-msgpack").status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
                 "data": {},
@@ -432,8 +441,8 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         }
         const abortResult = runAbortActiveQuestTransaction(playerId, {
             playId: body.play_id,
-            questId: body.quest_id,
-            category: body.category,
+            questId: abortQuestId,
+            category: abortCategory,
         });
         if (!abortResult.cancelled) return reply.status(400).send({
             "error": "Bad Request", "message": "Active quest was already changed."
