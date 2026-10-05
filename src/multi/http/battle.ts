@@ -50,6 +50,7 @@ import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
 import { resolveRoomEstablisherFollowStateSync } from "../follow-policy";
 import { getLocalFollowRelationSync } from "../../data/domains/follow";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
+import { cacheFinishResponse, getCachedFinishResponse } from "../finish-response-cache";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
 import { isNewbieHostSync } from "../../lib/newbie-host";
@@ -319,6 +320,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         }
 
         const { playerId } = ctx;
+        // 缓存命中（TTL 内重复 finish）：直接回放首次响应
+        const cachedFinish = getCachedFinishResponse(viewerId, body.category, body.quest_id, body.play_id);
+        if (cachedFinish !== null) {
+            reply.header("content-type", "application/x-msgpack");
+            return reply.status(200).send(cachedFinish);
+        }
         const preparation = await prepareMultiplayerSettlement({
             body,
             context,
@@ -327,9 +334,10 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         });
         if (!preparation.ok) {
             if (preparation.statusCode === 400) {
-                // 重复 finish（活跃任务已完成并删除）：幂等零奖励终态而非 H400
+                // 重复 finish（活跃任务已完成并删除）：优先回放缓存响应，未命中回幂等零奖励终态
+                const cached = getCachedFinishResponse(viewerId, body.category, body.quest_id, body.play_id);
                 return reply.header("content-type", "application/x-msgpack").status(200).send(
-                    buildTerminalMultiFinishResponse(playerId, viewerId, body),
+                    cached ?? buildTerminalMultiFinishResponse(playerId, viewerId, body),
                 );
             }
             return reply.status(preparation.statusCode).send(preparation.response);
@@ -371,6 +379,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 },
             ),
         });
+        cacheFinishResponse(viewerId, body.category, body.quest_id, body.play_id, response);
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send(response);
     });
@@ -401,12 +410,24 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         if (!activeQuestData
             || !storedQuest
             || !storedQuest.isMulti
-            || typeof storedQuest.roomNumber !== "string"
-            || storedQuest.playId !== body.play_id
-            || storedQuest.questId !== body.quest_id
-            || storedQuest.category !== body.category) {
+            || typeof storedQuest.roomNumber !== "string") {
             return reply.status(400).send({
-                "error": "Bad Request", "message": "Active quest does not match abort request."
+                "error": "Bad Request", "message": "No matching active quest to abort."
+            })
+        }
+        // 宽容解析：CN 客户端的 abort 可能缺 category/quest_id（参考服同型事故），
+        // 以 storedQuest 为主键来源补全；仅显式冲突值才拒绝。
+        const abortQuestId = body.quest_id === undefined || body.quest_id === 0
+            ? storedQuest.questId : body.quest_id
+        const abortCategory = body.category === undefined || body.category === 0
+            ? storedQuest.category : body.category
+        if (storedQuest.playId !== body.play_id
+            || storedQuest.questId !== abortQuestId
+            || storedQuest.category !== abortCategory) {
+            // play_id 不匹配的迟到 abort：幂等无操作终态，不渲染 H400、不动当前局
+            return reply.header("content-type", "application/x-msgpack").status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": {},
             })
         }
         const abortResult = runAbortActiveQuestTransaction(playerId, {
@@ -477,21 +498,24 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
 
         const { playerId } = ctx;
 
-        if (activeQuests[playerId] === undefined) {
-            return reply.status(400).send({
-                "error": "Bad Request", "message": "No active quest to continue."
+        // 迟到/重复 continue：幂等终态（返回当前 continue_count，不写），不渲染 H400
+        const activeData = activeQuests[playerId];
+        if (activeData === undefined) {
+            return reply.header("content-type", "application/x-msgpack").status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": { continue_count: 0 },
             });
         }
 
-        const activeData = activeQuests[playerId];
         const continueCount = runContinueActiveQuestTransaction(playerId, activeData, {
             playId: body.play_id,
             questId: body.quest_id,
             category: body.category,
         });
         if (continueCount === null) {
-            return reply.status(400).send({
-                "error": "Bad Request", "message": "Active quest does not match continue request."
+            return reply.header("content-type", "application/x-msgpack").status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": { continue_count: activeData.continueCount },
             });
         }
 
