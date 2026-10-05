@@ -326,6 +326,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             viewerId,
         });
         if (!preparation.ok) {
+            if (preparation.statusCode === 400) {
+                // 重复 finish（活跃任务已完成并删除）：幂等零奖励终态而非 H400
+                return reply.header("content-type", "application/x-msgpack").status(200).send(
+                    buildTerminalMultiFinishResponse(playerId, viewerId, body),
+                );
+            }
             return reply.status(preparation.statusCode).send(preparation.response);
         }
         let settlementResult;
@@ -333,9 +339,10 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             settlementResult = runMultiplayerSettlementOrchestration(preparation.value);
         } catch (error) {
             if (error instanceof ActiveQuestSettlementConflictError) {
-                return reply.status(400).send({
-                    "error": "Bad Request", "message": error.message,
-                });
+                // 旧局迟到/重复 finish：幂等零奖励终态，不渲染 H400
+                return reply.header("content-type", "application/x-msgpack").status(200).send(
+                    buildTerminalMultiFinishResponse(playerId, viewerId, body),
+                );
             }
             throw error;
         }
@@ -497,3 +504,67 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         });
     });
 }
+/**
+ * 多人迟到/重复请求的幂等零奖励终态（对齐参考服 2026-10 事故修复）：
+ * 生命周期竞态与重复提交一律 200 业务终态，不再渲染为 H400。
+ * 身份校验仍由结算事务内的 playId 全等检查负责防串局写。
+ */
+function buildTerminalMultiFinishResponse(
+    playerId: number,
+    viewerId: number,
+    body: { category?: number; contribution_score?: number; mate_player_result?: Array<{ viewer_id?: number }> },
+) {
+    const player = getPlayerSync(playerId)
+    const dataHeaders = generateDataHeaders({ viewer_id: viewerId })
+    return {
+        data_headers: dataHeaders,
+        data: {
+            user_info: {
+                free_mana: player?.freeMana ?? 0,
+                exp_pool: player?.expPool ?? 0,
+                exp_pooled_time: realToVirtual(player?.staminaHealTime ?? new Date()),
+                free_vmoney: player?.freeVmoney ?? 0,
+                rank_point: player?.rankPoint ?? 0,
+                degree_id: player?.degreeId ?? 1,
+                stamina: player?.stamina ?? 0,
+                stamina_heal_time: realToVirtual(player?.staminaHealTime ?? new Date()),
+                boost_point: player?.boostPoint ?? 0,
+                boss_boost_point: player?.bossBoostPoint ?? 0,
+            },
+            add_exp_list: [],
+            character_list: [],
+            bond_token_status_list: [],
+            rewards: {
+                overflow_pool_exp: 0,
+                converted_pool_exp: 0,
+                reward_pool_exp: 0,
+                reward_mana: 0,
+                field_mana: 0,
+            },
+            old_high_score: 0,
+            joined_character_id_list: [],
+            before_rank_point: player?.rankPoint ?? 0,
+            clear_rank: 0,
+            drop_score_reward_ids: [],
+            drop_rare_reward_ids: [],
+            drop_additional_reward_ids: [],
+            drop_periodic_reward_ids: [],
+            equipment_list: [],
+            category_id: Number(body.category) || 0,
+            start_time: dataHeaders.servertime,
+            is_multi: "multi",
+            quest_name: "",
+            item_list: {},
+            presigned_quest_category: [],
+            mate_player_result: body.mate_player_result ?? [],
+            follow_info: [],
+            contribution_score: Number(body.contribution_score) || 0,
+            host_finished: false,
+            aborted_play_id: null,
+            unfinished_play_id: null,
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+        },
+    }
+}
+
+
