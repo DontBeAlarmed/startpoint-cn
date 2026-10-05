@@ -10,6 +10,7 @@ import type { DegreeContentTables } from "./degree-content-tables"
 import { readonlyMap, readonlySet } from "./degree-immutable"
 import type { DegreeRule } from "./degree-rule-catalog"
 import { parsePositiveSafeIntegerMasterValue } from "./master-value"
+import { getMissionCounterValueSync, newbieRescueClearQuery, rescueClearQuery } from "./rescue-battle-counters"
 import type { CategoryContext } from "./types"
 
 export const EMPTY_BATTLE_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
@@ -25,6 +26,8 @@ export const EMPTY_BATTLE_COUNTERS: Readonly<MissionBattleCounters> = Object.fre
     rankACount: 0,
     rankBCount: 0,
     challengeDungeonClearCount: 0,
+    rescueBattleClearCount: 0,
+    newbieRescueBattleClearCount: 0,
     singleScoreMax: 0,
     singleClearTimeMin: 0,
     bossBattleClearCount: 0,
@@ -182,6 +185,7 @@ export function deriveDegreeStats(
     facts: DegreeLoadedFacts,
     rules: ReadonlyMap<number, DegreeRule>,
     tables: DegreeContentTables,
+    playerId?: number,
 ): NonNullable<CategoryContext["degreeStats"]> {
     const characters = facts.characters ?? {}
     const manaNodes = facts.characterManaNodes ?? {}
@@ -264,6 +268,12 @@ export function deriveDegreeStats(
         hardMultiFinishedQuestIds: finishedBySection[26] ?? readonlySet(),
         finishedQuestIdsBySection: finishedBySection,
         challengeDungeonClearCount: battle.challengeDungeonClearCount,
+        rescueBattleClearCount: playerId === undefined
+            ? 0
+            : getMissionCounterValueSync(playerId, rescueClearQuery()),
+        newbieRescueBattleClearCount: playerId === undefined
+            ? 0
+            : getMissionCounterValueSync(playerId, newbieRescueClearQuery()),
         singleScoreMax: battle.singleScoreMax,
         singleClearTimeMin: battle.singleClearTimeMin,
         bossBattleClearCount: battle.bossBattleClearCount,

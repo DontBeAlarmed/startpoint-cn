@@ -694,8 +694,8 @@ assert.equal(getExactDegreeQuestClearRuleCount(), 84)
 assert.equal(getDegreeOperationRuleCount(), 9)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1282,
-    unsupported: 6,
+    serverComputed: 1288,
+    unsupported: 0,
     supportedFamilies: {
         playerRank: 8,
         characterLevel: 3,
@@ -722,6 +722,8 @@ assert.deepEqual(coverage, {
         carnivalQuestClear: 27,
         hardMultiQuestClear: 6,
         specifiedQuestClearCount: 84,
+        attentionBattleClear: 3,
+        multiBattleNewbie: 3,
         mvpFacts: 3,
         feverCount: 3,
         feverTime: 3,

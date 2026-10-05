@@ -20,6 +20,7 @@ function buildActiveQuest(raw: RawPlayerActiveQuest): PlayerActiveQuest {
         dailyChallengePointId: raw.daily_challenge_point_id,
         eventId: raw.event_id,
         rescueFragmentEligible: raw.rescue_fragment_eligible === 1,
+        newbieRescueEligible: raw.newbie_rescue_eligible === 1,
         continueCount: raw.continue_count
     }
 }
@@ -42,7 +43,7 @@ export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiv
              use_boost_point, is_auto_start_mode, is_multi, room_number,
              battle_session_id, coordinator_origin, entry_item_id, entry_item_count,
              stamina_cost, daily_challenge_point_id, event_id,
-             rescue_fragment_eligible, continue_count)
+             rescue_fragment_eligible, newbie_rescue_eligible, continue_count)
         VALUES (
             @player_id, @play_id, @quest_id, @category, @use_boss_boost_point,
             @use_boost_point, @is_auto_start_mode, @is_multi, @room_number,
@@ -50,6 +51,7 @@ export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiv
             @entry_item_count, @stamina_cost, @daily_challenge_point_id,
             @event_id,
             CASE WHEN @is_multi = 1 THEN @rescue_fragment_eligible ELSE 0 END,
+            CASE WHEN @is_multi = 1 THEN @newbie_rescue_eligible ELSE 0 END,
             @continue_count
         )
     `).run({
@@ -70,6 +72,7 @@ export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiv
         daily_challenge_point_id: quest.dailyChallengePointId ?? null,
         event_id: quest.eventId ?? null,
         rescue_fragment_eligible: quest.isMulti && quest.rescueFragmentEligible ? 1 : 0,
+        newbie_rescue_eligible: quest.isMulti && quest.newbieRescueEligible ? 1 : 0,
         continue_count: quest.continueCount,
     })
 }

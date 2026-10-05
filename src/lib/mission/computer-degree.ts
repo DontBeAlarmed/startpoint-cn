@@ -27,6 +27,8 @@ function metricValue(metric: DegreeMetric, ctx: CategoryContext): number {
         case "clearSelfDebuffCount": return stats.degreeBattleStats.clearSelfDebuffCount
         case "buffPartyCount": return stats.degreeBattleStats.buffPartyCount
         case "healPartyCount": return stats.degreeBattleStats.healPartyCount
+        case "rescueBattleClearCount": return stats.rescueBattleClearCount
+        case "newbieRescueBattleClearCount": return stats.newbieRescueBattleClearCount
         case "emotionCount": return stats.degreeBattleStats.emotionCount
         case "enemyKillCount": return stats.degreeBattleStats.enemyKillCount
         case "weakPointAttackCount": return stats.degreeBattleStats.weakPointAttackCount

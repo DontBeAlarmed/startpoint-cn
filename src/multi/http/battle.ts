@@ -52,6 +52,7 @@ import { getLocalFollowRelationSync } from "../../data/domains/follow";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
+import { isNewbieHostSync } from "../../lib/newbie-host";
 import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
 
 export function canAbortMultiBattle(
@@ -224,6 +225,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             isRoomHost,
             hostSelfRescueEnabled: gameplaySettings.multiRescueHostRewardsEnabled,
         });
+        // 新手组队计数资格（cond92）：guest 参与新冒险者（房主）发起的战斗。
+        // 发起者本人不计数（官方口径）；总开关关闭时一律不计。
+        const newbieRescueEligible = gameplaySettings.multiRescueFragmentRewardsEnabled
+            && !isRoomHost
+            && hostContext?.playerId !== undefined
+            && isNewbieHostSync(hostContext.playerId);
         const activeQuest = {
             questId: quest_id,
             category,
@@ -237,6 +244,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             matePlayerIds: Array.isArray(mate_player_ids) ? mate_player_ids : [],
             mateComIds: [],
             rescueFragmentEligible,
+            newbieRescueEligible,
             entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
             entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
             playId: play_id,

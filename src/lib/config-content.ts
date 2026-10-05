@@ -10,6 +10,9 @@ export interface CurrencyCapacityPolicy {
     readonly maxVmoney: number
     readonly maxMana: number
     readonly maxStarCrumb: number
+    /** 新手组队战斗的房主资格阈值（rank ≤ 值 或 建号 ≤ 值天；≤0 关闭判定）。 */
+    readonly newbieRank: number
+    readonly newbieDays: number
 }
 
 export interface StaminaContentPolicy {
@@ -98,6 +101,8 @@ export function getCurrencyCapacityPolicySync(
         maxVmoney: nonNegativeSafeInteger(raw, "max_virtual_money"),
         maxMana: nonNegativeSafeInteger(raw, "max_mana"),
         maxStarCrumb: nonNegativeSafeInteger(raw, "max_star_crumb"),
+        newbieRank: nonNegativeSafeInteger(raw, "newbie_rank"),
+        newbieDays: nonNegativeSafeInteger(raw, "newbie_days"),
     })
     currencyByRepository.set(selected, policy)
     return policy

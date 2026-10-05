@@ -134,7 +134,7 @@ export function buildDegreeCategoryContextFromSession(
         } : {}),
     })
     const player = cloneAndFreeze(projectPlayer(session.getFact({ kind: "player" })))
-    const degreeStats = deriveDegreeStats(facts, catalog.rules, catalog.tables)
+    const degreeStats = deriveDegreeStats(facts, catalog.rules, catalog.tables, session.playerId)
     const needsPlayerRank = [...catalog.rules.values()].some(rule => rule.kind === "playerRank")
     const playerRankDegree = needsPlayerRank
         ? parsePlayerRankContent(

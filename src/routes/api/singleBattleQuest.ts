@@ -353,6 +353,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             isMulti: false,
             coordinatorOrigin: null,
             rescueFragmentEligible: false,
+            newbieRescueEligible: false,
             entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
             entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
             dailyChallengePointId: challengePointId,

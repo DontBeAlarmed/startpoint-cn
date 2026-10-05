@@ -71,6 +71,8 @@ export interface CategoryContext {
         hardMultiFinishedQuestIds: ReadonlySet<number>
         finishedQuestIdsBySection: Readonly<Record<number, ReadonlySet<number>>>
         challengeDungeonClearCount: number
+        rescueBattleClearCount: number
+        newbieRescueBattleClearCount: number
         singleScoreMax: number
         singleClearTimeMin: number
         bossBattleClearCount: number

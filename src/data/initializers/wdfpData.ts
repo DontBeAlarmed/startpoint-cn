@@ -6,6 +6,7 @@ import {
     ensureActiveQuestEntryItemCountStorageSync,
     ensureActiveQuestResourceCostStorageSync,
     ensureActiveQuestRescueFragmentEligibilityStorageSync,
+    ensureActiveQuestNewbieRescueEligibilityStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
 import { initializeServerNewsSchemaSync } from "../schema/server-news";
@@ -352,6 +353,20 @@ export default function init(
     ensureSchemaColumn(database, "players_mission_battle_counters.single_clear_time_min")
     ensureSchemaColumn(database, "players_mission_battle_counters.boss_battle_clear_count")
     ensureSchemaColumn(database, "players_mission_battle_counters.skill_use_count")
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_mission_counters (
+        player_id INTEGER NOT NULL,
+        counter_key TEXT NOT NULL,
+        dimension TEXT NOT NULL,
+        scope_type TEXT NOT NULL,
+        scope_key TEXT NOT NULL,
+        qualifier_json TEXT NOT NULL DEFAULT '{}',
+        value INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, counter_key),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_mission_counters_dimension
+        ON players_mission_counters (player_id, dimension)`).run()
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_degree_battle_stats (
         player_id INTEGER PRIMARY KEY,
@@ -1284,6 +1299,8 @@ export default function init(
         event_id INTEGER,
         rescue_fragment_eligible INTEGER NOT NULL DEFAULT 0
             CHECK (rescue_fragment_eligible IN (0, 1)),
+        newbie_rescue_eligible INTEGER NOT NULL DEFAULT 0
+            CHECK (newbie_rescue_eligible IN (0, 1)),
         continue_count INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
@@ -1292,4 +1309,5 @@ export default function init(
     ensureActiveQuestCoordinatorOriginStorageSync(database)
     ensureActiveQuestResourceCostStorageSync(database)
     ensureActiveQuestRescueFragmentEligibilityStorageSync(database)
+    ensureActiveQuestNewbieRescueEligibilityStorageSync(database)
 }

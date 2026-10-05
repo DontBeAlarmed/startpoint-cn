@@ -441,6 +441,7 @@ const routes = async (fastify: FastifyInstance) => {
             isMulti: false,
             coordinatorOrigin: null,
             rescueFragmentEligible: false,
+            newbieRescueEligible: false,
             playId: body.play_id,
             continueCount: 0
         }

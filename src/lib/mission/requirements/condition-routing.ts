@@ -119,6 +119,8 @@ export const DEGREE_FACT_FAMILIES_BY_CONDITION: Readonly<Record<number, readonly
     36: ["equipment"], // max-level equipment
     39: ["player"], // stamina use
     45: ["treasureShop"], // treasure shop purchases
+    20: ["missionBattleCounters"], // rescue battle clears (bell-join semantics)
+    92: ["missionBattleCounters"], // newbie multi battle clears
     44: ["characters"], // specific-character bond (row[15] selector)
     48: ["characters", "manaNodes"], // second mana board per-character or aggregate
 })

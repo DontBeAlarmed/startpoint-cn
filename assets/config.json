@@ -49,6 +49,6 @@
     "monthly_bonus_payment_total_requirement": 0,
     "crazygacha_ten_times_character_ticket_id": 0,
     "reward_multiplier_by_newbie": 1.0,
-    "newbie_rank": 50,
-    "newbie_days": 7
+    "newbie_rank": 80,
+    "newbie_days": 30
 }

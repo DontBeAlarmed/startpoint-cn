@@ -901,6 +901,7 @@ export interface RawPlayerActiveQuest {
     daily_challenge_point_id: number | null
     event_id: number | null
     rescue_fragment_eligible: number
+    newbie_rescue_eligible: number
     continue_count: number
 }
 
@@ -922,5 +923,6 @@ export interface PlayerActiveQuest {
     dailyChallengePointId: number | null
     eventId: number | null
     rescueFragmentEligible: boolean
+    newbieRescueEligible: boolean
     continueCount: number
 }

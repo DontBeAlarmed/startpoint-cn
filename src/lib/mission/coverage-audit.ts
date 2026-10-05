@@ -63,18 +63,8 @@ function eventFallbackReason(row: readonly unknown[]): string {
     return `authoritative-event-fact-unavailable:type-${Number.isSafeInteger(patternType) ? patternType : "unknown"}`
 }
 
-const DEFERRED_DEGREE_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Map([
-    [25000, "attention-source-unavailable"],
-    [25010, "attention-source-unavailable"],
-    [25020, "attention-source-unavailable"],
-    [70004, "newbie-classification-unavailable"],
-    [70005, "newbie-classification-unavailable"],
-    [70006, "newbie-classification-unavailable"],
-])
-
 function degreeFallbackReason(missionId: number): string {
-    return DEFERRED_DEGREE_REASON_BY_MISSION_ID.get(missionId)
-        ?? "authoritative-degree-fact-unavailable"
+    return "authoritative-degree-fact-unavailable"
 }
 
 const REGULAR_FALLBACK_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Map([
@@ -129,9 +119,15 @@ function requirementBackedPartition(
 }
 
 function regularPartition(): MissionCoveragePartition {
+    // 62/63/64/87/88/89（patternType 20 救援通关）由多人 finish 的救援计数
+    // 生产者直接递增（见 rescue-battle-counters），属生产者支持而非 regular
+    // computer 的 computed 集。
+    const producerBacked = missionKeys(1, [62, 63, 64, 87, 88, 89])
+    const automated = missionKeys(1, getRegularComputedMissionIds())
+    for (const key of producerBacked) automated.add(key)
     return createPartition(
         [{ category: 1, definitions: getMissionCatalog().getDefinitions(1) }],
-        missionKeys(1, getRegularComputedMissionIds()),
+        automated,
         (_category, definition) => REGULAR_FALLBACK_REASON_BY_MISSION_ID.get(definition.missionId)
             ?? "authoritative-regular-fact-unavailable",
     )

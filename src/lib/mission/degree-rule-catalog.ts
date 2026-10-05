@@ -35,6 +35,7 @@ export type DegreeMetric =
     | "healPartyCount" | "emotionCount" | "enemyKillCount" | "weakPointAttackCount"
     | "powerFlipLv3Count" | "coffinReducedCount" | "damageDealMax"
     | "revivalCoffinMax" | "partyPowerMax" | "skillChainMax"
+    | "rescueBattleClearCount" | "newbieRescueBattleClearCount"
 
 interface DegreeRuleBase {
     readonly missionId: number
@@ -119,6 +120,7 @@ const METRICS: readonly [string, DegreeMetric, boolean][] = [
     [FAMILY.manaBoardCount, "manaBoardCount", true], [FAMILY.bondTokenCount, "bondTokenCount", true],
     [FAMILY.singleSsCount, "singleSsCount", true], [FAMILY.multiClearCount, "multiClearCount", false],
     [FAMILY.multiHostClearCount, "multiHostClearCount", false], [FAMILY.episodeClearCount, "episodeClearCount", false],
+    [FAMILY.attentionBattleClear, "rescueBattleClearCount", false], [FAMILY.multiBattleNewbie, "newbieRescueBattleClearCount", false],
     [FAMILY.staminaUseCount, "staminaUseCount", false], [FAMILY.loginCount, "loginCount", false],
     [FAMILY.challengeDungeonClear, "challengeDungeonClearCount", false], [FAMILY.bossBattleClear, "bossBattleClearCount", false],
     [FAMILY.skillUse, "skillUseCount", false], [FAMILY.feverCount, "feverCount", false],

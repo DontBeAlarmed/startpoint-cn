@@ -33,6 +33,7 @@ export interface ActiveQuest {
     dailyChallengePointId?: number | null
     eventId?: number | null
     rescueFragmentEligible: boolean
+    newbieRescueEligible: boolean
     playId: string
     continueCount: number
 }
@@ -81,6 +82,7 @@ export function persistActiveQuest(playerId: number, quest: ActiveQuest): void {
         dailyChallengePointId: quest.dailyChallengePointId ?? null,
         eventId: quest.eventId ?? null,
         rescueFragmentEligible: quest.isMulti && quest.rescueFragmentEligible === true,
+        newbieRescueEligible: quest.isMulti && quest.newbieRescueEligible === true,
         continueCount: quest.continueCount,
     })
 }

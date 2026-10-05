@@ -55,3 +55,13 @@ export function ensureActiveQuestRescueFragmentEligibilityStorageSync(database: 
         CHECK (rescue_fragment_eligible IN (0, 1))
     `).run()
 }
+
+export function ensureActiveQuestNewbieRescueEligibilityStorageSync(database: Database): void {
+    const columns = database.prepare(`PRAGMA table_info(players_active_quests)`).all() as { name: string }[]
+    if (columns.some(column => column.name === "newbie_rescue_eligible")) return
+    database.prepare(`
+        ALTER TABLE players_active_quests
+        ADD COLUMN newbie_rescue_eligible INTEGER NOT NULL DEFAULT 0
+        CHECK (newbie_rescue_eligible IN (0, 1))
+    `).run()
+}

@@ -1,4 +1,5 @@
 import { getPlayerSingleQuestProgressSync, incrementPlayerQuestMultiClearSync } from "../../data/domains/quest"
+import { recordRescueBattleMissionCountersSync } from "../../lib/mission/rescue-battle-counters"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 import { getAdditionalRewardTable, settleAdditionalRewardsSync } from "../../lib/additional-reward"
@@ -415,6 +416,12 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         if (questAccomplished) {
             incrementPlayerQuestMultiClearSync(input.playerId, questCategory, questId)
         }
+        recordRescueBattleMissionCountersSync(input.playerId, {
+            rescue: storedQuest.rescueFragmentEligible === true,
+            newbieRescue: storedQuest.newbieRescueEligible === true,
+            questCategory,
+            questId,
+        })
         const rewardCharacterExpResult = givePlayerCharactersExpSync(
             input.playerId,
             partyCharacterIdsArray,

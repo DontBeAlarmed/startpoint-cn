@@ -32,17 +32,11 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.regular)
     assert.deepEqual(
         { total: report.regular.total, automated: report.regular.automated, fallback: report.regular.fallback },
-        { total: 120, automated: 112, fallback: 8 },
+        { total: 120, automated: 118, fallback: 2 },
     )
     assert.deepEqual(
         report.regular.fallbackMissions.map(entry => [entry.missionId, entry.reason]),
         [
-            [62, "rescue-source-unavailable"],
-            [63, "rescue-source-unavailable"],
-            [64, "rescue-source-unavailable"],
-            [87, "rescue-source-unavailable"],
-            [88, "rescue-source-unavailable"],
-            [89, "rescue-source-unavailable"],
             [100, "rescue-source-unavailable"],
             [107, "external-social-check-not-supported"],
         ],
@@ -115,7 +109,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.degree)
     assert.deepEqual(
         { total: report.degree.total, automated: report.degree.automated, fallback: report.degree.fallback },
-        { total: 1288, automated: 1282, fallback: 6 },
+        { total: 1288, automated: 1288, fallback: 0 },
     )
     assert.deepEqual(
         report.degree.automatedMissions

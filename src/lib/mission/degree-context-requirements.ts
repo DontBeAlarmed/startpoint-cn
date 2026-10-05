@@ -38,6 +38,8 @@ export const DEGREE_SUPPORTED_FAMILIES = {
     coffinReduced: "degree_coffin_count_sub_", damageMax: "degree_damage_onetime_",
     revivalCoffinMax: "degree_return_coffin_count_30over_", partyPowerMax: "degree_condition_party_force_",
     skillChainMax: "degree_skill_chain_condition_",
+    attentionBattleClear: "degree_attention_battle_clear_",
+    multiBattleNewbie: "degree_multi_battle_newbie_",
 } as const
 
 export type DegreeContextFactFamily =
