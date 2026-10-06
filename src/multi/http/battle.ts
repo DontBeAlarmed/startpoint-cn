@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { getRealNow } from "../../runtime/time/game-time";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
-import { generateDataHeaders, realToVirtual } from "../../utils";
+import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { getRoom, disbandRoom } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import {
@@ -54,6 +54,11 @@ import { cacheFinishResponse, getCachedFinishResponse } from "../finish-response
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
 import { isNewbieHostSync } from "../../lib/newbie-host";
+import {
+    findOpenRecruitmentByKey,
+    recordResponse,
+    type AttentionRecruitment,
+} from "../../data/domains/attention";
 import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
 
 export function canAbortMultiBattle(
@@ -76,6 +81,29 @@ export function cleanupAbortedMultiBattle(
     }
     sessionManager.removeBattleParticipant(roomNumber, participant);
     return false;
+}
+
+/**
+ * 铃铛进房解析：key 指向的招募必须 open，且房间号/房主与当前战斗一致才有效；
+ * 任何失败（含 DB 异常）fail-open 为 null，退回实时 isNewbieHostSync 判定。
+ * 导出供回归测试直接锁定语义（防伪 key/跨房间 key）。
+ */
+export function resolveBellRecruitmentForStart(
+    attentionKey: string | null,
+    roomNumber: string,
+    hostViewerId: number,
+): AttentionRecruitment | null {
+    if (attentionKey === null) return null;
+    try {
+        const recruitment = findOpenRecruitmentByKey(attentionKey, getServerTime() * 1000);
+        if (recruitment === null) return null;
+        return recruitment.roomNumber === roomNumber
+            && recruitment.hostViewerId === hostViewerId
+            ? recruitment
+            : null;
+    } catch {
+        return null;
+    }
 }
 
 export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
@@ -228,10 +256,26 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         });
         // 新手组队计数资格（cond92）：guest 参与新冒险者（房主）发起的战斗。
         // 发起者本人不计数（官方口径）；总开关关闭时一律不计。
-        const newbieRescueEligible = gameplaySettings.multiRescueFragmentRewardsEnabled
-            && !isRoomHost
-            && hostContext?.playerId !== undefined
-            && isNewbieHostSync(hostContext.playerId);
+        // 铃铛进房（quest/start 携 attention_key）以招募行的 is_newbie_host 冻结
+        // 资格（房主开铃时的状态），并记录 accepted 响应；无 key/无效 key 走实时判定。
+        const bellRecruitment = resolveBellRecruitmentForStart(
+            typeof body.attention_key === "string" && body.attention_key.length > 0
+                ? body.attention_key
+                : null,
+            room_number,
+            room.value.host.viewerId,
+        );
+        const newbieRescueEligible = bellRecruitment !== null
+            ? gameplaySettings.multiRescueFragmentRewardsEnabled
+                && !isRoomHost
+                && bellRecruitment.isNewbieHost
+            : gameplaySettings.multiRescueFragmentRewardsEnabled
+                && !isRoomHost
+                && hostContext?.playerId !== undefined
+                && isNewbieHostSync(hostContext.playerId);
+        if (bellRecruitment !== null && !isRoomHost) {
+            recordResponse(bellRecruitment.id, viewer_id, "accepted", getServerTime() * 1000);
+        }
         const activeQuest = {
             questId: quest_id,
             category,
