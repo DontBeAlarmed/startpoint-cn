@@ -192,16 +192,24 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         // - publishBell on 且 W=0（官服还原）：发候选（客户端 ~20s 原生时序）
         // - publishBell on 且 W>0（私服混合）：窗口未到回空（省略 mate 字段，
         //   客户端 Faild 重开铃），NPC 由服务端注入在 W 到点时进场（批次三）
-        const settings = getServerGameplaySettingsSync();
-        const recruitment = settings.multiRandomRecruitmentPublishEnabled && settings.multiNpcReleaseSeconds > 0
-            ? findOpenRecruitmentForRoom(viewerId, body.room_number, getServerTime() * 1000)
-            : null;
-        const serveCandidates = resolveSummonServeCandidates({
-            publishEnabled: settings.multiRandomRecruitmentPublishEnabled,
-            releaseSeconds: settings.multiNpcReleaseSeconds,
-            recruitment: recruitment === null ? null : { postedAtMs: recruitment.postedAtMs },
-            nowMs: getServerTime() * 1000,
-        });
+        // 双审修订：判定路径（settings 读 + 招募行读）整体 fail-open——共享库
+        // 抖动等 DB 异常时回退为直接发候选（提交前行为），恒 200 不变式优先。
+        const nowMs = getServerTime() * 1000;
+        let serveCandidates = true;
+        try {
+            const settings = getServerGameplaySettingsSync();
+            const recruitment = settings.multiRandomRecruitmentPublishEnabled && settings.multiNpcReleaseSeconds > 0
+                ? findOpenRecruitmentForRoom(viewerId, body.room_number, nowMs)
+                : null;
+            serveCandidates = resolveSummonServeCandidates({
+                publishEnabled: settings.multiRandomRecruitmentPublishEnabled,
+                releaseSeconds: settings.multiNpcReleaseSeconds,
+                recruitment: recruitment === null ? null : { postedAtMs: recruitment.postedAtMs },
+                nowMs,
+            });
+        } catch (error) {
+            console.warn("[MULTI] summon candidate decision failed; serving candidates", error);
+        }
 
         const mates = buildNpcMates(body.quest_id, room.value.category);
         const data: Record<string, unknown> = serveCandidates
