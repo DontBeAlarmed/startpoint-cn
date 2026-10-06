@@ -218,6 +218,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/attention_lifecycle.test.cjs",
             "tools/attention_routes.test.cjs",
             "tools/attention_bell_start.test.cjs",
+            "tools/social_store_shared.test.cjs",
             "tools/active_account_state_cache.test.cjs",
             "tools/load_identity_boundary.test.cjs",
         ],

@@ -9,6 +9,7 @@ import {
     ensureActiveQuestNewbieRescueEligibilityStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
+import { ensureAttentionSchema } from "../social/attention-schema";
 import { initializeServerNewsSchemaSync } from "../schema/server-news";
 import { initializeServerGiftsSchemaSync } from "../schema/server-gifts";
 import { initializePlayerFollowsSchemaSync } from "../schema/player-follows";
@@ -1279,34 +1280,9 @@ export default function init(
     )`).run()
 
 
-    // 铃铛招募（新手房主开随机招募 → 投递给在线可加入玩家）
-    database.prepare(`CREATE TABLE IF NOT EXISTS attention_recruitments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        attention_key TEXT NOT NULL UNIQUE,
-        room_number TEXT NOT NULL,
-        host_pid INTEGER NOT NULL,
-        host_viewer_id INTEGER NOT NULL,
-        category INTEGER NOT NULL,
-        quest_id INTEGER NOT NULL,
-        is_newbie_host INTEGER NOT NULL DEFAULT 0,
-        establisher_json TEXT NOT NULL DEFAULT '{}',
-        posted_at_ms INTEGER NOT NULL,
-        expires_at_ms INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'open'
-    )`).run()
-    database.prepare(`CREATE TABLE IF NOT EXISTS attention_deliveries (
-        recruitment_id INTEGER NOT NULL,
-        viewer_id INTEGER NOT NULL,
-        state TEXT NOT NULL DEFAULT 'delivered',
-        acted_at_ms INTEGER,
-        PRIMARY KEY (recruitment_id, viewer_id)
-    )`).run()
-    // 投递热路径（每在线玩家每 ~10s 一次 /attention/check）与 share_room 的
-    // get-or-create 都靠这两个索引；行清理见 attention 域 pruneExpiredRecruitments
-    database.prepare(`CREATE INDEX IF NOT EXISTS idx_attention_recruitments_host_room
-        ON attention_recruitments (host_viewer_id, room_number)`).run()
-    database.prepare(`CREATE INDEX IF NOT EXISTS idx_attention_recruitments_status_expires
-        ON attention_recruitments (status, expires_at_ms)`).run()
+    // 铃铛招募两表 + 索引：DDL 单一来源在 social/attention-schema.ts
+    //（与共享社交库 MULTI_SOCIAL_DB_PATH 同源，保证 schema 永远一致）
+    ensureAttentionSchema(database)
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_active_quests (
         player_id INTEGER PRIMARY KEY,
