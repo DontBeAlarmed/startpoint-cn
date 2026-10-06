@@ -46,6 +46,10 @@ const {
     getOrCreateRecruitmentForRoom,
 } = require("../src/data/domains/attention")
 const { isPresenceOnline } = require("../src/multi/presence")
+const { getServerTime } = require("../src/utils")
+const { createRoom } = require("../src/multi/room/manager")
+const { createEmbeddedMultiHttpContext } = require("../src/multi/http/context")
+const { registerRoomRoutes } = require("../src/multi/http/room")
 
 initializeDatabase()
 db = getDb()
@@ -96,6 +100,11 @@ async function main() {
     })
     const { default: attentionRoutes } = require("../src/routes/api/attention")
     await fastify.register(attentionRoutes, { prefix: "/api/index.php/attention" })
+    const multiContext = createEmbeddedMultiHttpContext()
+    await fastify.register(
+        async instance => { registerRoomRoutes(instance, multiContext) },
+        { prefix: "/api/index.php/multi_battle_quest" },
+    )
     await fastify.ready()
 
     const host = await createPlayer()
@@ -122,7 +131,7 @@ async function main() {
             rankLevel: 42,
             hostEntryTime: 1700,
         }),
-        nowMs: Date.now(),
+        nowMs: getServerTime() * 1000,
     })
 
     // ---- guest 轮询 check：收到铃铛，字段集与客户端契约一致 ----
@@ -233,6 +242,66 @@ async function main() {
     assert.equal((await post(fastify, "/api/index.php/attention/logger", {
         viewer_id: 0, client_logs: [], api_count: 1,
     })).statusCode, 400)
+
+    // ---- share_room 类型门控：仅 share_type_list 含 3（随机招募）才落招募行 ----
+    // 客户端契约（MultiBattleRoomScene.shareRequestAPI / AttentionRecruitmentRedeliverTimer）：
+    // 含 3 时移出列表走 startRecruit 定时器（重发恒为 [3]）；纯 [1]/[2]（互关/粉丝）
+    // 一次性分享不得把房间广播成随机招募铃铛。
+    const shareGateHost = await createPlayer()
+    const shareRoom = createRoom(
+        shareGateHost.viewerId, shareGateHost.playerId, 1, 1, 1001001, 0, 341005,
+    )
+    const shareUrl = "/api/index.php/multi_battle_quest/share_room"
+    const recruitmentCount = () => db.prepare(
+        "SELECT COUNT(*) AS n FROM attention_recruitments WHERE room_number = ?"
+    ).get(shareRoom.room_number).n
+
+    for (const shareTypeList of [[1, 2], [1], [2]]) {
+        const shared = await post(fastify, shareUrl, {
+            viewer_id: shareGateHost.viewerId,
+            room_number: shareRoom.room_number,
+            share_type_list: shareTypeList,
+            api_count: 1,
+        })
+        assert.equal(shared.statusCode, 200, shared.body)
+        assert.equal(recruitmentCount(), 0, `纯 ${JSON.stringify(shareTypeList)} 分享不得创建招募行`)
+    }
+
+    const noList = await post(fastify, shareUrl, {
+        viewer_id: shareGateHost.viewerId,
+        room_number: shareRoom.room_number,
+        api_count: 2,
+    })
+    assert.equal(noList.statusCode, 200, noList.body)
+    assert.equal(recruitmentCount(), 0, "缺省 share_type_list 不得创建招募行")
+
+    const recruited = await post(fastify, shareUrl, {
+        viewer_id: shareGateHost.viewerId,
+        room_number: shareRoom.room_number,
+        share_type_list: [3],
+        api_count: 3,
+    })
+    assert.equal(recruited.statusCode, 200, recruited.body)
+    assert.equal(recruitmentCount(), 1, "share_type_list 含 3 必须创建招募行")
+    const gateRow = db.prepare(
+        "SELECT attention_key FROM attention_recruitments WHERE room_number = ?"
+    ).get(shareRoom.room_number)
+    assert.match(gateRow.attention_key, new RegExp(`^attention_\\d{6}_${shareGateHost.viewerId}$`))
+
+    // 重发 [3] 幂等：同房间仍是一行、同一 key
+    await post(fastify, shareUrl, {
+        viewer_id: shareGateHost.viewerId,
+        room_number: shareRoom.room_number,
+        share_type_list: [3],
+        api_count: 4,
+    })
+    assert.equal(recruitmentCount(), 1, "重发 [3] 不得创建新行")
+    assert.equal(
+        db.prepare("SELECT attention_key FROM attention_recruitments WHERE room_number = ?")
+            .get(shareRoom.room_number).attention_key,
+        gateRow.attention_key,
+        "重发 [3] 不得更换 attention_key",
+    )
 
     console.log("attention routes: all assertions passed")
     await fastify.close()

@@ -37,6 +37,7 @@ const {
     getOrCreateRecruitmentForRoom,
     getRecruitmentLifetimeMs,
     parseEstablisherSnapshot,
+    pruneExpiredRecruitments,
     recordResponse,
 } = require("../src/data/domains/attention")
 
@@ -132,6 +133,10 @@ function share(input = {}) {
     assert.equal(declined.state, "declined")
     assert.equal(declined.acted_at_ms, 5_555)
 
+    // 拒绝后不复发：再次轮询不得重新投递已 declined 的招募
+    assert.equal(deliverOpenRecruitmentsToViewer(viewerC, nowMs, 3).length, 0,
+        "declined 必须收敛（不得重新投递）")
+
     // 对已响应状态重复写必须 no-op（不降级、不刷新 acted_at）
     recordResponse(recruitmentId, viewerC, "accepted", 7_777)
     const still = db.prepare(
@@ -213,6 +218,39 @@ function share(input = {}) {
     closeRecruitmentForRoom(HOST_VIEWER, "555666")
     assert.ok(findOpenRecruitmentByKey(keep.attentionKey, nowMs) !== null, "其它房间的招募不受影响")
     assert.equal(findOpenRecruitmentByKey(doomed.attentionKey, nowMs), null, "关闭房间必须失效")
+}
+
+// ---- prune：过期标记 + 超过保留期的行连同投递历史删除 ----
+{
+    db.prepare("DELETE FROM attention_recruitments").run()
+    db.prepare("DELETE FROM attention_deliveries").run()
+    const retentionMs = 60_000
+    const expiredAt = nowMs + getRecruitmentLifetimeMs()
+    const stale = getOrCreateRecruitmentForRoom({
+        hostPid: 400, hostViewerId: 9300, category: 1, questId: 1001001,
+        roomNumber: "910001", isNewbieHost: false, establisherJson: "{}", nowMs,
+    })
+    // live 的过期时间必须落在 prune 时间之后，否则会被一并标记 expired
+    const liveAtMs = nowMs + 120_000
+    const live = share({ roomNumber: "910002", nowMs: liveAtMs })
+    deliverOpenRecruitmentsToViewer(9301, nowMs, 3)
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries").get().n, 2)
+
+    // 过期即标记 expired，但保留期内行仍在（含投递历史）
+    pruneExpiredRecruitments(expiredAt + 1, retentionMs)
+    const marked = db.prepare("SELECT status FROM attention_recruitments WHERE id = ?").get(stale.id)
+    assert.equal(marked.status, "expired")
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries").get().n, 2,
+        "保留期内不得删除投递历史")
+
+    // 超过保留期：过期行 + 其投递历史删除；open 行不受影响
+    pruneExpiredRecruitments(expiredAt + retentionMs + 1, retentionMs)
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_recruitments WHERE id = ?").get(stale.id).n, 0,
+        "超过保留期的过期招募必须删除")
+    assert.equal(db.prepare(
+        "SELECT COUNT(*) AS n FROM attention_deliveries WHERE recruitment_id = ?"
+    ).get(stale.id).n, 0, "删除招募必须连带删除投递历史")
+    assert.ok(findOpenRecruitmentByKey(live.attentionKey, liveAtMs) !== null, "open 招募不得被 prune 误删")
 }
 
 console.log("attention lifecycle: all assertions passed")

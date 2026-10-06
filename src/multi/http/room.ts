@@ -15,6 +15,7 @@ import {
     buildEstablisherSnapshot,
     closeRecruitmentForRoom,
     getOrCreateRecruitmentForRoom,
+    pruneExpiredRecruitments,
 } from "../../data/domains/attention";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import { getPlayerRankLevel } from "../player-context";
@@ -248,14 +249,23 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     });
 
     // ---- share_room ----
-    // 铃铛招募落点：房主客户端每 15s 重发（上限 20 次），此处幂等 get-or-create
-    // （同房间恒定 attention_key）+ 刷新过期时间与房主快照。客户端忽略响应体。
+    // 铃铛招募落点。客户端两种语义（RoomShareType 1=互关 2=粉丝 3=随机招募）：
+    // 仅 share_type_list 含 3 才创建/刷新招募行——含 3 时客户端把 3 移出列表走
+    // startRecruit 定时器（重发恒为 [3]），纯 [1]/[2] 一次性分享不广播铃铛。
+    // 房主每 15s 重发（上限 20 次），幂等 get-or-create（同房间恒定 attention_key）
+    // + 刷新过期时间与房主快照。客户端忽略响应体；招募记账尽力而为，失败不 500。
     fastify.post("/share_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as ShareRoomBody;
         const viewerId = body.viewer_id;
         console.log("[MULTI] share_room received");
 
-        if (!await hasValidViewer(context, viewerId)) {
+        if (!isValidMultiViewerId(viewerId)) {
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Invalid request body."
+            });
+        }
+        const hostContext = await context.resolvePlayerContext(viewerId);
+        if (hostContext === null) {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
@@ -271,22 +281,31 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         }
         if (viewerId !== room.value.host.viewerId) return forbidden(reply);
 
-        const hostContext = await context.resolvePlayerContext(viewerId);
-        const recruitment = getOrCreateRecruitmentForRoom({
-            hostPid: hostContext?.playerId ?? 0,
-            hostViewerId: viewerId,
-            category: room.value.category,
-            questId: room.value.questId,
-            roomNumber: body.room_number,
-            isNewbieHost: hostContext !== null && isNewbieHostSync(hostContext.playerId),
-            establisherJson: buildEstablisherSnapshot({
-                character: room.value.hostMainCharacterId,
-                rankLevel: getPlayerRankLevel(hostContext?.player.rankPoint ?? 0),
-                hostEntryTime: room.value.hostEntryTime,
-            }),
-            nowMs: getServerTime() * 1000,
-        });
-        console.log(`[MULTI] share_room ${recruitment.created ? "created" : "refreshed"} key=${recruitment.attentionKey}`);
+        const wantsRecruitment = Array.isArray(body.share_type_list)
+            && body.share_type_list.includes(3);
+        if (wantsRecruitment) {
+            // 尽力而为：招募落库/过期清理失败不得阻断分享主流程（15s 重发自愈）
+            try {
+                const recruitment = getOrCreateRecruitmentForRoom({
+                    hostPid: hostContext.playerId,
+                    hostViewerId: viewerId,
+                    category: room.value.category,
+                    questId: room.value.questId,
+                    roomNumber: body.room_number,
+                    isNewbieHost: isNewbieHostSync(hostContext.playerId),
+                    establisherJson: buildEstablisherSnapshot({
+                        character: room.value.hostMainCharacterId,
+                        rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
+                        hostEntryTime: room.value.hostEntryTime,
+                    }),
+                    nowMs: getServerTime() * 1000,
+                });
+                console.log(`[MULTI] share_room ${recruitment.created ? "created" : "refreshed"} key=${recruitment.attentionKey}`);
+                pruneExpiredRecruitments(getServerTime() * 1000);
+            } catch (error) {
+                console.warn("[MULTI] share_room recruitment bookkeeping failed", error);
+            }
+        }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

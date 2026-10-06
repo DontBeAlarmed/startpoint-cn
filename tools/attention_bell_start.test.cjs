@@ -35,11 +35,14 @@ const {
     getOrCreateRecruitmentForRoom,
 } = require("../src/data/domains/attention")
 const { resolveBellRecruitmentForStart } = require("../src/multi/http/battle")
+// 被测代码内部用 getServerTime()*1000（虚拟钟）取时，测试造数必须同域，
+// 否则一旦测试环境设置 timeOffset 就会以"招募过期"的方式碎掉
+const { getServerTime } = require("../src/utils")
 
 const HOST_VIEWER = 9501
 const HOST_PID = 501
 const ROOM = "998877"
-const nowMs = Date.now()
+const nowMs = getServerTime() * 1000
 
 const recruitment = getOrCreateRecruitmentForRoom({
     hostPid: HOST_PID,

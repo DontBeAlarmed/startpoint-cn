@@ -1301,6 +1301,12 @@ export default function init(
         acted_at_ms INTEGER,
         PRIMARY KEY (recruitment_id, viewer_id)
     )`).run()
+    // 投递热路径（每在线玩家每 ~10s 一次 /attention/check）与 share_room 的
+    // get-or-create 都靠这两个索引；行清理见 attention 域 pruneExpiredRecruitments
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_attention_recruitments_host_room
+        ON attention_recruitments (host_viewer_id, room_number)`).run()
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_attention_recruitments_status_expires
+        ON attention_recruitments (status, expires_at_ms)`).run()
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_active_quests (
         player_id INTEGER PRIMARY KEY,

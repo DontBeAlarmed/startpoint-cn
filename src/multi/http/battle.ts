@@ -274,7 +274,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 && hostContext?.playerId !== undefined
                 && isNewbieHostSync(hostContext.playerId);
         if (bellRecruitment !== null && !isRoomHost) {
-            recordResponse(bellRecruitment.id, viewer_id, "accepted", getServerTime() * 1000);
+            // 铃铛响应记账尽力而为：开战主流程不得被投递行 UPDATE 失败阻断
+            try {
+                recordResponse(bellRecruitment.id, viewer_id, "accepted", getServerTime() * 1000);
+            } catch (error) {
+                console.warn("[MULTI] bell accepted bookkeeping failed", error);
+            }
         }
         const activeQuest = {
             questId: quest_id,

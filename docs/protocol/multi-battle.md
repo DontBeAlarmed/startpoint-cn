@@ -168,7 +168,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 | `prepare` | 校验 viewer session、房间和关卡并预留真人席位后返回 TCP 连接信息；这是首次加入前入口，不要求已有成员资格；满员返回状态 3 |
 | `summon` | 仅房主可请求静态 NPC mate 模板 |
 | `restore_room` | 已记录成员可恢复仍在进程内的房间；陌生玩家返回状态 13，缺失房间返回状态 9 |
-| `share_room` | 仅房主可提交，成功响应不含业务字段，也不提供真实分享或匹配队列 |
+| `share_room` | 仅房主可提交。`share_type_list` 含 3（随机招募）时幂等创建/刷新铃铛招募行（房主客户端每 15s 重发、上限 20 次，同房间恒定 attention_key），投递经 `/attention/check` 下发、guest 经 `start` 携 attention_key 进房；纯 1/2（互关/粉丝）分享不落招募行。成功响应不含业务字段（客户端忽略响应体），招募记账失败不影响 200 |
 | `disband_room` | 房间存在时仅房主可广播 Disbanded 并删除房间；房间已不存在时幂等成功 |
 
 ### 4.3 战斗生命周期

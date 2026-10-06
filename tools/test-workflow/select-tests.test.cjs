@@ -2258,6 +2258,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/single_finish_awake_reward_owner.test.cjs",
         "tools/single_finish_response_projector.test.cjs",
         "tools/single_finish_request_validation.test.cjs",
+        "tools/single_finish_stale_play.test.cjs",
         "tools/story_quest_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",
     ])
@@ -2269,6 +2270,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/multi_response_projection.test.cjs",
         "tools/multi_settlement_active_mission.test.cjs",
         "tools/rescue_fragment_reward.test.cjs",
+        "tools/rescue_counters.test.cjs",
         "tools/special_quest_party.test.cjs",
     ])
 })
@@ -2416,6 +2418,9 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
             "tools/gift_code_lifecycle.test.cjs",
             "tools/gift_receive_route.test.cjs",
             "tools/attention_config_route.test.cjs",
+        "tools/attention_lifecycle.test.cjs",
+        "tools/attention_routes.test.cjs",
+        "tools/attention_bell_start.test.cjs",
             "tools/active_account_state_cache.test.cjs",
         "tools/load_identity_boundary.test.cjs",
     ])

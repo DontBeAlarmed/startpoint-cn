@@ -55,9 +55,19 @@ function generateAttentionKey(hostViewerId: number): string {
     return `attention_${rand}_${hostViewerId}`
 }
 
+function isUniqueConstraintError(error: unknown): boolean {
+    const code = (error as { code?: unknown } | null)?.code
+    return code === "SQLITE_CONSTRAINT_UNIQUE"
+        || String((error as Error | null)?.message ?? "").includes("UNIQUE")
+}
+
+// 过期行保留 24h（已 accepted/declined 的投递历史随行删除；重开的新招募是全新行）
+const PRUNE_RETENTION_MS = 24 * 60 * 60 * 1000
+
 /**
  * share_room 幂等落点：同一 (房主, 房间) 恒定一个 attention_key。
  * 客户端重发（每 15s）只刷新过期时间与快照，不产生新行/新 key。
+ * 事务包裹 + attention_key UNIQUE 碰撞换随机数重试，避免历史残留 key 让分享 500。
  */
 export function getOrCreateRecruitmentForRoom(input: {
     hostPid: number
@@ -70,40 +80,49 @@ export function getOrCreateRecruitmentForRoom(input: {
     nowMs: number
 }): { id: number; attentionKey: string; created: boolean } {
     const db = getDb()
-    const existing = db.prepare(`
-        SELECT id, attention_key FROM attention_recruitments
-        WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
-    `).get(input.hostViewerId, input.roomNumber) as { id: number; attention_key: string } | undefined
-    if (existing !== undefined) {
-        db.prepare(`
-            UPDATE attention_recruitments
-            SET category = ?, quest_id = ?, is_newbie_host = ?, establisher_json = ?,
-                expires_at_ms = ?
-            WHERE id = ?
-        `).run(
-            input.category,
-            input.questId,
-            input.isNewbieHost ? 1 : 0,
-            input.establisherJson,
-            input.nowMs + getRecruitmentLifetimeMs(),
-            existing.id,
-        )
-        return { id: existing.id, attentionKey: existing.attention_key, created: false }
-    }
-    const key = generateAttentionKey(input.hostViewerId)
-    const result = db.prepare(`
-        INSERT INTO attention_recruitments
-            (attention_key, room_number, host_pid, host_viewer_id,
-             category, quest_id, is_newbie_host, establisher_json,
-             posted_at_ms, expires_at_ms, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
-    `).run(
-        key, input.roomNumber, input.hostPid, input.hostViewerId,
-        input.category, input.questId,
-        input.isNewbieHost ? 1 : 0, input.establisherJson,
-        input.nowMs, input.nowMs + getRecruitmentLifetimeMs(),
-    )
-    return { id: Number(result.lastInsertRowid), attentionKey: key, created: true }
+    return db.transaction((): { id: number; attentionKey: string; created: boolean } => {
+        const existing = db.prepare(`
+            SELECT id, attention_key FROM attention_recruitments
+            WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
+        `).get(input.hostViewerId, input.roomNumber) as { id: number; attention_key: string } | undefined
+        if (existing !== undefined) {
+            db.prepare(`
+                UPDATE attention_recruitments
+                SET category = ?, quest_id = ?, is_newbie_host = ?, establisher_json = ?,
+                    expires_at_ms = ?
+                WHERE id = ?
+            `).run(
+                input.category,
+                input.questId,
+                input.isNewbieHost ? 1 : 0,
+                input.establisherJson,
+                input.nowMs + getRecruitmentLifetimeMs(),
+                existing.id,
+            )
+            return { id: existing.id, attentionKey: existing.attention_key, created: false }
+        }
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const key = generateAttentionKey(input.hostViewerId)
+            try {
+                const result = db.prepare(`
+                    INSERT INTO attention_recruitments
+                        (attention_key, room_number, host_pid, host_viewer_id,
+                         category, quest_id, is_newbie_host, establisher_json,
+                         posted_at_ms, expires_at_ms, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+                `).run(
+                    key, input.roomNumber, input.hostPid, input.hostViewerId,
+                    input.category, input.questId,
+                    input.isNewbieHost ? 1 : 0, input.establisherJson,
+                    input.nowMs, input.nowMs + getRecruitmentLifetimeMs(),
+                )
+                return { id: Number(result.lastInsertRowid), attentionKey: key, created: true }
+            } catch (error) {
+                if (!isUniqueConstraintError(error) || attempt === 2) throw error
+            }
+        }
+        throw new Error("unreachable: attention_key generation exhausted retries")
+    })()
 }
 
 /**
@@ -174,7 +193,31 @@ export function expireStaleRecruitments(nowMs: number): void {
     `).run(nowMs)
 }
 
+/**
+ * 长期清理：过期 open 行标记 expired，且把过期超过保留期的行连同投递历史删除
+ * （否则 attention_recruitments/attention_deliveries 只增不减，且 6 位随机
+ * attention_key 的碰撞概率随历史行数单调上升）。挂在房主重发节奏上调用。
+ */
+export function pruneExpiredRecruitments(nowMs: number, retentionMs: number = PRUNE_RETENTION_MS): void {
+    const db = getDb()
+    db.transaction(() => {
+        expireStaleRecruitments(nowMs)
+        const cutoff = nowMs - retentionMs
+        db.prepare(`
+            DELETE FROM attention_deliveries WHERE recruitment_id IN (
+                SELECT id FROM attention_recruitments
+                WHERE expires_at_ms < ? AND status != 'open'
+            )
+        `).run(cutoff)
+        db.prepare(`
+            DELETE FROM attention_recruitments
+            WHERE expires_at_ms < ? AND status != 'open'
+        `).run(cutoff)
+    })()
+}
+
 function mapRecruitmentRow(row: Record<string, unknown>): AttentionRecruitment {
+    const status = row.status
     return {
         id: Number(row.id),
         attentionKey: String(row.attention_key),
@@ -187,6 +230,6 @@ function mapRecruitmentRow(row: Record<string, unknown>): AttentionRecruitment {
         establisherJson: String(row.establisher_json ?? "{}"),
         postedAtMs: Number(row.posted_at_ms),
         expiresAtMs: Number(row.expires_at_ms),
-        status: "open",
+        status: status === "closed" || status === "expired" ? status : "open",
     }
 }
