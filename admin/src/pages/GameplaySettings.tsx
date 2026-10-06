@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Alert, Button, Card, InputNumber, Popconfirm, Skeleton, Space, Switch, Typography, Upload, message } from "antd"
 import { SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -186,16 +186,18 @@ export default function GameplaySettings() {
             && draftRecruitment.multiNpcCloseRecruitmentAfterFill === savedRecruitment.multiNpcCloseRecruitmentAfterFill
             && draftRecruitment.multiNpcOneShotLifecycle === savedRecruitment.multiNpcOneShotLifecycle)
     // 派生标签按已保存值计算（草稿不参与——标签描述"线上正在跑什么"）
-    const recruitmentModeLabel = savedRecruitment === undefined
-        ? "-"
+    const recruitmentModeBadge = savedRecruitment === undefined
+        ? { text: "-" }
         : !savedRecruitment.multiRandomRecruitmentPublishEnabled
-            ? "NPC 快速模式"
+            ? { text: "NPC" }
             : savedRecruitment.multiNpcReleaseSeconds === 0
                 && savedRecruitment.multiNpcCloseRecruitmentAfterFill
                 && savedRecruitment.multiNpcOneShotLifecycle
-                ? "官服还原"
-                : "私服混合（自定义）"
+                ? { text: "官服" }
+                : { text: "自定义" }
     const publishOn = (draftRecruitment ?? savedRecruitment)?.multiRandomRecruitmentPublishEnabled ?? false
+    // NPC 自动续战 = multiNpcOneShotLifecycle 的反向 UI 语义（开=跨战斗保留续战）
+    const autoRematchOn = !((draftRecruitment ?? savedRecruitment)?.multiNpcOneShotLifecycle ?? false)
 
     const currentMultiplier = settings.data?.dropMultiplier
     const unchanged = draftMultiplier === null || draftMultiplier === currentMultiplier
@@ -207,7 +209,7 @@ export default function GameplaySettings() {
         || draftRushCompatibilityEnabled === settings.data?.rush700011To700017CompatibilityEnabled
 
     // 卡片标题：未保存圆点（有改动未保存）+ 保存成功后的 2 秒「已保存 ✓」反馈
-    const cardTitle = (title: string, dirty: boolean, flashKey: string) => (
+    const cardTitle = (title: ReactNode, dirty: boolean, flashKey: string) => (
         <span className="admin-settings-card-title">
             {title}
             {dirty && <span className="admin-dirty-dot" role="img" aria-label="有未保存修改" title="有未保存修改" />}
@@ -362,21 +364,34 @@ export default function GameplaySettings() {
                     </Card>
                     <Card
                         title={cardTitle(
-                            `联机招募模式（当前：${recruitmentModeLabel}）`,
+                            <span>
+                                联机招募模式
+                                <span
+                                    className={recruitmentModeBadge.text === "自定义" ? "admin-badge-muted" : "admin-badge-ok"}
+                                    style={{ marginLeft: 8 }}
+                                    role="img"
+                                    aria-label={`当前模式：${recruitmentModeBadge.text}`}
+                                >
+                                    {recruitmentModeBadge.text}
+                                </span>
+                            </span>,
                             !recruitmentUnchanged,
                             "recruitmentMode",
                         )}
                     >
                         <Space direction="vertical" size="middle" className="admin-stack">
                             <Space wrap align="center">
+                                <span className={recruitmentModeBadge.text === "自定义" ? "admin-badge-muted" : "admin-badge-ok"}>
+                                    {recruitmentModeBadge.text}
+                                </span>
                                 <Button onClick={() => applyRecruitmentPreset("npc")}>NPC 快速预设</Button>
                                 <Button onClick={() => applyRecruitmentPreset("official")}>官服还原预设</Button>
                                 <Typography.Text type="secondary">
-                                    预设仅填充下方参数，点「保存」后生效；参数偏离两个预设即私服混合模式。
+                                    预设仅填充下方参数，点「保存」后生效；参数偏离两个预设即自定义（私服混合）。
                                 </Typography.Text>
                             </Space>
-                            <Space wrap align="center" size={12}>
-                                <Typography.Text>随机招募铃铛</Typography.Text>
+                            <Space wrap align="center">
+                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>随机招募铃铛</Typography.Text>
                                 <Switch
                                     checked={publishOn}
                                     onChange={value => setDraftRecruitment(current => current && {
@@ -385,7 +400,10 @@ export default function GameplaySettings() {
                                     })}
                                     aria-label="随机招募铃铛发布"
                                 />
-                                <Typography.Text>NPC 释放窗口</Typography.Text>
+                                <Typography.Text type="secondary">关闭时按钮只做 NPC 补位，其他玩家收不到救援铃铛</Typography.Text>
+                            </Space>
+                            <Space wrap align="center">
+                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>NPC 释放窗口</Typography.Text>
                                 <InputNumber
                                     min={0}
                                     max={3600}
@@ -399,7 +417,10 @@ export default function GameplaySettings() {
                                     aria-label="NPC 释放窗口（秒）"
                                     addonAfter="秒"
                                 />
-                                <Typography.Text>NPC 补位后关闭招募</Typography.Text>
+                                <Typography.Text type="secondary">铃铛广播时长；窗口内无人加入才由服务端补 NPC</Typography.Text>
+                            </Space>
+                            <Space wrap align="center">
+                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>NPC 补位后关闭招募</Typography.Text>
                                 <Switch
                                     checked={(draftRecruitment ?? savedRecruitment)?.multiNpcCloseRecruitmentAfterFill ?? true}
                                     disabled={!publishOn}
@@ -409,15 +430,21 @@ export default function GameplaySettings() {
                                     })}
                                     aria-label="NPC 补位后关闭招募"
                                 />
-                                <Typography.Text>NPC 一场一换</Typography.Text>
+                                <Typography.Text type="secondary">关闭时 NPC 先补位、之后真人仍可经铃铛进房替换 NPC</Typography.Text>
+                            </Space>
+                            <Space wrap align="center">
+                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>NPC 自动续战</Typography.Text>
                                 <Switch
-                                    checked={(draftRecruitment ?? savedRecruitment)?.multiNpcOneShotLifecycle ?? false}
+                                    checked={autoRematchOn}
                                     onChange={value => setDraftRecruitment(current => current && {
                                         ...current,
-                                        multiNpcOneShotLifecycle: value,
+                                        multiNpcOneShotLifecycle: !value,
                                     })}
-                                    aria-label="NPC 一场一换"
+                                    aria-label="NPC 自动续战"
                                 />
+                                <Typography.Text type="secondary">开启后 NPC 跨战斗保留（续战队员不变）；关闭为官服一场一换（战斗结束 NPC 离场）</Typography.Text>
+                            </Space>
+                            <Space wrap align="center">
                                 <Button
                                     type="primary"
                                     icon={<SaveOutlined />}
@@ -430,10 +457,6 @@ export default function GameplaySettings() {
                             </Space>
                             <div className="admin-page-note">
                                 <Typography.Text type="secondary">
-                                    关闭铃铛时随机招募按钮只做 NPC 补位，其他玩家收不到救援铃铛；释放窗口是铃铛向全服
-                                    广播的时长（窗口内无人加入才由服务端补 NPC，窗口加 60 秒余量不得超过房间不完整寿命）；
-                                    「补位后关闭招募」关闭时 NPC 先补位、之后真人仍可经铃铛进房替换 NPC；
-                                    「一场一换」为官服语义——战斗结束 NPC 即离场，关闭则跨战斗保留。
                                     切换即时生效，不影响已开房间。
                                 </Typography.Text>
                             </div>
