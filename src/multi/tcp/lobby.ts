@@ -178,7 +178,7 @@ function commitRecruitmentRequest(room: MultiRoom, requestId: number): number | 
     return state.revision
 }
 
-function advanceRecruitmentGeneration(room: MultiRoom): number | null {
+export function advanceRecruitmentGeneration(room: MultiRoom): number | null {
     return commitRecruitmentRequest(room, beginRecruitmentRequest(room))
 }
 

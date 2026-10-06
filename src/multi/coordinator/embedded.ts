@@ -49,6 +49,8 @@ const hostIdentityByRoom = new WeakMap<MultiRoom, ParticipantIdentity>()
 export interface EmbeddedMultiCoordinatorOptions {
     readonly allowRemoteParticipants?: boolean
     readonly onRoomDisband?: (roomNumber: string) => void
+    /** 战斗 release 回房（4→1 成功）后回调：一场一换在此撤除 NPC 编队（尽力而为） */
+    readonly onBattleReleased?: (roomNumber: string) => void
     readonly onCompatibilityRejection?: (input: {
         readonly code: "INCOMPATIBLE_ROOM"
         readonly differences: readonly {
@@ -130,11 +132,13 @@ function resolveCompatibleRoom(input: CompatibleRoomInput): MultiRoom | undefine
 export class EmbeddedMultiCoordinator implements MultiCoordinator {
     private readonly allowRemoteParticipants: boolean
     private readonly onRoomDisband: EmbeddedMultiCoordinatorOptions["onRoomDisband"]
+    private readonly onBattleReleased: EmbeddedMultiCoordinatorOptions["onBattleReleased"]
     private readonly onCompatibilityRejection: EmbeddedMultiCoordinatorOptions["onCompatibilityRejection"]
 
     constructor(options: EmbeddedMultiCoordinatorOptions = {}) {
         this.allowRemoteParticipants = options.allowRemoteParticipants === true
         this.onRoomDisband = options.onRoomDisband
+        this.onBattleReleased = options.onBattleReleased
         this.onCompatibilityRejection = options.onCompatibilityRejection
     }
 
@@ -402,6 +406,15 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             return false
         }
         sessionManager.clearBattleExpectedCount(roomNumber)
+        // 一场一换挂点（设计 v2 §4）：release 是 finalize/abort 两路的唯一咽喉，
+        // 且先于 host re-enter——NPC 编队清除必须发生在客户端重建视图之前
+        if (this.onBattleReleased) {
+            try {
+                this.onBattleReleased(roomNumber)
+            } catch (error) {
+                console.warn(`[MULTI] onBattleReleased callback failed: room=${roomNumber}`, error)
+            }
+        }
         return true
     }
 

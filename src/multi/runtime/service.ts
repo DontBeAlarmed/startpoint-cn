@@ -67,6 +67,7 @@ import {
     ClientFallbackController,
 } from "./client-fallback"
 import { buildSessionServerOptions } from "./session-options"
+import { clearRoomNpcRoster } from "../npc/one-shot"
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getSessionSync } from "../../data/domains/session"
@@ -265,6 +266,7 @@ class Service implements MultiRuntimeService {
                 allowRemoteParticipants: true,
                 onRoomDisband: roomNumber => admissionRegistry.clearRoom(roomNumber),
                 onCompatibilityRejection: recordMultiCompatibilityRejection,
+                onBattleReleased: clearRoomNpcRoster,
             })
             const credentialReloader = new CredentialReloader({
                 credentialsPath: config.credentialsPath,
@@ -312,6 +314,7 @@ class Service implements MultiRuntimeService {
                         allowRemoteParticipants: true,
                         onRoomDisband: roomNumber => embeddedAdmissionRegistry.clearRoom(roomNumber),
                         onCompatibilityRejection: recordMultiCompatibilityRejection,
+                        onBattleReleased: clearRoomNpcRoster,
                     })
                 const fallback = new ClientFallbackController({
                     now: this.dependencies.now,
