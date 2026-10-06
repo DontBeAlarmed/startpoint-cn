@@ -146,7 +146,7 @@ test("one-shot：6 项原子面——npc_count/host 权威/投影/room.mates/rev
     const { host, guest, hostSocket } = setupRoomWithNpcs(test)
     const writesBefore = hostSocket.writes.length
 
-    clearRoomNpcRoster(host.roomNumber)
+    clearRoomNpcRoster(host.roomNumber, "session-1")
 
     const live = getRoom(host.roomNumber)
     assert.equal(live.npc_count, 0, "原子面 1：npc_count 归零")
@@ -162,6 +162,53 @@ test("one-shot：6 项原子面——npc_count/host 权威/投影/room.mates/rev
     )
     assert.ok(mateBroadcast, "原子面 6：全量 mates 广播（[1,[1,mates]]）")
     assert.equal(mateBroadcast[1][1].length, 1, "广播内容为清除后的编队")
+})
+
+test("T2 修正回归：viewerId ≥ 9e8 的真人不被误判为 NPC", () => {
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiNpcOneShotLifecycle: true,
+    })
+    // generateViewerId 真人空间 [1e8, 999999998] 与 NPC 合成区间重叠——
+    // 谓词只认 comId（双审 B-5），高段位 viewerId 真人必须保留
+    const { host } = setupRoomWithNpcs(test)
+    const highTierViewer = 950000000
+    host.mates.push({
+        viewerId: highTierViewer, connectionId: `${host.roomNumber}-high-tier`,
+        party: { characters: [] }, state: [0],
+    })
+    getRoom(host.roomNumber).mates.push({ viewer_id: highTierViewer, com_id: 0 })
+
+    clearRoomNpcRoster(host.roomNumber, "session-high")
+
+    assert.ok(host.mates.some(m => m.viewerId === highTierViewer), "高段位真人保留在权威列表")
+    assert.equal(getRoom(host.roomNumber).mates.some(m => m.viewer_id === highTierViewer), true)
+})
+
+test("一代一闩：同 session 重入不误清 rematch 新一代；新 session 正常清除", () => {
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiNpcOneShotLifecycle: true,
+    })
+    const { host, hostSocket } = setupRoomWithNpcs(test)
+    clearRoomNpcRoster(host.roomNumber, "session-1")
+    assert.equal(npcCountIn(host.mates), 0)
+
+    // finalize 重试（同 session-1）在 30min fact 窗口内重入：
+    // 若 host 已重开招募并重建新一代 NPC（rematch），重入不得误清
+    host.mates.push(
+        makeNpcMate(host.roomNumber, 1),
+        makeNpcMate(host.roomNumber, 2),
+    )
+    getRoom(host.roomNumber).npc_count = 2
+    const writesBefore = hostSocket.writes.length
+    clearRoomNpcRoster(host.roomNumber, "session-1")
+    assert.equal(npcCountIn(host.mates), 2, "同 session 重入不得误清新一代编队")
+    assert.equal(hostSocket.writes.length, writesBefore, "重入不广播")
+
+    // 新一代战斗（新 session id）释放：正常清除
+    clearRoomNpcRoster(host.roomNumber, "session-2")
+    assert.equal(npcCountIn(host.mates), 0, "新 session 释放正常清除新一代")
 })
 
 test("one-shot：hostClient 缺席（战斗中掉线）降级——room.mates 直清、不抛错", () => {
@@ -203,10 +250,10 @@ test("one-shot：无 NPC 房间为 no-op", () => {
     assert.deepEqual(host.mates, before)
 })
 
-test("releaseBattle 挂点：4→1 成功触发回调、拒绝转移不触发", () => {
+test("releaseBattle 挂点：4→1 成功触发回调（携带 session id）、幂等重复触发", () => {
     const released = []
     const coordinator = new EmbeddedMultiCoordinator({
-        onBattleReleased: roomNumber => { released.push(roomNumber) },
+        onBattleReleased: (roomNumber, battleSessionId) => { released.push([roomNumber, battleSessionId]) },
     })
 
     const room = createRoom(
@@ -216,12 +263,23 @@ test("releaseBattle 挂点：4→1 成功触发回调、拒绝转移不触发", 
     assert.equal(updateRoomState(room.room_number, 4), true, "前置：转 Battle")
 
     // releaseBattle 是私有边界——经实例直接驱动（CJS 运行时无可见性限制）
-    assert.equal(coordinator.releaseBattle(room.room_number), true, "4→1 释放成功")
-    assert.deepEqual(released, [room.room_number], "成功释放触发 onBattleReleased")
+    assert.equal(coordinator.releaseBattle(room.room_number, "session-x"), true, "4→1 释放成功")
+    assert.deepEqual(released, [[room.room_number, "session-x"]], "成功释放触发 onBattleReleased 并携带 session id")
     assert.equal(getRoom(room.room_number).raising_state, 1)
 
-    // 重复释放幂等：1→1 无转移仍返回 true、回调再触发，但清除函数以
-    // npc_count<=0 早退守卫保证幂等（不复活、不重复广播内容变化）
-    assert.equal(coordinator.releaseBattle(room.room_number), true)
+    // 重复释放幂等：1→1 无转移仍返回 true、回调再触发，但清除函数以一代一闩
+    // 保证同 session 幂等（不复活、不重复广播内容变化）
+    assert.equal(coordinator.releaseBattle(room.room_number, "session-x"), true)
     assert.equal(released.length, 2)
+})
+
+// 双审 A-1 回归：embedded 模式（MULTI_MODE 缺省 = 默认单节点部署）构造必须接线
+test("embedded 缺省构造接线 onBattleReleased（默认部署一场一换不静默失效）", () => {
+    const src = fs.readFileSync(
+        path.join(__dirname, "../src/multi/runtime/service.ts"), "utf8",
+    )
+    const constructorSites = src.split("new EmbeddedMultiCoordinator").length - 1
+    const wiredSites = src.split("onBattleReleased: clearRoomNpcRoster").length - 1
+    assert.ok(constructorSites >= 3, `service 应有 ≥3 处构造（host/client/embedded），实际 ${constructorSites}`)
+    assert.equal(wiredSites, constructorSites, "每处 EmbeddedMultiCoordinator 构造都必须接线 onBattleReleased")
 })

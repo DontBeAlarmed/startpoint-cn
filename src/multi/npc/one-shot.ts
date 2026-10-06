@@ -4,14 +4,22 @@ import { advanceRecruitmentGeneration } from "../tcp/lobby"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 
 /**
- * NPC viewer 合成空间：EnterComs 以 900000000+com_id 分配（tcp/lobby.ts），
- * 真人 viewer 不会落入该区间——一场一换以此 + comId 标记识别 NPC 条目。
+ * NPC 识别：comId > 0（全仓约定——真人条目无 comId，见 countRealPlayers/
+ * selectRealMates/limitLobbyMates）。不要用 viewerId 区间判断：真人 viewerId
+ * 由 generateViewerId 在 [1e8, 999999998] 随机，与 NPC 合成区间 [9e8, ...] 重叠。
  */
-const NPC_VIEWER_ID_FLOOR = 900_000_000
-
-function isNpcMate(mate: { viewerId?: number | null; comId?: number | null }): boolean {
-    return (mate.comId ?? 0) > 0 || (mate.viewerId ?? 0) >= NPC_VIEWER_ID_FLOOR
+function isNpcMate(mate: { comId?: number | null }): boolean {
+    return (mate.comId ?? 0) > 0
 }
+
+/**
+ * 一场一换的一代一闩：同一 battleSessionId 只清一次。
+ * finalize 重试 / abort-after-finalize 会在 30min fact 窗口内携带同一
+ * battleSessionId 重入 releaseBattle——没有本闩时，rematch 重建的新一代编队
+ * 会被迟到重入误清。新一代战斗有新 session id，释放时正常清除。
+ * 每房一条，进程生命周期内存有界。
+ */
+const clearedBattleSessions = new Map<string, string>()
 
 /**
  * 一场一换（三模式参数 npcLifecycle=one-shot）：战斗 release 回房时撤除 NPC 编队。
@@ -29,11 +37,17 @@ function isNpcMate(mate: { viewerId?: number | null; comId?: number | null }): b
  * 绝不破坏 finalize 主流程。hostClient 缺席（战斗中掉线宽限期）时仅清
  * room.mates 与 npc_count，客户端视图由回房 Enter 以服务端状态重建。
  */
-export function clearRoomNpcRoster(roomNumber: string): void {
+export function clearRoomNpcRoster(roomNumber: string, battleSessionId?: string): void {
     try {
         if (!getServerGameplaySettingsSync().multiNpcOneShotLifecycle) return
         const room = getRoom(roomNumber)
         if (!room || (room.npc_count <= 0 && !room.is_npc_mode)) return
+
+        // 一代一闩：同战斗会话的重入直接跳过，防误清 rematch 新一代编队；
+        // 无战斗身份（node-session 清扫等）落空串闩
+        const latchKey = battleSessionId ?? ""
+        if (clearedBattleSessions.get(roomNumber) === latchKey) return
+        clearedBattleSessions.set(roomNumber, latchKey)
 
         room.npc_count = 0
         advanceRecruitmentGeneration(room)
@@ -51,11 +65,7 @@ export function clearRoomNpcRoster(roomNumber: string): void {
             sessionManager.broadcastMateListToRoom(roomNumber, hostClient.mates)
         } else {
             // 无 host 连接：房内权威视图直接过滤，客户端视图待回房重建
-            room.mates = room.mates.filter(mate => {
-                const viewerId = mate.viewer_id ?? 0
-                const comId = mate.com_id ?? 0
-                return comId <= 0 && viewerId < NPC_VIEWER_ID_FLOOR
-            })
+            room.mates = room.mates.filter(mate => (mate.com_id ?? 0) <= 0)
         }
         console.log(`[MULTI] one-shot NPC roster cleared: room=${roomNumber}`)
     } catch (error) {

@@ -357,6 +357,7 @@ class Service implements MultiRuntimeService {
                 this.context = createEmbeddedMultiHttpContext({
                     coordinator: new EmbeddedMultiCoordinator({
                         onCompatibilityRejection: recordMultiCompatibilityRejection,
+                        onBattleReleased: clearRoomNpcRoster,
                     }),
                     tcpEndpoint: () => this.getLocalTcpEndpoint(config),
                 })
