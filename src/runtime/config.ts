@@ -56,6 +56,7 @@ export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly MULTI_HUB_URL?: string
     readonly MULTI_HUB_TOKEN?: string
     readonly MULTI_HUB_CREDENTIALS_FILE?: string
+    readonly MULTI_SOCIAL_DB_PATH?: string
     readonly SUMMON_COM_SECONDS?: string
     readonly DAILY_RESET_HOUR?: string
     readonly GAME_CALENDAR_UTC_OFFSET_MINUTES?: string

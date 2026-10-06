@@ -5,15 +5,27 @@
 多节点/多进程部署时社交状态的平等读写落点：设置 env `MULTI_SOCIAL_DB_PATH` 指向共享
 SQLite 文件后，铃铛招募（`attention_recruitments`/`attention_deliveries`）与 presence
 （`social_presence` 表 TTL）全部经由该共享库，各进程独立打开连接（WAL +
-`busy_timeout=1000`），无主客机身份。单机单进程不设置该 env：attention 走主库、
+`busy_timeout=5000`），无主客机身份。单机单进程不设置该 env：attention 走主库、
 presence 走节点内内存 Map（与 A1 行为一致）。
+
+## 部署硬前提
+
+- **共享文件必须位于本地文件系统**（所有进程同一主机）。SQLite WAL 明确不支持
+  NFS/SMB 等网络文件系统——跨机共享一个网络盘上的文件会损坏数据。多机部署需要
+  PG 后端（接口已备，驱动/拓扑待定）。
+- **全部节点必须以相同的 `timeOffset` 启动**：attention 时间戳为虚拟钟
+  （`getServerTime()*1000`），两节点偏移不一致时铃铛会瞬间过期或永不过期
+  （presence 用真实时钟，不受影响）。
+- 写竞争纪律：`BEGIN IMMEDIATE`（`immediate()` 事务变体，杜绝 deferred 事务的
+  BUSY_SNAPSHOT）+ `busy_timeout=5000`；`/attention/check` 热路径对 touch/deliver
+  降级容错（presence 丢失无害、`multi: []` 客户端合法）。
 
 ## 组成
 
 | 模块 | 职责 |
 |---|---|
 | `src/data/social/attention-schema.ts` | 社交域 DDL 单一来源（主库初始化器与共享库共用，幂等） |
-| `src/data/social/shared-db.ts` | `MULTI_SOCIAL_DB_PATH` 单例连接（WAL + busy_timeout + 幂等 DDL） |
+| `src/data/social/shared-db.ts` | `MULTI_SOCIAL_DB_PATH` 单例连接（WAL + busy_timeout + 幂等 DDL；随 `closeDatabase` 一并优雅关闭） |
 | `src/data/domains/attention.ts` | `AttentionStore` 接口 + SQLite 实现 + 兼容函数委托（env-aware 单例） |
 | `src/multi/presence.ts` | `PresenceStore` 接口 + 内存/SQLite 双实现 + 兼容函数委托 |
 

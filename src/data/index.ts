@@ -1,6 +1,7 @@
 import sqlite3, { Database as BetterSqlite3Database } from "better-sqlite3";
 import * as fs from "fs";
 import * as path from "path";
+import { closeSharedSocialDb } from "./social/shared-db";
 import initWdfpData from "./initializers/wdfpData";
 import {
     updateAfterInit as updateWdfpDataAfter,
@@ -208,6 +209,13 @@ export function checkpointDatabase(): DatabaseCheckpointResult {
 }
 
 export function closeDatabase(): boolean {
+    // 共享社交库（MULTI_SOCIAL_DB_PATH）与主库并列关闭——尽力而为，
+    // 其失败不得阻断主库关机序列（WAL 已提交事务崩溃安全）
+    try {
+        closeSharedSocialDb();
+    } catch (error) {
+        console.warn("[DATA] shared social db close failed", error);
+    }
     if (loadedDatabase === null) return false;
     const database = loadedDatabase;
     if (!database.open) {

@@ -111,7 +111,10 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
          * 事务包裹 + attention_key UNIQUE 碰撞换随机数重试，避免历史残留 key 让分享 500。
          */
         getOrCreateRecruitmentForRoom(input) {
-            return db.transaction((): { id: number; attentionKey: string; created: boolean } => {
+            // BEGIN IMMEDIATE：开事务即取写锁（busy_timeout 正常排队），
+            // 避免 deferred 事务在共享库多进程下 SELECT→写升级撞 SQLITE_BUSY_SNAPSHOT
+            //（该错误不吃 busy_timeout；对齐参考服 BEGIN IMMEDIATE 纪律）
+            const immediate = db.transaction((): { id: number; attentionKey: string; created: boolean } => {
                 const existing = db.prepare(`
                     SELECT id, attention_key FROM attention_recruitments
                     WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
@@ -153,7 +156,8 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
                     }
                 }
                 throw new Error("unreachable: attention_key generation exhausted retries")
-            })()
+            })
+            return immediate.immediate()
         },
 
         /**
@@ -220,7 +224,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
          * attention_key 的碰撞概率随历史行数单调上升）。挂在房主重发节奏上调用。
          */
         pruneExpiredRecruitments(nowMs, retentionMs = PRUNE_RETENTION_MS) {
-            db.transaction(() => {
+            const immediate = db.transaction(() => {
                 db.prepare(`
                     UPDATE attention_recruitments SET status = 'expired'
                     WHERE status = 'open' AND expires_at_ms <= ?
@@ -236,7 +240,8 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
                     DELETE FROM attention_recruitments
                     WHERE expires_at_ms < ? AND status != 'open'
                 `).run(cutoff)
-            })()
+            })
+            immediate.immediate()
         },
     }
 }
@@ -246,6 +251,8 @@ let configuredAttentionStore: AttentionStore | null = null
 /**
  * 进程级单例：设置 MULTI_SOCIAL_DB_PATH → 共享社交库；否则主库。
  * 兼容层函数（下方导出）都走这里，调用点无需感知部署形态。
+ * 注意：主库连接按"每进程只初始化一次"的仓库假设在首次调用时钉住
+ * （生产 closeDatabase 仅发生在关机；若将来出现进程内 close+重建，需同步复位本单例）。
  */
 export function getAttentionStore(): AttentionStore {
     if (configuredAttentionStore === null) {

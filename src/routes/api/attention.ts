@@ -57,12 +57,24 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        // 铃铛轮询即 presence 上报（原版客户端不加新请求，见 A1 计划书）
-        touchPresence(viewerId)
+        // 铃铛轮询即 presence 上报（原版客户端不加新请求，见 A1 计划书）。
+        // 共享库模式下二者都是 SQL 写（跨进程锁竞争/磁盘错误可能抛）——
+        // presence 是 advisory 数据、multi 空数组对客户端合法（ReceiveMulti([])），
+        // 降级容错：任一失败不拖垮这条最热轮询端点（每在线玩家每 ~10s 一次）
+        try {
+            touchPresence(viewerId)
+        } catch (error) {
+            console.warn("[ATTENTION] presence touch failed (degraded)", error)
+        }
 
         // 读时惰性投递：guest 轮询时才写入投递行（对齐官方"房主 15s 重发 × guest 轮询"）
         const nowMs = getServerTime() * 1000
-        const bells = deliverOpenRecruitmentsToViewer(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM)
+        let bells: ReturnType<typeof deliverOpenRecruitmentsToViewer> = []
+        try {
+            bells = deliverOpenRecruitmentsToViewer(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM)
+        } catch (error) {
+            console.warn("[ATTENTION] delivery failed (empty multi)", error)
+        }
         const multi = bells.map(recruitment => {
             const snapshot = parseEstablisherSnapshot(recruitment.establisherJson)
             // establisher_follow 按查看者实时计算（关注关系变化后铃铛图标跟随）

@@ -59,7 +59,7 @@ process.once("exit", cleanup)
     )
     assert.equal(
         shared.pragma("busy_timeout", { simple: true }),
-        1000,
+        5000,
         "共享库必须设置 busy_timeout（跨进程写竞争排队）",
     )
     for (const table of ["attention_recruitments", "attention_deliveries", "social_presence"]) {
@@ -120,7 +120,8 @@ process.once("exit", cleanup)
     assert.equal(storeB.findOpenRecruitmentByKey(created.attentionKey, t0 + 5), null,
         "进程 A 关闭的招募必须对进程 B 立即失效")
 
-    // 双侧并发写（WAL + busy_timeout 竞争 sanity）
+    // 双侧跨连接写入均落库（同线程顺序执行，不构成真实写锁竞争——
+    // 真实多进程竞争验证待部署侧，见 docs/systems/multi-social-store.md 边界）
     const left = storeA.getOrCreateRecruitmentForRoom({
         hostPid: 1, hostViewerId: 7101, category: 1, questId: 1001001,
         roomNumber: "520001", isNewbieHost: false, establisherJson: "{}", nowMs: t0 + 10,
