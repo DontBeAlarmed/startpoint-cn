@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { PrepareBody, SummonBody, RestoreRoomBody, ShareRoomBody } from "../types";
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerTime } from "../../utils";
 import { serializeRoomStatusConnection } from "../room/serializer";
 import { buildNpcMates } from "../npc/builder";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
@@ -11,6 +11,13 @@ import {
     restoreRoomUnavailableRaisingState,
 } from "./join-result";
 import { issueRoomAdmission } from "./room-admission";
+import {
+    buildEstablisherSnapshot,
+    closeRecruitmentForRoom,
+    getOrCreateRecruitmentForRoom,
+} from "../../data/domains/attention";
+import { isNewbieHostSync } from "../../lib/newbie-host";
+import { getPlayerRankLevel } from "../player-context";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
     return isValidMultiViewerId(viewerId)
@@ -241,6 +248,8 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
     });
 
     // ---- share_room ----
+    // 铃铛招募落点：房主客户端每 15s 重发（上限 20 次），此处幂等 get-or-create
+    // （同房间恒定 attention_key）+ 刷新过期时间与房主快照。客户端忽略响应体。
     fastify.post("/share_room", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as ShareRoomBody;
         const viewerId = body.viewer_id;
@@ -261,6 +270,23 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             return forbidden(reply);
         }
         if (viewerId !== room.value.host.viewerId) return forbidden(reply);
+
+        const hostContext = await context.resolvePlayerContext(viewerId);
+        const recruitment = getOrCreateRecruitmentForRoom({
+            hostPid: hostContext?.playerId ?? 0,
+            hostViewerId: viewerId,
+            category: room.value.category,
+            questId: room.value.questId,
+            roomNumber: body.room_number,
+            isNewbieHost: hostContext !== null && isNewbieHostSync(hostContext.playerId),
+            establisherJson: buildEstablisherSnapshot({
+                character: room.value.hostMainCharacterId,
+                rankLevel: getPlayerRankLevel(hostContext?.player.rankPoint ?? 0),
+                hostEntryTime: room.value.hostEntryTime,
+            }),
+            nowMs: getServerTime() * 1000,
+        });
+        console.log(`[MULTI] share_room ${recruitment.created ? "created" : "refreshed"} key=${recruitment.attentionKey}`);
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -288,6 +314,14 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         if (!result.ok && result.error === "HUB_UNAVAILABLE") return hubUnavailable(reply);
         if (!result.ok && result.error !== "ROOM_NOT_FOUND") return forbidden(reply);
         console.log(result.ok ? "[MULTI] room disbanded" : "[MULTI] room already absent");
+        if (result.ok) {
+            // 尽力而为的铃铛卫生操作：绝不能让招募关闭失败破坏解散主流程
+            try {
+                closeRecruitmentForRoom(viewerId, body.room_number);
+            } catch (error) {
+                console.warn("[MULTI] close recruitment on disband failed", error);
+            }
+        }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

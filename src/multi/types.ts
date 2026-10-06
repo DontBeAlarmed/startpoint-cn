@@ -171,6 +171,10 @@ export interface RestoreRoomBody {
 
 export interface ShareRoomBody {
     viewer_id: number
+    // 客户端会发送（MultiBattleQuestShareRoomRemote）；服务端以 RoomStatus 为权威，仅声明
+    category?: number
+    quest_id?: number
+    share_type_list?: number[]
     room_number: string
     api_count: number
 }

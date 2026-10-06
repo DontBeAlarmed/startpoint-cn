@@ -3,7 +3,16 @@ import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { generateDataHeaders } from "../../utils";
+import {
+    deliverOpenRecruitmentsToViewer,
+    parseEstablisherSnapshot,
+} from "../../data/domains/attention"
+import { getLocalFollowRelationSync } from "../../data/domains/follow"
+import { touchPresence } from "../../multi/presence"
+import { generateDataHeaders, getServerTime } from "../../utils";
+
+// 与下方 config.return_attention_max_num 保持一致：单次 check 最多携带的铃铛数
+const RETURN_ATTENTION_MAX_NUM = 3
 
 interface CheckBody {
     viewer_id: number
@@ -49,6 +58,37 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
+        // 铃铛轮询即 presence 上报（原版客户端不加新请求，见 A1 计划书）
+        touchPresence(viewerId)
+
+        // 读时惰性投递：guest 轮询时才写入投递行（对齐官方"房主 15s 重发 × guest 轮询"）
+        const nowMs = getServerTime() * 1000
+        const bells = deliverOpenRecruitmentsToViewer(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM)
+        const multi = bells.map(recruitment => {
+            const snapshot = parseEstablisherSnapshot(recruitment.establisherJson)
+            // establisher_follow 按查看者实时计算（关注关系变化后铃铛图标跟随）
+            let establisherFollow = 0
+            try {
+                establisherFollow = getLocalFollowRelationSync(playerId, recruitment.hostPid).state
+            } catch {
+                establisherFollow = 0
+            }
+            return {
+                "attention_key": recruitment.attentionKey,
+                "quest_info": {
+                    "category_id": recruitment.category,
+                    "establisher_character": snapshot.character,
+                    "establisher_character_evolution_img_level": 0,
+                    "establisher_follow": establisherFollow,
+                    "establisher_rank": snapshot.rankLevel,
+                    "host_entry_time": snapshot.hostEntryTime,
+                    "is_newbie": recruitment.isNewbieHost,
+                    "quest_id": recruitment.questId,
+                    "room_number": recruitment.roomNumber,
+                }
+            }
+        })
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
@@ -82,7 +122,10 @@ const routes = async (fastify: FastifyInstance) => {
                     "polling_delay_battle_seconds_range_min": 1,
                     "polling_delay_battle_seconds_range_max": 15,
                     "return_attention_max_num": 3
-                }
+                },
+                // 客户端强校验 multi[i]（AttentionCheckRealRemoteService）：
+                // multi 缺失/为 null = 无铃铛；空数组同样安全（ReceiveMulti([])）
+                "multi": multi
             }
         })
     })
