@@ -21,6 +21,7 @@ import {
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import { getPlayerRankLevel } from "../player-context";
+import { scheduleNpcRelease } from "../npc/release";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
     return isValidMultiViewerId(viewerId)
@@ -349,6 +350,8 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                 });
                 console.log(`[MULTI] share_room ${recruitment.created ? "created" : "refreshed"} key=${recruitment.attentionKey}`);
                 pruneExpiredRecruitments(getServerTime() * 1000);
+                // 私服混合：发布后挂服务端 NPC 释放点（W>0 时启用；回调内惰性重读配置）
+                scheduleNpcRelease(body.room_number);
             } catch (error) {
                 console.warn("[MULTI] share_room recruitment bookkeeping failed", error);
             }

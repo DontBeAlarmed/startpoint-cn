@@ -8,6 +8,7 @@ import {
 } from "../../data/domains/attention"
 import { getLocalFollowRelationSync } from "../../data/domains/follow"
 import { touchPresence } from "../../multi/presence"
+import { isBellDeliveryEligible } from "../../multi/bell-gate"
 import { generateDataHeaders, getServerTime } from "../../utils";
 
 // 与下方 config.return_attention_max_num 保持一致：单次 check 最多携带的铃铛数
@@ -71,7 +72,10 @@ const routes = async (fastify: FastifyInstance) => {
         const nowMs = getServerTime() * 1000
         let bells: ReturnType<typeof deliverOpenRecruitmentsToViewer> = []
         try {
+            // T1 投递谓词（设计 §5）：本节点房间过房间态门（未开战/房主在线/真人未满员），
+            // 异节点房间放行；先过滤后下发，被滤房间的投递行已建（幂等无害）
             bells = deliverOpenRecruitmentsToViewer(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM)
+                .filter(recruitment => isBellDeliveryEligible(recruitment.roomNumber))
         } catch (error) {
             console.warn("[ATTENTION] delivery failed (empty multi)", error)
         }

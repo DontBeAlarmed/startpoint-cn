@@ -9,6 +9,8 @@ import {
 } from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
+import { applyNpcPostFill } from "../npc/release"
+import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import type { MultiRoom } from "../../lib/types"
 import { RoomState } from "../types"
 import {
@@ -321,7 +323,7 @@ export function notifyRoomDisbanded(roomNumber: string): void {
     sessionManager.broadcastToRoom(roomNumber, [1, [6, "multibattle_room_dismissed"]])
 }
 
-async function handleEnterComs(
+export async function handleEnterComs(
     client: SessionClient,
     lifecycle: LobbyLifecycleGuard = getLobbyLifecycleGuard(),
 ): Promise<void> {
@@ -404,6 +406,10 @@ async function handleEnterComs(
     console.log(`[LOBBY] EnterComs: room=${client.roomNumber} real=${currentRealMates.length} npc=${npcMates.length} total=${client.mates.length}`)
 
     if (npcMates.length === 0) return
+
+    // postFill（设计 v2 §3）：NPC 进场提交后的招募行处置——close（官服）关招募 /
+    // keep-open（私服）服务端接管行寿命。挂 commit 点（双审定案，非 summon 响应）。
+    applyNpcPostFill(client.roomNumber)
 
     scheduleLobbyTask(() => {
         try {
@@ -726,6 +732,12 @@ function beginBattle(client: SessionClient): boolean {
         console.warn(`[LOBBY] StartBattle rolled back: room=${client.roomNumber} refused Battle`)
         sessionManager.clearBattleExpectedCount(client.roomNumber)
         return false
+    }
+    // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底
+    try {
+        closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber)
+    } catch (error) {
+        console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, error)
     }
     client.enterData = null
     return true

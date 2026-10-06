@@ -65,6 +65,8 @@ export interface AttentionStore {
         nowMs: number,
     ): void
     closeRecruitmentForRoom(hostViewerId: number, roomNumber: string): void
+    /** keep-open 行寿命接管：NPC 进场后把 open 招募过期时间外推（服务端接管，客户端停铃不再依赖） */
+    refreshRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number, lifetimeMs: number): void
     /** 热切换清扫：publishBell on→off 时全量关闭 open 招募（共享库下跨节点生效） */
     closeAllOpenRecruitments(): void
     expireStaleRecruitments(nowMs: number): void
@@ -240,6 +242,15 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
             `).run(hostViewerId, roomNumber)
         },
 
+        /** keep-open 行寿命接管：仅 open 行生效；过期/关闭行不复活 */
+        refreshRecruitmentForRoom(hostViewerId, roomNumber, nowMs, lifetimeMs) {
+            db.prepare(`
+                UPDATE attention_recruitments SET expires_at_ms = ?
+                WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
+                    AND expires_at_ms > ?
+            `).run(nowMs + lifetimeMs, hostViewerId, roomNumber, nowMs)
+        },
+
         /** 热切换清扫：publishBell on→off 时全量关闭 open 招募（共享库下跨节点生效） */
         closeAllOpenRecruitments() {
             db.prepare(`
@@ -324,6 +335,15 @@ export function hasActiveDelivery(recruitmentId: number, viewerId: number): bool
 
 export function closeAllOpenRecruitments(): void {
     getAttentionStore().closeAllOpenRecruitments()
+}
+
+export function refreshRecruitmentForRoom(
+    hostViewerId: number,
+    roomNumber: string,
+    nowMs: number,
+    lifetimeMs: number,
+): void {
+    getAttentionStore().refreshRecruitmentForRoom(hostViewerId, roomNumber, nowMs, lifetimeMs)
 }
 
 export function recordResponse(
