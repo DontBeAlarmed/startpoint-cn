@@ -132,7 +132,7 @@ export default function GameplaySettings() {
         }) => apiPatch<GameplaySettings>("/api/server/settings/gameplay", payload),
         onSuccess: value => {
             queryClient.setQueryData(["serverGameplaySettings"], value)
-            setDraftRecruitment(value)
+            setDraftRecruitment(projectRecruitmentDraft(value))
             flashSaved("recruitmentMode")
             message.success("游戏设置已保存")
         },
@@ -144,7 +144,7 @@ export default function GameplaySettings() {
         if (settings.data) setDraftRescueEnabled(settings.data.multiRescueFragmentRewardsEnabled)
         if (settings.data) setDraftHostRescueEnabled(settings.data.multiRescueHostRewardsEnabled)
         if (settings.data) setDraftRushCompatibilityEnabled(settings.data.rush700011To700017CompatibilityEnabled)
-        if (settings.data) setDraftRecruitment(settings.data)
+        if (settings.data) setDraftRecruitment(projectRecruitmentDraft(settings.data))
     }, [settings.data])
 
     // ---- 联机招募模式（参数为真相，模式为派生标签） ----
@@ -155,6 +155,13 @@ export default function GameplaySettings() {
         multiNpcOneShotLifecycle: boolean
     }
     const [draftRecruitment, setDraftRecruitment] = useState<RecruitmentDraft | null>(null)
+    // 草稿只投影本卡片 4 个参数——携带 updatedAt 等其余键会被后端按未知字段拒绝
+    const projectRecruitmentDraft = (value: GameplaySettings): RecruitmentDraft => ({
+        multiRandomRecruitmentPublishEnabled: value.multiRandomRecruitmentPublishEnabled,
+        multiNpcReleaseSeconds: value.multiNpcReleaseSeconds,
+        multiNpcCloseRecruitmentAfterFill: value.multiNpcCloseRecruitmentAfterFill,
+        multiNpcOneShotLifecycle: value.multiNpcOneShotLifecycle,
+    })
     const applyRecruitmentPreset = (preset: "npc" | "official") => {
         if (preset === "npc") {
             setDraftRecruitment({
