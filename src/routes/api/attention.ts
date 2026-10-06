@@ -128,8 +128,10 @@ const routes = async (fastify: FastifyInstance) => {
                     "disable_unintent_disconnect_duration_seconds": 5,
                     "disable_remote_error_duration_seconds": 300,
                     // All 23 fields below are strictly validated by the client's
-                    // shared early-success transformer; summon_com_seconds comes
-                    // from CDN attention_config column 23.
+                    // shared early-success transformer (RealRemoteService: null →
+                    // Option.None = CDN fallback; Int → Some = overrides CDN).
+                    // summon_com_seconds here therefore controls the client's
+                    // summon window directly — fully CDN-decoupled.
                     "summon_com_seconds": 20,
                     "attention_animation_time_seconds": 6,
                     "disable_expire_count_limit": 4,
