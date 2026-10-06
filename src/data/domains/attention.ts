@@ -54,8 +54,9 @@ export interface AttentionStore {
         limit: number,
     ): AttentionRecruitment[]
     findOpenRecruitmentByKey(attentionKey: string, nowMs: number): AttentionRecruitment | null
-    /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null */
-    findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number): AttentionRecruitment | null
+    /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null；
+     * includeExpired=true 时不过滤过期（释放点服务端接管行寿命的兜底读） */
+    findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number, includeExpired?: boolean): AttentionRecruitment | null
     /** T2 门票：投递行存在且未被拒绝（delivered/accepted 均持票） */
     hasActiveDelivery(recruitmentId: number, viewerId: number): boolean
     recordResponse(
@@ -205,15 +206,20 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
             return row !== undefined ? mapRecruitmentRow(row) : null
         },
 
-        /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null */
-        findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs) {
+        /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null；
+         * includeExpired=true 时不过滤过期（释放点服务端接管行寿命的兜底读） */
+        findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs, includeExpired = false) {
+            const expiryFilter = includeExpired ? "" : "AND expires_at_ms > ?"
+            const params = includeExpired
+                ? [hostViewerId, roomNumber]
+                : [hostViewerId, roomNumber, nowMs]
             const row = db.prepare(`
                 SELECT * FROM attention_recruitments
                 WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
-                    AND expires_at_ms > ?
+                    ${expiryFilter}
                 ORDER BY posted_at_ms DESC
                 LIMIT 1
-            `).get(hostViewerId, roomNumber, nowMs) as Record<string, unknown> | undefined
+            `).get(...params) as Record<string, unknown> | undefined
             return row !== undefined ? mapRecruitmentRow(row) : null
         },
 
@@ -325,8 +331,13 @@ export function findOpenRecruitmentByKey(attentionKey: string, nowMs: number) {
     return getAttentionStore().findOpenRecruitmentByKey(attentionKey, nowMs)
 }
 
-export function findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number) {
-    return getAttentionStore().findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs)
+export function findOpenRecruitmentForRoom(
+    hostViewerId: number,
+    roomNumber: string,
+    nowMs: number,
+    includeExpired = false,
+) {
+    return getAttentionStore().findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs, includeExpired)
 }
 
 export function hasActiveDelivery(recruitmentId: number, viewerId: number): boolean {

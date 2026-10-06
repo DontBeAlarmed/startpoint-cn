@@ -74,8 +74,10 @@ const routes = async (fastify: FastifyInstance) => {
         try {
             // T1 投递谓词（设计 §5）：本节点房间过房间态门（未开战/房主在线/真人未满员），
             // 异节点房间放行；先过滤后下发，被滤房间的投递行已建（幂等无害）
-            bells = deliverOpenRecruitmentsToViewer(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM)
+            // 取数放大 3 倍再过滤补满：T1 被滤房间不得挤占 return_attention_max_num 名额
+            bells = deliverOpenRecruitmentsToViewer(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM * 3)
                 .filter(recruitment => isBellDeliveryEligible(recruitment.roomNumber))
+                .slice(0, RETURN_ATTENTION_MAX_NUM)
         } catch (error) {
             console.warn("[ATTENTION] delivery failed (empty multi)", error)
         }

@@ -48,14 +48,23 @@ export function scheduleNpcRelease(roomNumber: string): void {
     }
 }
 
+export function resetNpcReleaseState(): void {
+    pendingReleases.clear()
+}
+
 function fireOrReschedule(lifecycle: LobbyLifecycleGuard, roomNumber: string): void {
     const settings = getServerGameplaySettingsSync()
     if (!settings.multiRandomRecruitmentPublishEnabled || settings.multiNpcReleaseSeconds <= 0) return
     const room = getRoom(roomNumber)
     if (!room) return
     const nowMs = getServerTime() * 1000
-    const recruitment = findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs)
-    if (recruitment === null) return // 行关闭/过期/换行：放弃（活性重锚）
+    // 活性重锚：优先取未过期 open 行；仅 status='open' 但已过期（客户端重发停摆，
+    // 而非招募关闭）时服务端接管——视为到点继续注入（双审 B-3 退化分支）
+    let recruitment = findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs)
+    if (recruitment === null) {
+        recruitment = findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs, true)
+    }
+    if (recruitment === null) return // 行关闭/缺失（解散/开战/清扫）：放弃
 
     const remainingMs = recruitment.postedAtMs + settings.multiNpcReleaseSeconds * 1000 - nowMs
     if (remainingMs > RESCHEDULE_FLOOR_MS) {

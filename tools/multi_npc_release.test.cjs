@@ -230,6 +230,46 @@ test("释放点：W 热切换调长后按剩余时间重挂", async () => {
     assert.ok(npcCount(host.mates) > 0, "按剩余时间重挂后到点注入")
 }, 20000)
 
+// ---- 释放点：open-但-过期（客户端重发停摆）服务端接管，视为到点注入 ----
+test("释放点兜底：open 但已过期的行视为到点继续注入", async () => {
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiRandomRecruitmentPublishEnabled: true,
+        multiNpcReleaseSeconds: 1,
+        multiNpcCloseRecruitmentAfterFill: true,
+    })
+    const hostViewer = HOST_VIEWER + 6
+    const { room, host } = setupHostRoom(test, hostViewer)
+    const recruitment = share(hostViewer, room.room_number)
+    // 模拟客户端重发停摆：行 open 但已过期（getServerTime 秒级量化，直接改库）
+    db.prepare("UPDATE attention_recruitments SET expires_at_ms = ? WHERE id = ?")
+        .run(getServerTime() * 1000 - 1000, recruitment.id)
+    scheduleNpcRelease(room.room_number)
+    await wait(1600)
+
+    assert.ok(npcCount(host.mates) > 0, "open-但-过期 = 刷新停摆而非关闭，服务端接管继续注入")
+}, 15000)
+
+// ---- 释放点：resetNpcReleaseState 清除在途调度标记（hub→local 回退同款） ----
+test("释放点：resetNpcReleaseState 后可重新挂点", async () => {
+    const { resetNpcReleaseState } = require("../src/multi/npc/release")
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiRandomRecruitmentPublishEnabled: true,
+        multiNpcReleaseSeconds: 30,
+        multiNpcCloseRecruitmentAfterFill: true,
+    })
+    const hostViewer = HOST_VIEWER + 7
+    const { room, host } = setupHostRoom(test, hostViewer)
+    share(hostViewer, room.room_number)
+    scheduleNpcRelease(room.room_number)
+    resetNpcReleaseState()
+    scheduleNpcRelease(room.room_number)
+    await wait(100)
+    assert.equal(npcCount(host.mates), 0, "30s 窗口内不注入（仅验证重挂不抛错不重复注入）")
+    roomManager.disbandRoom(room.room_number)
+})
+
 // ---- T1 投递资格门 ----
 test("T1：开战拒绝、host 掉线拒绝、真人满员拒绝、异节点放行", async t => {
     const { room, host } = setupHostRoom(t)

@@ -23,6 +23,7 @@ import {
     resetNpcRecruitmentTiming,
     type NpcRecruitmentTiming,
 } from "./lobby"
+import { resetNpcReleaseState } from "../npc/release"
 import {
     embeddedAdmissionRegistry,
     type AdmissionProvider,
@@ -416,6 +417,7 @@ function stopSessionLifecycles(): void {
     stopRoomCleanup()
     stopLobbyLifecycle()
     resetNpcRecruitmentTiming()
+    resetNpcReleaseState()
     resetGenerationTuning()
 }
 
