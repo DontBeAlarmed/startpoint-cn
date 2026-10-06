@@ -381,14 +381,8 @@ export default function GameplaySettings() {
                     >
                         <Space direction="vertical" size="middle" className="admin-stack">
                             <Space wrap align="center">
-                                <span className={recruitmentModeBadge.text === "自定义" ? "admin-badge-muted" : "admin-badge-ok"}>
-                                    {recruitmentModeBadge.text}
-                                </span>
                                 <Button onClick={() => applyRecruitmentPreset("npc")}>NPC 快速预设</Button>
                                 <Button onClick={() => applyRecruitmentPreset("official")}>官服还原预设</Button>
-                                <Typography.Text type="secondary">
-                                    预设仅填充下方参数，点「保存」后生效；参数偏离两个预设即自定义（私服混合）。
-                                </Typography.Text>
                             </Space>
                             <Space wrap align="center">
                                 <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>随机招募铃铛</Typography.Text>
@@ -400,10 +394,9 @@ export default function GameplaySettings() {
                                     })}
                                     aria-label="随机招募铃铛发布"
                                 />
-                                <Typography.Text type="secondary">关闭时按钮只做 NPC 补位，其他玩家收不到救援铃铛</Typography.Text>
                             </Space>
                             <Space wrap align="center">
-                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>NPC 释放窗口</Typography.Text>
+                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>等待NPC加入时长</Typography.Text>
                                 <InputNumber
                                     min={0}
                                     max={3600}
@@ -414,7 +407,7 @@ export default function GameplaySettings() {
                                         ...current,
                                         multiNpcReleaseSeconds: Number(value) || 0,
                                     })}
-                                    aria-label="NPC 释放窗口（秒）"
+                                    aria-label="等待NPC加入时长（秒）"
                                     addonAfter="秒"
                                 />
                                 <Typography.Text type="secondary">铃铛广播时长；窗口内无人加入才由服务端补 NPC</Typography.Text>
@@ -430,7 +423,7 @@ export default function GameplaySettings() {
                                     })}
                                     aria-label="NPC 补位后关闭招募"
                                 />
-                                <Typography.Text type="secondary">关闭时 NPC 先补位、之后真人仍可经铃铛进房替换 NPC</Typography.Text>
+                                <Typography.Text type="secondary">开：NPC 进场后停止广播铃铛；关：继续广播，真人可进房替换 NPC（房间号直进不受影响）</Typography.Text>
                             </Space>
                             <Space wrap align="center">
                                 <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>NPC 自动续战</Typography.Text>
@@ -442,8 +435,7 @@ export default function GameplaySettings() {
                                     })}
                                     aria-label="NPC 自动续战"
                                 />
-                                <Typography.Text type="secondary">开启后 NPC 跨战斗保留（续战队员不变）；关闭为官服一场一换（战斗结束 NPC 离场）</Typography.Text>
-                            </Space>
+                                                            </Space>
                             <Space wrap align="center">
                                 <Button
                                     type="primary"
