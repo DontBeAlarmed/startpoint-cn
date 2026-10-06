@@ -56,6 +56,7 @@ import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import {
     findOpenRecruitmentByKey,
+    hasActiveDelivery,
     recordResponse,
     type AttentionRecruitment,
 } from "../../data/domains/attention";
@@ -84,23 +85,25 @@ export function cleanupAbortedMultiBattle(
 }
 
 /**
- * 铃铛进房解析：key 指向的招募必须 open，且房间号/房主与当前战斗一致才有效；
- * 任何失败（含 DB 异常）fail-open 为 null，退回实时 isNewbieHostSync 判定。
- * 导出供回归测试直接锁定语义（防伪 key/跨房间 key）。
+ * 铃铛进房解析：key 指向的招募必须 open，且房间号/房主与当前战斗一致，且该
+ * viewer 持有有效投递行（T2 门票：delivered/accepted 持票，declined 无票——
+ * attention_key 只经 check 下发，无票即伪造）；任何失败（含 DB 异常）fail-open
+ * 为 null 退回实时 isNewbieHostSync 判定。导出供回归测试直接锁定语义。
  */
 export function resolveBellRecruitmentForStart(
     attentionKey: string | null,
     roomNumber: string,
     hostViewerId: number,
+    viewerId: number,
 ): AttentionRecruitment | null {
     if (attentionKey === null) return null;
     try {
         const recruitment = findOpenRecruitmentByKey(attentionKey, getServerTime() * 1000);
         if (recruitment === null) return null;
-        return recruitment.roomNumber === roomNumber
-            && recruitment.hostViewerId === hostViewerId
-            ? recruitment
-            : null;
+        if (recruitment.roomNumber !== roomNumber || recruitment.hostViewerId !== hostViewerId) {
+            return null;
+        }
+        return hasActiveDelivery(recruitment.id, viewerId) ? recruitment : null;
     } catch {
         return null;
     }
@@ -264,6 +267,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 : null,
             room_number,
             room.value.host.viewerId,
+            viewer_id,
         );
         const newbieRescueEligible = bellRecruitment !== null
             ? gameplaySettings.multiRescueFragmentRewardsEnabled

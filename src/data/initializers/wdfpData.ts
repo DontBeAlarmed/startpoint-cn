@@ -43,11 +43,19 @@ export default function init(
         multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
         multi_rescue_host_rewards_enabled INTEGER NOT NULL DEFAULT 1,
         rush_700011_to_700017_compatibility_enabled INTEGER NOT NULL DEFAULT 1,
+        multi_random_recruitment_publish_enabled INTEGER NOT NULL DEFAULT 0,
+        multi_npc_release_seconds INTEGER NOT NULL DEFAULT 0,
+        multi_npc_close_recruitment_after_fill INTEGER NOT NULL DEFAULT 1,
+        multi_npc_one_shot_lifecycle INTEGER NOT NULL DEFAULT 0,
         updated_at TEXT NOT NULL
     )`).run()
     ensureSchemaColumn(database, "server_gameplay_settings.multi_rescue_fragment_rewards_enabled")
     ensureSchemaColumn(database, "server_gameplay_settings.multi_rescue_host_rewards_enabled")
     ensureSchemaColumn(database, "server_gameplay_settings.rush_700011_to_700017_compatibility_enabled")
+    ensureSchemaColumn(database, "server_gameplay_settings.multi_random_recruitment_publish_enabled")
+    ensureSchemaColumn(database, "server_gameplay_settings.multi_npc_release_seconds")
+    ensureSchemaColumn(database, "server_gameplay_settings.multi_npc_close_recruitment_after_fill")
+    ensureSchemaColumn(database, "server_gameplay_settings.multi_npc_one_shot_lifecycle")
     const gameplaySettingsExist = database.prepare(
         "SELECT 1 FROM server_gameplay_settings WHERE id = 1",
     ).get() !== undefined

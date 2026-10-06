@@ -243,11 +243,13 @@ async function main() {
         viewer_id: 0, client_logs: [], api_count: 1,
     })).statusCode, 400)
 
-    // ---- share_room 类型门控：仅 share_type_list 含 3（随机招募）才落招募行 ----
+    // ---- share_room 双重门控：发布门（publishBell）× 类型门控（share_type 3）----
     // 客户端契约（MultiBattleRoomScene.shareRequestAPI / AttentionRecruitmentRedeliverTimer）：
     // 含 3 时移出列表走 startRecruit 定时器（重发恒为 [3]）；纯 [1]/[2]（互关/粉丝）
-    // 一次性分享不得把房间广播成随机招募铃铛。
+    // 一次性分享不得把房间广播成随机招募铃铛。批次一新增发布门：publishBell off
+    // （NPC 快速预设默认）时含 3 也不落招募行——按钮退化为纯 NPC 开关。
     const shareGateHost = await createPlayer()
+    const { updateServerGameplaySettingsSync } = require("../src/data/domains/server-settings")
     const shareRoom = createRoom(
         shareGateHost.viewerId, shareGateHost.playerId, 1, 1, 1001001, 0, 341005,
     )
@@ -275,14 +277,29 @@ async function main() {
     assert.equal(noList.statusCode, 200, noList.body)
     assert.equal(recruitmentCount(), 0, "缺省 share_type_list 不得创建招募行")
 
-    const recruited = await post(fastify, shareUrl, {
+    // 发布门 off（默认 = NPC 快速预设）：含 3 也不落行
+    const gatedOff = await post(fastify, shareUrl, {
         viewer_id: shareGateHost.viewerId,
         room_number: shareRoom.room_number,
         share_type_list: [3],
         api_count: 3,
     })
+    assert.equal(gatedOff.statusCode, 200, gatedOff.body)
+    assert.equal(recruitmentCount(), 0, "publishBell off 时含 3 也不得创建招募行（发布门）")
+
+    // 发布门 on：含 3 恢复建行
+    updateServerGameplaySettingsSync({
+        dropMultiplier: 1,
+        multiRandomRecruitmentPublishEnabled: true,
+    })
+    const recruited = await post(fastify, shareUrl, {
+        viewer_id: shareGateHost.viewerId,
+        room_number: shareRoom.room_number,
+        share_type_list: [3],
+        api_count: 4,
+    })
     assert.equal(recruited.statusCode, 200, recruited.body)
-    assert.equal(recruitmentCount(), 1, "share_type_list 含 3 必须创建招募行")
+    assert.equal(recruitmentCount(), 1, "publishBell on 时 share_type_list 含 3 必须创建招募行")
     const gateRow = db.prepare(
         "SELECT attention_key FROM attention_recruitments WHERE room_number = ?"
     ).get(shareRoom.room_number)
@@ -293,7 +310,7 @@ async function main() {
         viewer_id: shareGateHost.viewerId,
         room_number: shareRoom.room_number,
         share_type_list: [3],
-        api_count: 4,
+        api_count: 5,
     })
     assert.equal(recruitmentCount(), 1, "重发 [3] 不得创建新行")
     assert.equal(

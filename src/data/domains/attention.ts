@@ -54,6 +54,10 @@ export interface AttentionStore {
         limit: number,
     ): AttentionRecruitment[]
     findOpenRecruitmentByKey(attentionKey: string, nowMs: number): AttentionRecruitment | null
+    /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null */
+    findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number): AttentionRecruitment | null
+    /** T2 门票：投递行存在且未被拒绝（delivered/accepted 均持票） */
+    hasActiveDelivery(recruitmentId: number, viewerId: number): boolean
     recordResponse(
         recruitmentId: number,
         viewerId: number,
@@ -61,6 +65,8 @@ export interface AttentionStore {
         nowMs: number,
     ): void
     closeRecruitmentForRoom(hostViewerId: number, roomNumber: string): void
+    /** 热切换清扫：publishBell on→off 时全量关闭 open 招募（共享库下跨节点生效） */
+    closeAllOpenRecruitments(): void
     expireStaleRecruitments(nowMs: number): void
     pruneExpiredRecruitments(nowMs: number, retentionMs?: number): void
 }
@@ -115,10 +121,13 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
             // 避免 deferred 事务在共享库多进程下 SELECT→写升级撞 SQLITE_BUSY_SNAPSHOT
             //（该错误不吃 busy_timeout；对齐参考服 BEGIN IMMEDIATE 纪律）
             const immediate = db.transaction((): { id: number; attentionKey: string; created: boolean } => {
+                // expires_at 过滤：过期行不得被重发"复活"（复活会保旧 posted_at，
+                // 窗口起点错乱）；过期重发 = 全新行/新 key/新 posted_at（收官审查 B2/C3）
                 const existing = db.prepare(`
                     SELECT id, attention_key FROM attention_recruitments
                     WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
-                `).get(input.hostViewerId, input.roomNumber) as { id: number; attention_key: string } | undefined
+                        AND expires_at_ms > ?
+                `).get(input.hostViewerId, input.roomNumber, input.nowMs) as { id: number; attention_key: string } | undefined
                 if (existing !== undefined) {
                     db.prepare(`
                         UPDATE attention_recruitments
@@ -194,6 +203,27 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
             return row !== undefined ? mapRecruitmentRow(row) : null
         },
 
+        /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null */
+        findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs) {
+            const row = db.prepare(`
+                SELECT * FROM attention_recruitments
+                WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
+                    AND expires_at_ms > ?
+                ORDER BY posted_at_ms DESC
+                LIMIT 1
+            `).get(hostViewerId, roomNumber, nowMs) as Record<string, unknown> | undefined
+            return row !== undefined ? mapRecruitmentRow(row) : null
+        },
+
+        /** T2 门票：投递行存在且未被拒绝（delivered/accepted 均持票） */
+        hasActiveDelivery(recruitmentId, viewerId) {
+            const row = db.prepare(`
+                SELECT state FROM attention_deliveries
+                WHERE recruitment_id = ? AND viewer_id = ?
+            `).get(recruitmentId, viewerId) as { state: string } | undefined
+            return row !== undefined && row.state !== "declined"
+        },
+
         /** 仅 delivered → accepted/declined 单向转移（幂等，不降级已响应状态） */
         recordResponse(recruitmentId, viewerId, state, nowMs) {
             db.prepare(`
@@ -208,6 +238,14 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
                 UPDATE attention_recruitments SET status = 'closed'
                 WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
             `).run(hostViewerId, roomNumber)
+        },
+
+        /** 热切换清扫：publishBell on→off 时全量关闭 open 招募（共享库下跨节点生效） */
+        closeAllOpenRecruitments() {
+            db.prepare(`
+                UPDATE attention_recruitments SET status = 'closed'
+                WHERE status = 'open'
+            `).run()
         },
 
         /** 卫生兜底：把过期招募标记为 expired（读路径本就按 expires_at_ms 过滤，可选调用） */
@@ -274,6 +312,18 @@ export function deliverOpenRecruitmentsToViewer(viewerId: number, nowMs: number,
 
 export function findOpenRecruitmentByKey(attentionKey: string, nowMs: number) {
     return getAttentionStore().findOpenRecruitmentByKey(attentionKey, nowMs)
+}
+
+export function findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number) {
+    return getAttentionStore().findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs)
+}
+
+export function hasActiveDelivery(recruitmentId: number, viewerId: number): boolean {
+    return getAttentionStore().hasActiveDelivery(recruitmentId, viewerId)
+}
+
+export function closeAllOpenRecruitments(): void {
+    getAttentionStore().closeAllOpenRecruitments()
 }
 
 export function recordResponse(

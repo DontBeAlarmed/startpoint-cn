@@ -16,6 +16,26 @@ const schemaColumns = {
         column: "rush_700011_to_700017_compatibility_enabled",
         definition: "INTEGER NOT NULL DEFAULT 1",
     },
+    "server_gameplay_settings.multi_random_recruitment_publish_enabled": {
+        table: "server_gameplay_settings",
+        column: "multi_random_recruitment_publish_enabled",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "server_gameplay_settings.multi_npc_release_seconds": {
+        table: "server_gameplay_settings",
+        column: "multi_npc_release_seconds",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
+    "server_gameplay_settings.multi_npc_close_recruitment_after_fill": {
+        table: "server_gameplay_settings",
+        column: "multi_npc_close_recruitment_after_fill",
+        definition: "INTEGER NOT NULL DEFAULT 1",
+    },
+    "server_gameplay_settings.multi_npc_one_shot_lifecycle": {
+        table: "server_gameplay_settings",
+        column: "multi_npc_one_shot_lifecycle",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
     "players.tutorial_gacha_character_id": {
         table: "players",
         column: "tutorial_gacha_character_id",

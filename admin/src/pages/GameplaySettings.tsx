@@ -11,6 +11,10 @@ interface GameplaySettings {
     multiRescueFragmentRewardsEnabled: boolean
     multiRescueHostRewardsEnabled: boolean
     rush700011To700017CompatibilityEnabled: boolean
+    multiRandomRecruitmentPublishEnabled: boolean
+    multiNpcReleaseSeconds: number
+    multiNpcCloseRecruitmentAfterFill: boolean
+    multiNpcOneShotLifecycle: boolean
     updatedAt: string
 }
 
@@ -118,13 +122,73 @@ export default function GameplaySettings() {
         },
         onError: (error: Error) => message.error(error.message),
     })
+    // 联机招募模式卡片：四参数一次原子保存（发布关闭时 W/兜后置灰但仍随保存提交）
+    const saveRecruitmentMode = useMutation({
+        mutationFn: (payload: {
+            multiRandomRecruitmentPublishEnabled: boolean
+            multiNpcReleaseSeconds: number
+            multiNpcCloseRecruitmentAfterFill: boolean
+            multiNpcOneShotLifecycle: boolean
+        }) => apiPatch<GameplaySettings>("/api/server/settings/gameplay", payload),
+        onSuccess: value => {
+            queryClient.setQueryData(["serverGameplaySettings"], value)
+            setDraftRecruitment(value)
+            flashSaved("recruitmentMode")
+            message.success("游戏设置已保存")
+        },
+        onError: (error: Error) => message.error(error.message),
+    })
 
     useEffect(() => {
         if (settings.data) setDraftMultiplier(settings.data.dropMultiplier)
         if (settings.data) setDraftRescueEnabled(settings.data.multiRescueFragmentRewardsEnabled)
         if (settings.data) setDraftHostRescueEnabled(settings.data.multiRescueHostRewardsEnabled)
         if (settings.data) setDraftRushCompatibilityEnabled(settings.data.rush700011To700017CompatibilityEnabled)
+        if (settings.data) setDraftRecruitment(settings.data)
     }, [settings.data])
+
+    // ---- 联机招募模式（参数为真相，模式为派生标签） ----
+    interface RecruitmentDraft {
+        multiRandomRecruitmentPublishEnabled: boolean
+        multiNpcReleaseSeconds: number
+        multiNpcCloseRecruitmentAfterFill: boolean
+        multiNpcOneShotLifecycle: boolean
+    }
+    const [draftRecruitment, setDraftRecruitment] = useState<RecruitmentDraft | null>(null)
+    const applyRecruitmentPreset = (preset: "npc" | "official") => {
+        if (preset === "npc") {
+            setDraftRecruitment({
+                multiRandomRecruitmentPublishEnabled: false,
+                multiNpcReleaseSeconds: 0,
+                multiNpcCloseRecruitmentAfterFill: true,
+                multiNpcOneShotLifecycle: false,
+            })
+        } else {
+            setDraftRecruitment({
+                multiRandomRecruitmentPublishEnabled: true,
+                multiNpcReleaseSeconds: 0,
+                multiNpcCloseRecruitmentAfterFill: true,
+                multiNpcOneShotLifecycle: true,
+            })
+        }
+    }
+    const savedRecruitment = settings.data
+    const recruitmentUnchanged = draftRecruitment === null || savedRecruitment === undefined
+        || (draftRecruitment.multiRandomRecruitmentPublishEnabled === savedRecruitment.multiRandomRecruitmentPublishEnabled
+            && draftRecruitment.multiNpcReleaseSeconds === savedRecruitment.multiNpcReleaseSeconds
+            && draftRecruitment.multiNpcCloseRecruitmentAfterFill === savedRecruitment.multiNpcCloseRecruitmentAfterFill
+            && draftRecruitment.multiNpcOneShotLifecycle === savedRecruitment.multiNpcOneShotLifecycle)
+    // 派生标签按已保存值计算（草稿不参与——标签描述"线上正在跑什么"）
+    const recruitmentModeLabel = savedRecruitment === undefined
+        ? "-"
+        : !savedRecruitment.multiRandomRecruitmentPublishEnabled
+            ? "NPC 快速模式"
+            : savedRecruitment.multiNpcReleaseSeconds === 0
+                && savedRecruitment.multiNpcCloseRecruitmentAfterFill
+                && savedRecruitment.multiNpcOneShotLifecycle
+                ? "官服还原"
+                : "私服混合（自定义）"
+    const publishOn = (draftRecruitment ?? savedRecruitment)?.multiRandomRecruitmentPublishEnabled ?? false
 
     const currentMultiplier = settings.data?.dropMultiplier
     const unchanged = draftMultiplier === null || draftMultiplier === currentMultiplier
@@ -285,6 +349,85 @@ export default function GameplaySettings() {
                             <div className="admin-page-note">
                                 <Typography.Text type="secondary">
                                     开启后 700011–700017 复用 700001–700007 的文件夹奖励、商店与购买期；关闭后完全回到官方末期空奖励、空商店行为。整体开关，无部分开启状态。
+                                </Typography.Text>
+                            </div>
+                        </Space>
+                    </Card>
+                    <Card
+                        title={cardTitle(
+                            `联机招募模式（当前：${recruitmentModeLabel}）`,
+                            !recruitmentUnchanged,
+                            "recruitmentMode",
+                        )}
+                    >
+                        <Space direction="vertical" size="middle" className="admin-stack">
+                            <Space wrap align="center">
+                                <Button onClick={() => applyRecruitmentPreset("npc")}>NPC 快速预设</Button>
+                                <Button onClick={() => applyRecruitmentPreset("official")}>官服还原预设</Button>
+                                <Typography.Text type="secondary">
+                                    预设仅填充下方参数，点「保存」后生效；参数偏离两个预设即私服混合模式。
+                                </Typography.Text>
+                            </Space>
+                            <Space wrap align="center" size={12}>
+                                <Typography.Text>随机招募铃铛</Typography.Text>
+                                <Switch
+                                    checked={publishOn}
+                                    onChange={value => setDraftRecruitment(current => current && {
+                                        ...current,
+                                        multiRandomRecruitmentPublishEnabled: value,
+                                    })}
+                                    aria-label="随机招募铃铛发布"
+                                />
+                                <Typography.Text>NPC 释放窗口</Typography.Text>
+                                <InputNumber
+                                    min={0}
+                                    max={3600}
+                                    precision={0}
+                                    disabled={!publishOn}
+                                    value={draftRecruitment?.multiNpcReleaseSeconds ?? 0}
+                                    onChange={value => setDraftRecruitment(current => current && {
+                                        ...current,
+                                        multiNpcReleaseSeconds: Number(value) || 0,
+                                    })}
+                                    aria-label="NPC 释放窗口（秒）"
+                                    addonAfter="秒"
+                                />
+                                <Typography.Text>NPC 补位后关闭招募</Typography.Text>
+                                <Switch
+                                    checked={(draftRecruitment ?? savedRecruitment)?.multiNpcCloseRecruitmentAfterFill ?? true}
+                                    disabled={!publishOn}
+                                    onChange={value => setDraftRecruitment(current => current && {
+                                        ...current,
+                                        multiNpcCloseRecruitmentAfterFill: value,
+                                    })}
+                                    aria-label="NPC 补位后关闭招募"
+                                />
+                                <Typography.Text>NPC 一场一换</Typography.Text>
+                                <Switch
+                                    checked={(draftRecruitment ?? savedRecruitment)?.multiNpcOneShotLifecycle ?? false}
+                                    onChange={value => setDraftRecruitment(current => current && {
+                                        ...current,
+                                        multiNpcOneShotLifecycle: value,
+                                    })}
+                                    aria-label="NPC 一场一换"
+                                />
+                                <Button
+                                    type="primary"
+                                    icon={<SaveOutlined />}
+                                    disabled={recruitmentUnchanged || draftRecruitment === null}
+                                    loading={saveRecruitmentMode.isPending}
+                                    onClick={() => draftRecruitment !== null && saveRecruitmentMode.mutate(draftRecruitment)}
+                                >
+                                    保存
+                                </Button>
+                            </Space>
+                            <div className="admin-page-note">
+                                <Typography.Text type="secondary">
+                                    关闭铃铛时随机招募按钮只做 NPC 补位，其他玩家收不到救援铃铛；释放窗口是铃铛向全服
+                                    广播的时长（窗口内无人加入才由服务端补 NPC，窗口加 60 秒余量不得超过房间不完整寿命）；
+                                    「补位后关闭招募」关闭时 NPC 先补位、之后真人仍可经铃铛进房替换 NPC；
+                                    「一场一换」为官服语义——战斗结束 NPC 即离场，关闭则跨战斗保留。
+                                    切换即时生效，不影响已开房间。
                                 </Typography.Text>
                             </div>
                         </Space>

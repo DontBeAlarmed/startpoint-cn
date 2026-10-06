@@ -14,9 +14,11 @@ import { issueRoomAdmission } from "./room-admission";
 import {
     buildEstablisherSnapshot,
     closeRecruitmentForRoom,
+    findOpenRecruitmentForRoom,
     getOrCreateRecruitmentForRoom,
     pruneExpiredRecruitments,
 } from "../../data/domains/attention";
+import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import { getPlayerRankLevel } from "../player-context";
 
@@ -27,6 +29,23 @@ async function hasValidViewer(context: MultiHttpContext, viewerId: number): Prom
 
 function forbidden(reply: FastifyReply): FastifyReply {
     return reply.status(403).send({ "error": "Forbidden", "message": "Room permission denied." });
+}
+
+/**
+ * summon 是否直接发双候选（纯函数，导出供测试锁定三模式语义）：
+ * publishBell off（NPC 快速）或 W=0（官服原生时序）恒发；
+ * W>0（私服混合）仅当招募行存在且窗口已过才发——行缺失/未到点回空，
+ * NPC 由服务端注入在 W 到点时进场（批次三）。
+ */
+export function resolveSummonServeCandidates(input: {
+    publishEnabled: boolean
+    releaseSeconds: number
+    recruitment: { postedAtMs: number } | null
+    nowMs: number
+}): boolean {
+    if (!input.publishEnabled || input.releaseSeconds === 0) return true
+    if (input.recruitment === null) return false
+    return input.nowMs - input.recruitment.postedAtMs >= input.releaseSeconds * 1000
 }
 
 function hubUnavailable(reply: FastifyReply): FastifyReply {
@@ -167,15 +186,32 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             });
         }
 
+        // 三模式 summon 语义（收官审查：合法房主 + 活房间恒 200，业务降级编码进
+        // mate 字段——任何 4xx 会把客户端状态机永久卡死在 WaitRemote）：
+        // - publishBell off（NPC 快速预设）：直接发双候选（机器人开关）
+        // - publishBell on 且 W=0（官服还原）：发候选（客户端 ~20s 原生时序）
+        // - publishBell on 且 W>0（私服混合）：窗口未到回空（省略 mate 字段，
+        //   客户端 Faild 重开铃），NPC 由服务端注入在 W 到点时进场（批次三）
+        const settings = getServerGameplaySettingsSync();
+        const recruitment = settings.multiRandomRecruitmentPublishEnabled && settings.multiNpcReleaseSeconds > 0
+            ? findOpenRecruitmentForRoom(viewerId, body.room_number, getServerTime() * 1000)
+            : null;
+        const serveCandidates = resolveSummonServeCandidates({
+            publishEnabled: settings.multiRandomRecruitmentPublishEnabled,
+            releaseSeconds: settings.multiNpcReleaseSeconds,
+            recruitment: recruitment === null ? null : { postedAtMs: recruitment.postedAtMs },
+            nowMs: getServerTime() * 1000,
+        });
+
         const mates = buildNpcMates(body.quest_id, room.value.category);
+        const data: Record<string, unknown> = serveCandidates
+            ? { "mate1": mates.mate1, "mate2": mates.mate2 }
+            : {};
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "mate1": mates.mate1,
-                "mate2": mates.mate2,
-            }
+            "data": data
         });
     });
 
@@ -282,7 +318,10 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         if (viewerId !== room.value.host.viewerId) return forbidden(reply);
 
         const wantsRecruitment = Array.isArray(body.share_type_list)
-            && body.share_type_list.includes(3);
+            && body.share_type_list.includes(3)
+            // 发布门（三模式参数）：publishBell off（NPC 快速预设）时按钮退化为
+            // 纯 NPC 开关——不落招募行，其他玩家收不到铃铛（客户端忽略响应体）
+            && getServerGameplaySettingsSync().multiRandomRecruitmentPublishEnabled;
         if (wantsRecruitment) {
             // 尽力而为：招募落库/过期清理失败不得阻断分享主流程（15s 重发自愈）
             try {
