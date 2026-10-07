@@ -1,4 +1,5 @@
 import { getDb } from "../../data/db"
+import { maybeSettleCraftPointMissions } from "./craft-point-settlement-gate"
 import {
     InventoryTransactionError,
     InventoryValidationError,
@@ -271,7 +272,10 @@ export class InventorySqliteRepository {
                   AND players_collected_items.total_obtained >= 0
                   AND players_collected_items.total_obtained <= ? - excluded.total_obtained
             `).run(...values)
-            if (result.changes === chunk.length) continue
+            if (result.changes === chunk.length) {
+                for (const row of chunk) maybeSettleCraftPointMissions(ownerId, row.itemId)
+                continue
+            }
             // Diagnose the failing row without further writes; errors mirror the
             // single-row path verbatim and the caller's transaction rolls back.
             for (const row of chunk) {
