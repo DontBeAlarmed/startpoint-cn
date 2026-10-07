@@ -73,12 +73,6 @@ export type MultiplayerSettlementPreparation =
         readonly ok: false
         readonly statusCode: 400 | 500
         readonly response: Record<string, unknown>
-        /**
-         * 400 失败的性质（双审修复）：duplicate = 活跃任务已删除/状态的重复
-         * finish（HTTP 层可转幂等零奖励终态）；validation = 请求体校验失败
-         * （必须保持 400，不得被吞成 200——否则 int32 越界等校验形同虚设）
-         */
-        readonly kind: "validation" | "duplicate"
     }
 
 export interface MultiplayerSettlementInput {
@@ -114,7 +108,7 @@ export async function prepareMultiplayerSettlement(
     } catch (error) {
         const configurationError = getQuestConfigurationErrorResponse(error)
         if (configurationError !== null) {
-            return { ok: false, statusCode: 500, kind: "validation", response: configurationError }
+            return { ok: false, statusCode: 500, response: configurationError }
         }
         throw error
     }
@@ -136,21 +130,32 @@ export async function prepareMultiplayerSettlement(
     }
 
     const participant = context.snapshotProvider.getParticipant(viewerId)
-    const verification = await context.settlementVerifier.verify({
-        nodeSessionId: participant.nodeSessionId,
-        viewerId,
-        roomNumber: activeQuest.roomNumber,
-        battleSessionId: activeQuest.battleSessionId,
-        coordinatorOrigin: activeQuest.coordinatorOrigin,
-    })
+    // finalize 瞬态竞态（TCP scene 上报与 finish HTTP 的时序差）：有界重试让
+    // finalize 落地后再结算——重试穷尽才 400（客户端回标题，活跃任务仍在，
+    // 重新 finish 可收敛；旧零奖励终态会让合法结算静默丢失，双审需修 2）
+    let verification: Awaited<ReturnType<typeof context.settlementVerifier.verify>> | null = null
+    let finalizedBattle: Awaited<ReturnType<typeof context.coordinator.finalizeBattle>> | null = null
+    for (let attempt = 0; ; attempt++) {
+        verification = await context.settlementVerifier.verify({
+            nodeSessionId: participant.nodeSessionId,
+            viewerId,
+            roomNumber: activeQuest.roomNumber,
+            battleSessionId: activeQuest.battleSessionId,
+            coordinatorOrigin: activeQuest.coordinatorOrigin,
+        })
+        if (verification.ok) {
+            finalizedBattle = await context.coordinator.finalizeBattle({
+                participant,
+                roomNumber: activeQuest.roomNumber,
+                battleSessionId: activeQuest.battleSessionId as BattleSessionId,
+            })
+            if (finalizedBattle.ok && finalizedBattle.value.finalized) break
+        }
+        if (attempt >= 3) break
+        await new Promise(resolve => setTimeout(resolve, 250))
+    }
     if (!verification.ok) return badRequest("Battle is not finalized.")
-
-    const finalizedBattle = await context.coordinator.finalizeBattle({
-        participant,
-        roomNumber: activeQuest.roomNumber,
-        battleSessionId: activeQuest.battleSessionId as BattleSessionId,
-    })
-    if (!finalizedBattle.ok || !finalizedBattle.value.finalized) {
+    if (finalizedBattle === null || !finalizedBattle.ok || !finalizedBattle.value.finalized) {
         return badRequest("Battle finalization is unavailable.")
     }
 
@@ -168,14 +173,10 @@ export async function prepareMultiplayerSettlement(
     }
 }
 
-function badRequest(
-    message: string,
-    kind: "validation" | "duplicate" = "validation",
-): MultiplayerSettlementPreparation {
+function badRequest(message: string): MultiplayerSettlementPreparation {
     return {
         ok: false,
         statusCode: 400,
-        kind,
         response: { error: "Bad Request", message },
     }
 }

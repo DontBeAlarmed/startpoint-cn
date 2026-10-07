@@ -474,7 +474,6 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             || storedQuest.questId !== abortQuestId
             || storedQuest.category !== abortCategory) {
             // play_id 不匹配的迟到 abort：幂等无操作终态，不渲染 H400、不动当前局
-            // play_id 不匹配的迟到 abort：幂等无操作终态，不渲染 H400、不动当前局
             return reply.header("content-type", "application/x-msgpack").status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
                 "data": {},
