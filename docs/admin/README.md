@@ -99,3 +99,4 @@ Server Bundle 始终打包完整 `web/dist/`，manifest 固定为 `admin.require
 ## 待执行专项
 
 - [壳内 WebView 存档导出无反应（服务端侧修复）](webview-save-export-fix.md)：admin 前端 + web_api 的待执行交接文档，壳（launcher）侧零改动。
+- [防御机制死锁残留自愈交接（服务端侧）](stale-guard-self-heal-handoff.md)：sync.lock / 凭据锁的 stale-guard 自愈修复交接文档，待服务端侧执行。
