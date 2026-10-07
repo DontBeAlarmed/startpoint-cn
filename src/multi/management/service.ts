@@ -62,6 +62,11 @@ export class MultiManagementService implements MultiManagementServiceContract {
         return cloneAndFreeze(this.dependencies.credentials.list())
     }
 
+    rebuildCredentials(): { archivedTo: string | null } {
+        this.assertHostManagementAvailable()
+        return this.dependencies.credentials.rebuildFromCorruption()
+    }
+
     revokeCredential(credentialId: string): MultiHubCredential {
         this.assertHostManagementAvailable()
         return cloneAndFreeze(this.dependencies.credentials.revoke(credentialId))

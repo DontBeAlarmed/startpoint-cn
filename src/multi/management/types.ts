@@ -45,7 +45,7 @@ export interface MultiAuthenticationDiagnostics {
 
 export interface MultiManagementDependencies {
     readonly mode: MultiManagementMode
-    readonly credentials: Pick<MultiHubCredentialStore, "create" | "list" | "revoke">
+    readonly credentials: Pick<MultiHubCredentialStore, "create" | "list" | "revoke" | "rebuildFromCorruption">
     readonly getStatus: () => Promise<AdminMultiStatus> | AdminMultiStatus
     readonly probe: () => Promise<CoordinatorResult<MultiHubControlStatus>>
         | CoordinatorResult<MultiHubControlStatus>

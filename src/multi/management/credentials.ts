@@ -24,6 +24,7 @@ const CLIENT_CREDENTIALS: MultiManagementDependencies["credentials"] = Object.fr
     create: unavailableCredentialOperation,
     list: unavailableCredentialOperation,
     revoke: unavailableCredentialOperation,
+    rebuildFromCorruption: unavailableCredentialOperation,
 })
 
 export function createMultiManagementCredentialProvider({

@@ -355,37 +355,38 @@ export async function acquireContentSyncLock(
                 throw error
             }
         }
+        // S1：持有者已死（ESRCH）且锁龄超过 stale 阈值 → 经 dev/ino 校验接管。
+        // S2：空锁/垃圾锁（崩溃残留）同样要求锁龄超阈值——无年龄门槛会在双开
+        // 场景把「败者 create→write 亚毫秒空窗的新锁」误判孤儿删除（双审需修项）。
+        // 误判方向安全：pid 复用时 ESRCH 不出现 → 不接管，不会误删活锁。
+        // 接管判定统一收口：expired 且满足接管条件才动手；未满足则继续睡眠
+        //（总等待上界 = timeoutMs + staleThresholdMs），避免 30s 默认 < 60s 阈值
+        // 导致死 pid 残留在首轮启动空转打不出接管窗口。
+        const takeoverEligible = existing !== null
+            && now() - existing.mtimeMs >= staleThresholdMs
+            && (existing.kind !== "record"
+                || !isProcessAlive(existing.record.pid))
         const expired = now() - startedAt >= timeoutMs
-        if (existing !== null) {
-            // S1：持有者已死（ESRCH）且锁龄超过 stale 阈值 → 经 dev/ino 校验接管。
-            // 误判方向安全：pid 复用时 ESRCH 不出现 → 不接管，不会误删活锁。
-            const staleAge = now() - existing.mtimeMs >= staleThresholdMs
-            const holderDead = existing.kind === "record" && !isProcessAlive(existing.record.pid)
-            const orphanedContent = existing.kind !== "record" // S2：空锁/垃圾锁=崩溃残留
-            if (expired && (orphanedContent || (holderDead && staleAge))) {
-                try {
-                    await unlinkOwnedFile(lockPath, existing.identity, null)
-                    console.warn(`[CONTENT_SYNC] stale sync.lock taken over: kind=${existing.kind}` +
-                        (existing.kind === "record" ? ` pid=${existing.record.pid}` : ""))
-                    continue
-                } catch (takeoverError) {
-                    // 接管失败（identity 变化等）→ 回落既有超时语义
-                    if (expired && !legacyError) {
-                        throw new ContentSyncLockError(
-                            "CONTENT_SYNC_LOCK_TIMEOUT",
-                            `等待同步锁超时，且 stale 接管失败：${takeoverError instanceof Error ? takeoverError.message : String(takeoverError)}`,
-                        )
-                    }
-                }
+        if (expired && takeoverEligible && existing !== null) {
+            try {
+                await unlinkOwnedFile(lockPath, existing.identity, null)
+                console.warn(`[CONTENT_SYNC] stale sync.lock taken over: kind=${existing.kind}` +
+                    (existing.kind === "record" ? ` pid=${existing.record.pid}` : ""))
+                continue
+            } catch (takeoverError) {
+                throw new ContentSyncLockError(
+                    "CONTENT_SYNC_LOCK_TIMEOUT",
+                    `等待同步锁超时，且 stale 接管失败：${takeoverError instanceof Error ? takeoverError.message : String(takeoverError)}`,
+                )
             }
         }
-        if (expired) {
-            if (legacyError) throw legacyError
+        if (expired && legacyError !== null) throw legacyError
+        if (now() - startedAt >= timeoutMs + staleThresholdMs) {
             throw new ContentSyncLockError(
                 "CONTENT_SYNC_LOCK_TIMEOUT",
                 `等待同步锁超时${existing?.kind === "record" ? `（pid ${existing.record.pid}）` : ""}；若该进程已退出，请确认后人工删除 sync.lock`,
             )
         }
-        await sleep(Math.min(pollIntervalMs, Math.max(1, timeoutMs - (now() - startedAt))))
+        await sleep(Math.min(pollIntervalMs, Math.max(1, timeoutMs + staleThresholdMs - (now() - startedAt))))
     }
 }

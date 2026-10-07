@@ -47,17 +47,31 @@ test("S1：死 pid + 锁龄超阈值 → 接管成功", async t => {
     assert.equal(fs.existsSync(path.join(contentStateDir, "sync.lock")), false)
 })
 
-test("S1：死 pid + 锁龄未超阈值 → 等待到超时（阈值防 pid 复用窗口误删）", async t => {
+test("S1：死 pid + 锁龄未超阈值 → 继续等待至阈值后接管（总窗口 = timeout + stale）", async t => {
     const { contentStateDir } = createSandbox(t, "lock-stale-fresh-")
-    agedLock(contentStateDir, { ageMs: 1_000 })
+    agedLock(contentStateDir, { ageMs: 0 }) // 新鲜死 pid 锁：阈值门先于 timeout 满足
+    // 收口语义（双审修 3）：timeoutMs 后不抛，继续睡到锁龄 ≥ staleThresholdMs 再接管
+    const lock = await acquireContentSyncLock(contentStateDir, {
+        timeoutMs: 80, pollIntervalMs: 5, staleThresholdMs: 150,
+    })
+    assert.equal(fs.readFileSync(lock.lockPath, "utf8").includes(String(DEAD_PID)), false)
+    await lock.release()
+})
+
+test("S1：活 pid 锁即使超龄也不接管 → 总窗口超时（TIMEOUT）", async t => {
+    const { contentStateDir } = createSandbox(t, "lock-stale-alive-window-")
+    agedLock(contentStateDir, { pid: process.pid, ageMs: 120_000 })
     await assert.rejects(
         acquireContentSyncLock(contentStateDir, {
             timeoutMs: 60, pollIntervalMs: 5, staleThresholdMs: 60_000,
+            isProcessAlive: () => true,
         }),
         error => error instanceof ContentSyncLockError
             && error.code === "CONTENT_SYNC_LOCK_TIMEOUT"
-            && new RegExp(String(DEAD_PID)).test(error.message),
+            && new RegExp(String(process.pid)).test(error.message),
     )
+    assert.equal(fs.readFileSync(path.join(contentStateDir, "sync.lock"), "utf8")
+        .includes(String(process.pid)), true, "活锁不被误删")
 })
 
 test("S1：pid 存活（注入恒活）→ 不接管，超时失败", async t => {

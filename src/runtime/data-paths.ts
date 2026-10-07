@@ -142,6 +142,28 @@ function inspectOptionalRegularFile(
     return stats;
 }
 
+// S6 采纳（双审建议）：旧版固定名迁移 tmp（唯一名改造前的遗留）best-effort 回收
+function cleanupLegacyFixedTemporaryFile(
+    paths: RuntimeDataPaths,
+    fileName: string,
+    fileSystem: DataVolumeFileSystem,
+): void {
+    const legacyTemporaryFile = path.join(paths.stateDir, `.${fileName}.migrate.tmp`);
+    const stats = inspectOptionalRegularFile(
+        legacyTemporaryFile,
+        "Legacy state migration temporary path",
+        fileSystem,
+    );
+    if (stats === null) return;
+    try {
+        fileSystem.unlinkSync(legacyTemporaryFile);
+    } catch (error) {
+        console.warn(
+            `Failed to clean up legacy state migration temporary file "${legacyTemporaryFile}": ${errorMessage(error)}`,
+        );
+    }
+}
+
 function cleanupTemporaryFile(
     temporaryFile: string,
     fileSystem: DataVolumeFileSystem,
@@ -197,6 +219,7 @@ function migrateStateFile(
         `.${fileName}.migrate.${process.pid}.${Math.random().toString(36).slice(2, 10)}.tmp`,
     );
 
+    cleanupLegacyFixedTemporaryFile(paths, fileName, fileSystem);
     cleanupTemporaryFile(temporaryFile, fileSystem);
     const targetStats = inspectOptionalRegularFile(
         target,

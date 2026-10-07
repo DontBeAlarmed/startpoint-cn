@@ -298,18 +298,20 @@ test("degrades corrupt legacy active account JSON to null offset with WARN", () 
   const { paths, service } = freshService()
   fs.writeFileSync(paths.legacyFilePath, "not-json")
 
-  // S5 核心断言：不再抛 INVALID_SERVER_TIME_STATE——启动继续（回落默认偏移流程）
+  // S5 核心断言：不再抛 INVALID_SERVER_TIME_STATE——回落默认日期偏移（同
+  // 「无有效状态存在」路径），启动继续
   const restored = service.restore({ nowMs: NOW_MS })
-  assert.equal(restored.offsetMs, service.defaultOffsetMs ?? restored.offsetMs)
+  assert.equal(restored.mode, "offset")
+  assert.equal(restored.offsetMs, Date.parse(DEFAULT_DATE) - NOW_MS)
 })
 
 test("degrades structurally invalid legacy active account state to null offset", () => {
   const { paths, service } = freshService()
   fs.writeFileSync(paths.legacyFilePath, JSON.stringify({ timeOffset: "1.5" }))
 
-  // 同上：结构损坏仅 WARN 降级，不中止启动
   const restored = service.restore({ nowMs: NOW_MS })
-  assert.equal(restored.offsetMs, service.defaultOffsetMs ?? restored.offsetMs)
+  assert.equal(restored.mode, "offset")
+  assert.equal(restored.offsetMs, Date.parse(DEFAULT_DATE) - NOW_MS)
 })
 
 test("rejects a symbolic-link legacy active account file", () => {
