@@ -55,6 +55,10 @@ export interface AcquireContentSyncLockOptions {
     readonly now?: () => number
     readonly sleep?: (milliseconds: number) => Promise<void>
     readonly writeLock?: (handle: fs.promises.FileHandle, bytes: Buffer) => Promise<void>
+    /** stale 接管阈值：死 pid 且锁龄超过该值才接管（防 pid 立即复用窗口） */
+    readonly staleThresholdMs?: number
+    /** pid 存活探测（测试注入）；默认 process.kill(pid, 0)，仅 ESRCH 视为已死 */
+    readonly isProcessAlive?: (pid: number) => boolean
 }
 
 interface LockIdentity {
@@ -73,6 +77,20 @@ function isCode(error: unknown, code: string): boolean {
         && (error as NodeJS.ErrnoException).code === code)
 }
 
+/**
+ * pid 存活探测（credential-lock 同款）：仅 ESRCH 视为已死。
+ * 误判方向（写进测试注释）：pid 被复用为无关进程时 ESRCH 不出现 → 不接管，
+ * 不会误删活锁；接管失败回落到既有超时语义。
+ */
+function defaultProcessAlive(pid: number): boolean {
+    try {
+        process.kill(pid, 0)
+        return true
+    } catch (error) {
+        return !isCode(error, "ESRCH")
+    }
+}
+
 function sameIdentity(left: LockIdentity, right: LockIdentity): boolean {
     return left.dev === right.dev && left.ino === right.ino
 }
@@ -81,21 +99,20 @@ function identityOf(stat: fs.Stats): LockIdentity {
     return { dev: stat.dev, ino: stat.ino }
 }
 
-function parseLockRecord(bytes: Buffer): LockRecord {
+/**
+ * 解析锁记录；不合规返回 null（S2：空文件/垃圾内容在超时后可接管——
+ * 本仓只有一种锁格式，"格式冲突的另一个同步进程"在全部部署形态下不存在）。
+ * symlink/非普通文件仍由调用方 fail-closed 拒绝，不走本函数。
+ */
+function parseLockRecord(bytes: Buffer): LockRecord | null {
     let value: unknown
     try {
         value = JSON.parse(bytes.toString("utf8"))
     } catch {
-        throw new ContentSyncLockError(
-            "CONTENT_SYNC_LOCK_LEGACY",
-            "sync.lock 不是当前锁格式；确认没有同步进程后请人工删除该文件",
-        )
+        return null
     }
     if (!value || typeof value !== "object" || Array.isArray(value)) {
-        throw new ContentSyncLockError(
-            "CONTENT_SYNC_LOCK_LEGACY",
-            "sync.lock 不是当前锁格式；确认没有同步进程后请人工删除该文件",
-        )
+        return null
     }
     const record = value as Record<string, unknown>
     const keys = Object.keys(record).sort()
@@ -105,10 +122,7 @@ function parseLockRecord(bytes: Buffer): LockRecord {
         || !TOKEN_PATTERN.test(record.token)
         || !Number.isSafeInteger(record.pid)
         || (record.pid as number) <= 0) {
-        throw new ContentSyncLockError(
-            "CONTENT_SYNC_LOCK_LEGACY",
-            "sync.lock 不是当前锁格式；确认没有同步进程后请人工删除该文件",
-        )
+        return null
     }
     return record as unknown as LockRecord
 }
@@ -151,7 +165,11 @@ async function assertRootIdentity(contentRootDir: string, expected: LockIdentity
     }
 }
 
-async function inspectExistingLock(lockPath: string): Promise<LockRecord> {
+type ExistingLock =
+    | { readonly kind: "record"; readonly record: LockRecord; readonly identity: LockIdentity; readonly mtimeMs: number }
+    | { readonly kind: "empty" | "garbage"; readonly identity: LockIdentity; readonly mtimeMs: number }
+
+async function inspectExistingLock(lockPath: string): Promise<ExistingLock> {
     const before = await fs.promises.lstat(lockPath)
     if (before.isSymbolicLink()) {
         throw new ContentSyncLockError(
@@ -174,7 +192,16 @@ async function inspectExistingLock(lockPath: string): Promise<LockRecord> {
                 "sync.lock 在读取期间发生变化",
             )
         }
-        return parseLockRecord(await handle.readFile())
+        const bytes = await handle.readFile()
+        const record = parseLockRecord(bytes)
+        if (record !== null) {
+            return { kind: "record", record, identity: identityOf(opened), mtimeMs: opened.mtimeMs }
+        }
+        return {
+            kind: bytes.length === 0 ? "empty" : "garbage",
+            identity: identityOf(opened),
+            mtimeMs: opened.mtimeMs,
+        }
     } finally {
         await handle.close()
     }
@@ -206,8 +233,8 @@ async function unlinkOwnedFile(
         )
     }
     if (expectedToken !== null) {
-        const record = await inspectExistingLock(lockPath)
-        if (record.token !== expectedToken) {
+        const current = await inspectExistingLock(lockPath)
+        if (current.kind !== "record" || current.record.token !== expectedToken) {
             throw new ContentSyncLockError(
                 "CONTENT_SYNC_LOCK_REPLACED",
                 "sync.lock token 已被替换，拒绝删除",
@@ -252,6 +279,8 @@ export async function acquireContentSyncLock(
 
     const now = options.now ?? getRealNowMs
     const sleep = options.sleep ?? (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)))
+    const staleThresholdMs = positiveDuration(options.staleThresholdMs ?? 60_000, "staleThresholdMs", true)
+    const isProcessAlive = options.isProcessAlive ?? defaultProcessAlive
     const writeLock = options.writeLock ?? (async (handle, bytes) => {
         await handle.writeFile(bytes)
     })
@@ -313,7 +342,7 @@ export async function acquireContentSyncLock(
             if (!isCode(error, "EEXIST")) throw error
         }
 
-        let existing: LockRecord | null = null
+        let existing: ExistingLock | null = null
         let legacyError: ContentSyncLockError | null = null
         try {
             existing = await inspectExistingLock(lockPath)
@@ -326,11 +355,35 @@ export async function acquireContentSyncLock(
                 throw error
             }
         }
-        if (now() - startedAt >= timeoutMs) {
+        const expired = now() - startedAt >= timeoutMs
+        if (existing !== null) {
+            // S1：持有者已死（ESRCH）且锁龄超过 stale 阈值 → 经 dev/ino 校验接管。
+            // 误判方向安全：pid 复用时 ESRCH 不出现 → 不接管，不会误删活锁。
+            const staleAge = now() - existing.mtimeMs >= staleThresholdMs
+            const holderDead = existing.kind === "record" && !isProcessAlive(existing.record.pid)
+            const orphanedContent = existing.kind !== "record" // S2：空锁/垃圾锁=崩溃残留
+            if (expired && (orphanedContent || (holderDead && staleAge))) {
+                try {
+                    await unlinkOwnedFile(lockPath, existing.identity, null)
+                    console.warn(`[CONTENT_SYNC] stale sync.lock taken over: kind=${existing.kind}` +
+                        (existing.kind === "record" ? ` pid=${existing.record.pid}` : ""))
+                    continue
+                } catch (takeoverError) {
+                    // 接管失败（identity 变化等）→ 回落既有超时语义
+                    if (expired && !legacyError) {
+                        throw new ContentSyncLockError(
+                            "CONTENT_SYNC_LOCK_TIMEOUT",
+                            `等待同步锁超时，且 stale 接管失败：${takeoverError instanceof Error ? takeoverError.message : String(takeoverError)}`,
+                        )
+                    }
+                }
+            }
+        }
+        if (expired) {
             if (legacyError) throw legacyError
             throw new ContentSyncLockError(
                 "CONTENT_SYNC_LOCK_TIMEOUT",
-                `等待同步锁超时（pid ${(existing as LockRecord).pid}）；若该进程已退出，请确认后人工删除 sync.lock`,
+                `等待同步锁超时${existing?.kind === "record" ? `（pid ${existing.record.pid}）` : ""}；若该进程已退出，请确认后人工删除 sync.lock`,
             )
         }
         await sleep(Math.min(pollIntervalMs, Math.max(1, timeoutMs - (now() - startedAt))))

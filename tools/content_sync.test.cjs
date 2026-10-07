@@ -1475,12 +1475,12 @@ test("lock waits through the owner's create/write window and diagnoses legacy fi
     await second.release()
 
     fs.writeFileSync(path.join(paths.contentStateDir, "sync.lock"), "old lock")
-    await assert.rejects(
-        acquireContentSyncLock(paths.contentStateDir, { timeoutMs: 10, pollIntervalMs: 2 }),
-        error => error instanceof ContentSyncLockError
-            && error.code === "CONTENT_SYNC_LOCK_LEGACY"
-            && /remove|人工删除/i.test(error.message),
-    )
+    // S2（stale-guard 自愈）：垃圾内容锁=崩溃残留，超时后接管而非 fail-closed
+    const takeover = await acquireContentSyncLock(paths.contentStateDir, {
+        timeoutMs: 10, pollIntervalMs: 2,
+    })
+    await takeover.release()
+    assert.equal(fs.existsSync(path.join(paths.contentStateDir, "sync.lock")), false)
 })
 
 test("CLI parses mutually exclusive modes, returns exit codes, and never prints absolute paths", async () => {
