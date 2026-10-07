@@ -342,9 +342,9 @@ export async function handleEnterComs(
     const initialRealMates = getConnectedRealMates(client, room)
 
     // Assign the room roster synchronously so concurrent EnterComs calls share one binding.
-    if (room.npc_count <= 0) {
-        room.npc_count = Math.max(0, 3 - initialRealMates.length)
-    }
+    // 配额在每次招募激活时重算（3 − 当前真人）：上一轮成员变动（离开/加入）后的
+    // 缺口在重新开启招募/注入的这一次提交中补齐（用户定案语义，非离开瞬间补位）
+    room.npc_count = Math.max(0, 3 - initialRealMates.length)
     ensureNpcRoster(room, room.npc_count)
 
     const initialActiveCount = getAvailableNpcSlotCount(room, initialRealMates)

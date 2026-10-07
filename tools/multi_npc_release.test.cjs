@@ -41,6 +41,8 @@ const {
     findOpenRecruitmentForRoom,
 } = require("../src/data/domains/attention")
 const { applyNpcPostFill, scheduleNpcRelease } = require("../src/multi/npc/release")
+const NPC_VIEWER_FLOOR = 900000000
+const { handleSocketDisconnect } = require("../src/multi/tcp/lobby")
 const { isBellDeliveryEligible } = require("../src/multi/bell-gate")
 const { QuestCategory } = require("../src/lib/types")
 const roomManager = require("../src/multi/room/manager")
@@ -299,5 +301,58 @@ test("T1：房主掉线（hostClient 缺席）拒绝", () => {
 test("T1：异节点房间（本节点不可见）放行", () => {
     assert.equal(isBellDeliveryEligible("000000"), true, "查无房间 = 其他节点持有：放行")
 })
+
+// ---- 重新开启招募时重算配额（用户定案语义：补全发生在开启招募，而非离开瞬间）----
+test("重算·续战：1真人+1NPC 重开招募 → npc_count=2，保留旧 NPC 补 1 个", async () => {
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiRandomRecruitmentPublishEnabled: true,
+        multiNpcReleaseSeconds: 1,
+        multiNpcCloseRecruitmentAfterFill: false,
+    })
+    const hostViewer = HOST_VIEWER + 10
+    const { room, host } = setupHostRoom(test, hostViewer)
+    const live = getRoom(room.room_number)
+    // 第一把结束客机离开后的状态：1真人 + 旧NPC1（npc_count=1 冻结值）
+    live.npc_count = 1
+    live.is_npc_mode = true
+    host.mates.push({ viewerId: NPC_VIEWER_FLOOR + 1, comId: 1, connectionId: `${room.room_number}-npc-1`, name: "Pain1", party: { characters: [] }, state: [0] })
+    live.mates = host.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+
+    // 重新开启招募（share_room [3] → 发布门开 → 挂释放点）
+    share(hostViewer, room.room_number)
+    scheduleNpcRelease(room.room_number)
+    await wait(1800)
+
+    assert.equal(live.npc_count, 2, "重算 = 3 − 真人1 = 2")
+    assert.equal(npcCount(host.mates), 2, "保留旧 NPC 并补 1 个")
+    assert.ok(npcCount(host.mates.filter(m => m.comId === 1)) === 1, "旧 NPC1 保留")
+    const row = db.prepare("SELECT status FROM attention_recruitments WHERE room_number = ?").get(room.room_number)
+    assert.equal(row.status, "open", "keep-open 行保持 open")
+}, 15000)
+
+test("重算·不续战：1真人（npc_count=0）重开招募 → 补 2 个 NPC", async () => {
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiRandomRecruitmentPublishEnabled: true,
+        multiNpcReleaseSeconds: 1,
+        multiNpcCloseRecruitmentAfterFill: true,
+    })
+    const hostViewer = HOST_VIEWER + 11
+    const { room, host } = setupHostRoom(test, hostViewer)
+    const live = getRoom(room.room_number)
+    // 一场一换 release 清零后的状态：1真人、无 NPC
+    live.npc_count = 0
+    live.is_npc_mode = true
+    live.mates = [{ viewer_id: hostViewer, com_id: 0 }]
+
+    share(hostViewer, room.room_number)
+    scheduleNpcRelease(room.room_number)
+    await wait(1800)
+
+    assert.equal(live.npc_count, 2, "重算 = 3 − 真人1 = 2")
+    assert.equal(npcCount(host.mates), 2, "补 2 个 NPC")
+    assert.equal(host.mates.length, 3, "满编 3/3")
+}, 15000)
 
 console.log("multi npc release: all assertions passed")
