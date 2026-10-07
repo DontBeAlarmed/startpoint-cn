@@ -111,6 +111,12 @@ export function settleEventTradeExpiryOnLoadSync(
             freeMana: currentPlayer.freeMana + capacity.acceptedMana,
             totalManaObtained: nextTotalManaObtained,
         })
+        // 玛纳入账（任务 40 族）当场窄域结算（活动兑换过期入口）
+        if (capacity.acceptedMana > 0) {
+            const { settleManaAdditionMissions } = require("./mana-addition-mission-settlement") as typeof import("./mana-addition-mission-settlement")
+            const { getServerDate } = require("../utils") as typeof import("../utils")
+            settleManaAdditionMissions(input.playerId, getServerDate())
+        }
         if (capacity.overflowMana > 0) {
             const maxAttachmentNumber = Math.max(
                 1,

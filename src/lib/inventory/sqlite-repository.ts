@@ -177,6 +177,10 @@ export class InventorySqliteRepository {
               AND total_obtained >= 0
               AND total_obtained <= ? - excluded.total_obtained
         `).run(ownerId, id, obtainedAmount, MAX_SAFE_INTEGER)
+        // 锻块入账是「累计获得锻造石」事实（任务 66 族）的产生时点：当场窄域结算
+        //（门为 .cjs 惰性 require，规避低层仓库 → 任务域依赖环）
+        require("./craft-point-settlement-gate.cjs")
+            .maybeSettleCraftPointMissions(ownerId, id)
         if (result.changes !== 1) {
             const stored = getDb().prepare(`
                 SELECT total_obtained, typeof(total_obtained) AS storage_type

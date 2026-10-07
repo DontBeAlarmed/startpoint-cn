@@ -129,4 +129,12 @@ export function persistPlayerResourceGrantsWithinTransactionSync(
             "Player resource grant did not update one valid Player row",
         )
     }
+    // 玛纳入账是「累计获得玛纳」事实（任务 40 族）的产生时点：当场窄域结算。
+    // 惰性要求（lazy require）：mission/settlement 依赖树可能回指本模块。
+    // 通用入账点一次覆盖邮件附件/嘉年华/登录奖励等全部通用发放源。
+    if (manaDelta > 0) {
+        const { settleManaAdditionMissions } = require("./mana-addition-mission-settlement") as typeof import("./mana-addition-mission-settlement")
+        const { getServerDate } = require("../utils") as typeof import("../utils")
+        settleManaAdditionMissions(normalizedAfter.playerId, getServerDate())
+    }
 }
