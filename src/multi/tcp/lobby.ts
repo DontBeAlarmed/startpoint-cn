@@ -246,7 +246,7 @@ function commitRoomMates(client: SessionClient, room: MultiRoom, mates: any[]): 
     room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
 }
 
-function reconcileRematchSlots(client: SessionClient, room: MultiRoom): void {
+export function reconcileRematchSlots(client: SessionClient, room: MultiRoom): void {
     const revision = advanceRecruitmentGeneration(room)
     const realMates = getConnectedRealMates(client, room)
     commitRoomMates(client, room, realMates)
@@ -340,6 +340,9 @@ export async function handleEnterComs(
     if (!hostMate) return
 
     const initialRealMates = getConnectedRealMates(client, room)
+    // 双检：请求已被更新的一代废弃（开战/一场一换清除 bump 过 revision）时
+    // 不做任何副作用写入（npc_count/roster），直接让位
+    if (requestId < getRoomRecruitmentState(room).committedRequestId) return
 
     // Assign the room roster synchronously so concurrent EnterComs calls share one binding.
     // 配额在每次招募激活时重算（3 − 当前真人）：上一轮成员变动（离开/加入）后的

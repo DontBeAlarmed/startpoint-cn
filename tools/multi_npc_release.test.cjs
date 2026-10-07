@@ -42,7 +42,7 @@ const {
 } = require("../src/data/domains/attention")
 const { applyNpcPostFill, scheduleNpcRelease } = require("../src/multi/npc/release")
 const NPC_VIEWER_FLOOR = 900000000
-const { handleSocketDisconnect } = require("../src/multi/tcp/lobby")
+const { handleEnterComs, handleSocketDisconnect } = require("../src/multi/tcp/lobby")
 const { isBellDeliveryEligible } = require("../src/multi/bell-gate")
 const { QuestCategory } = require("../src/lib/types")
 const roomManager = require("../src/multi/room/manager")
@@ -353,6 +353,37 @@ test("重算·不续战：1真人（npc_count=0）重开招募 → 补 2 个 NPC
     assert.equal(live.npc_count, 2, "重算 = 3 − 真人1 = 2")
     assert.equal(npcCount(host.mates), 2, "补 2 个 NPC")
     assert.equal(host.mates.length, 3, "满编 3/3")
+}, 15000)
+
+// ---- 一场一换：rematch 回房不复活 NPC（仅重新开启招募才补，双审 A-建议 b）----
+test("一场一换：清零后回房/reconcile 不复活 NPC，仅重开招募补齐", async () => {
+    const { startLobbyLifecycle: start } = require("../src/multi/tcp/lobby-lifecycle")
+    start()
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiRandomRecruitmentPublishEnabled: true,
+        multiNpcCloseRecruitmentAfterFill: true,
+    })
+    const hostViewer = HOST_VIEWER + 12
+    const { room, host } = setupHostRoom(test, hostViewer)
+    const live = getRoom(room.room_number)
+    // 一场一换 release 清零后的状态：1真人、npc_count=0
+    live.npc_count = 0
+    live.is_npc_mode = true
+    live.mates = [{ viewer_id: hostViewer, com_id: 0 }]
+    const lifecycle = require("../src/multi/tcp/lobby-lifecycle").getLobbyLifecycleGuard()
+
+    // 回房/rematch reconcile 路径：npc_count=0 → getAvailableNpcSlotCount=0 → 不触发 EnterComs
+    const { reconcileRematchSlots } = require("../src/multi/tcp/lobby")
+    reconcileRematchSlots(host, live)
+    await wait(300)
+    assert.equal(npcCount(host.mates), 0, "回房 reconcile 不得复活 NPC")
+    assert.equal(live.npc_count, 0)
+
+    // 重新开启招募（summon/注入路径的 EnterComs）→ 才补齐
+    handleEnterComs(host, lifecycle).catch(() => {})
+    await wait(300)
+    assert.ok(npcCount(host.mates) > 0, "招募激活（EnterComs）才重算补齐")
 }, 15000)
 
 console.log("multi npc release: all assertions passed")
