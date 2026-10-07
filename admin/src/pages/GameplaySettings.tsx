@@ -396,7 +396,7 @@ export default function GameplaySettings() {
                                 />
                             </Space>
                             <Space wrap align="center">
-                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>等待NPC加入时长</Typography.Text>
+                                <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>铃铛广播时长</Typography.Text>
                                 <InputNumber
                                     min={0}
                                     max={3600}
@@ -407,10 +407,10 @@ export default function GameplaySettings() {
                                         ...current,
                                         multiNpcReleaseSeconds: Number(value) || 0,
                                     })}
-                                    aria-label="等待NPC加入时长（秒）"
+                                    aria-label="铃铛广播时长（秒）"
                                     addonAfter="秒"
                                 />
-                                <Typography.Text type="secondary">铃铛广播时长；窗口内无人加入才由服务端补 NPC</Typography.Text>
+                                <Typography.Text type="secondary">窗口内无人加入时由NPC补齐</Typography.Text>
                             </Space>
                             <Space wrap align="center">
                                 <Typography.Text style={{ minWidth: 160, display: "inline-block" }}>NPC 补位后关闭招募</Typography.Text>
