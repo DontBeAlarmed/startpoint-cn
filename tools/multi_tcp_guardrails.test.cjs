@@ -10,6 +10,21 @@ const {
     stopSessionServer,
 } = require("../src/multi/tcp/server")
 const { sessionManager } = require("../src/multi/state/SessionManager")
+const gameTime = require("../src/runtime/time/game-time")
+// 真实时钟偏移注入：租约复核按真实时钟判 inactiveMs，假定时器零推进会导致
+// 「续约而非销毁」——把真实时钟前移越过租约即可命中销毁分支
+async function withShiftedRealClock(shiftMs, run) {
+    const original = gameTime.getRealNowMs
+    gameTime.getRealNowMs = () => original() + shiftMs
+    try {
+        await run(() => original() + shiftMs)
+    } finally {
+        gameTime.getRealNowMs = original
+    }
+}
+const flushLeaseRecheck = async () => {
+    for (let i = 0; i < 3; i++) await new Promise(resolve => setImmediate(resolve))
+}
 const {
     getReliableSendQueueStats,
     sendFrameReliably,
@@ -373,7 +388,11 @@ test("battle lease tuning follows server generations and retired timers stay cle
             "generation-default-after-stop",
             connectionId,
         )
-        defaultGeneration.loadingTimer.callback()
+        // 租约复核按真实时钟判 inactiveMs：前移 61s 越过默认 60s 租约再触发
+        await withShiftedRealClock(61_000, async () => {
+            defaultGeneration.loadingTimer.callback()
+            await flushLeaseRecheck()
+        })
         assert.equal(defaultGeneration.socket.destroyed, true)
     } finally {
         await stopSessionServer()
@@ -592,10 +611,15 @@ test("runtime fatal teardown clears active backpressure state and restores defau
             connectionId,
         )
         loadingTimer.callback()
+        await flushLeaseRecheck()
         assert.equal(active.destroyCalls, 1)
         assert.equal(defaultGeneration.socket.destroyed, false)
 
-        defaultGeneration.loadingTimer.callback()
+        // 默认 60s 租约：复核按真实时钟判 inactiveMs，前移越过再触发
+        await withShiftedRealClock(61_000, async () => {
+            defaultGeneration.loadingTimer.callback()
+            await flushLeaseRecheck()
+        })
         assert.equal(defaultGeneration.socket.destroyed, true)
 
         const afterFatal = new GuardrailSocket([false])

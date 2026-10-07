@@ -73,6 +73,12 @@ export type MultiplayerSettlementPreparation =
         readonly ok: false
         readonly statusCode: 400 | 500
         readonly response: Record<string, unknown>
+        /**
+         * 400 失败的性质（双审修复）：duplicate = 活跃任务已删除/状态的重复
+         * finish（HTTP 层可转幂等零奖励终态）；validation = 请求体校验失败
+         * （必须保持 400，不得被吞成 200——否则 int32 越界等校验形同虚设）
+         */
+        readonly kind: "validation" | "duplicate"
     }
 
 export interface MultiplayerSettlementInput {
@@ -108,7 +114,7 @@ export async function prepareMultiplayerSettlement(
     } catch (error) {
         const configurationError = getQuestConfigurationErrorResponse(error)
         if (configurationError !== null) {
-            return { ok: false, statusCode: 500, response: configurationError }
+            return { ok: false, statusCode: 500, kind: "validation", response: configurationError }
         }
         throw error
     }
@@ -162,10 +168,14 @@ export async function prepareMultiplayerSettlement(
     }
 }
 
-function badRequest(message: string): MultiplayerSettlementPreparation {
+function badRequest(
+    message: string,
+    kind: "validation" | "duplicate" = "validation",
+): MultiplayerSettlementPreparation {
     return {
         ok: false,
         statusCode: 400,
+        kind,
         response: { error: "Bad Request", message },
     }
 }

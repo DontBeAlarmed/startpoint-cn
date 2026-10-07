@@ -18,6 +18,9 @@ function createManager() {
 function captureTimeouts() {
     const originalSetTimeout = global.setTimeout
     const originalClearTimeout = global.clearTimeout
+    // 测试内真实时间等待用原始 setTimeout（mock 只供被测代码捕获定时器）
+    const realSleep = ms => new Promise(resolve => originalSetTimeout(resolve, ms))
+    captureTimeouts.currentRealSleep = realSleep
     const timers = []
     const handles = new Set()
 
@@ -233,7 +236,14 @@ test("clearing battle state cancels leases and rejects late SceneReady", async (
     manager.removeClient(client)
 })
 
-test("constructor snapshots battle tuning and configure applies to later clients", () => {
+// 8278ffee 起：租约到期经 setImmediate 复核（入站帧优先），且复核用真实时钟
+// 计算 inactiveMs——不足 leaseMs 会续约。测试须推进真实时间到租约之外，
+// 并在回调后冲刷 setImmediate 再断言销毁。
+const flushLeaseRecheck = async () => {
+    for (let i = 0; i < 3; i++) await new Promise(resolve => setImmediate(resolve))
+}
+
+test("constructor snapshots battle tuning and configure applies to later clients", async () => {
     const captured = captureTimeouts()
     const configured = { loadingLeaseMs: 30, heartbeatLeaseMs: 30 }
     const manager = new SessionManager({ battleTuning: configured })
@@ -250,11 +260,16 @@ test("constructor snapshots battle tuning and configure applies to later clients
         const secondTimer = captured.timers.at(-1)
         assert.equal(secondTimer.delayMs, 120)
 
+        // 推进真实时间越过 30ms 租约（复核按真实时钟判 inactiveMs）
+        await captureTimeouts.currentRealSleep(35)
         firstTimer.callback()
+        await flushLeaseRecheck()
         assert.equal(first.socket.destroyed, true)
         assert.equal(second.socket.destroyed, false)
 
+        await captureTimeouts.currentRealSleep(125)
         secondTimer.callback()
+        await flushLeaseRecheck()
         assert.equal(second.socket.destroyed, true)
     } finally {
         if (first && !first.socket.destroyed) manager.removeClient(first.client)
