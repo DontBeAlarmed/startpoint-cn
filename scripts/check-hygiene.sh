@@ -2,7 +2,7 @@
 # 提交卫生检查:阻止个人 IP / 家目录 / 个人邮箱 / .env / 大二进制 进入提交或仓库。
 # 用法:
 #   bash scripts/check-hygiene.sh          # 检查已暂存(pre-commit 钩子用)
-#   bash scripts/check-hygiene.sh --all     # 检查整树(CI 用)
+#   bash scripts/check-hygiene.sh --all     # 检查整树(CI 用,含 docs:check 文档索引)
 set -uo pipefail
 
 MODE="${1:-staged}"
@@ -13,6 +13,15 @@ if [ "$MODE" = "--all" ]; then
     files=$(git ls-files)
 else
     files=$(git diff --cached --name-only --diff-filter=ACM)
+fi
+if [ -z "$files" ] && [ "$MODE" != "--all" ]; then exit 0; fi
+
+# CI hygiene 工作流同时跑 docs:check;整树模式一并对齐,避免推送后 CI 才发现文档漏索引。
+if [ "$MODE" = "--all" ]; then
+    if ! docs_output=$(node tools/docs_check.cjs 2>&1); then
+        note "文档结构/链接检查失败(docs:check):"
+        printf '%s\n' "$docs_output" | grep -v '^$' | tail -6 | sed 's/^/      /'
+    fi
 fi
 [ -z "$files" ] && exit 0
 
