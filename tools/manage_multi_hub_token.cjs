@@ -11,10 +11,14 @@ const {
     isInteractiveTerminal,
     maybeWriteMultiHubTokenEnv,
 } = require("./lib/multi-hub-env.cjs")
+const {
+    MultiHubCredentialStore,
+} = require("../src/multi/hub/credential-store")
+const { resolveMultiHubCredentialsPath } = require("../src/runtime/config")
 
 function usage() {
     process.stderr.write(
-        "Usage: manage_multi_hub_token.cjs create <label> | list | revoke <credentialId>\n",
+        "Usage: manage_multi_hub_token.cjs create <label> | list | revoke <credentialId> | rebuild\n",
     )
     process.exitCode = 2
 }
@@ -61,6 +65,27 @@ async function main() {
     }
     if (command === "revoke" && args.length === 1) {
         print(service.revokeCredential(args[0]))
+        return
+    }
+    if (command === "rebuild" && args.length === 0) {
+        // S4（stale-guard 自愈专项）：凭据表损坏后的显式恢复。不做自动重建——
+        // 静默清空安全敏感文件不可接受，必须管理者显式确认。
+        const confirmed = await confirm({
+            message: "rebuild 会把现有凭据表改名留存并从空表重建，已分发的全部令牌将失效（需重新分发）。确认？",
+            defaultValue: false,
+        })
+        if (!confirmed) {
+            process.stderr.write("rebuild aborted\n")
+            return
+        }
+        const store = new MultiHubCredentialStore({
+            credentialsPath: resolveMultiHubCredentialsPath(process.env, projectRoot),
+        })
+        const result = store.rebuildFromCorruption()
+        print({
+            ...result,
+            warning: "已分发令牌全部失效；请重新 create 并重新分发各 client 节点令牌",
+        })
         return
     }
     usage()

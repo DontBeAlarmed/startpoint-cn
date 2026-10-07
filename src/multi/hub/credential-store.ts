@@ -282,6 +282,35 @@ export class MultiHubCredentialStore {
         }
     }
 
+    /**
+     * S4（stale-guard 自愈专项）：凭据表损坏后的显式恢复——现有文件改名留存
+     * （.corrupt-<ISO 时间戳>）再从空表重建。静默清空安全敏感文件不可接受，
+     * 故仅暴露给 `multi:token rebuild`（管理者显式确认）；已分发令牌全部失效，
+     * 调用方必须向运维提示重新分发。
+     */
+    rebuildFromCorruption(): { archivedTo: string | null } {
+        let archivedTo: string | null = null
+        try {
+            const stats = fs.lstatSync(this.credentialsPath)
+            if (stats.isFile() && !stats.isSymbolicLink()) {
+                archivedTo = `${this.credentialsPath}.corrupt-${new Date().toISOString().replace(/[:.]/g, "-")}`
+                fs.renameSync(this.credentialsPath, archivedTo)
+            }
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+                throw new MultiHubCredentialStoreError(
+                    "MULTI_HUB_CREDENTIAL_REBUILD_FAILED",
+                )
+            }
+        }
+        // 从空表重建：写入一份合法空表（走既有原子写路径）
+        this.writeTable(Object.freeze({
+            schemaVersion: SCHEMA_VERSION,
+            credentials: Object.freeze([]),
+        }))
+        return { archivedTo }
+    }
+
     private writeTable(table: MultiHubCredentialTable): void {
         const directory = path.dirname(this.credentialsPath)
         fs.mkdirSync(directory, { recursive: true, mode: 0o700 })

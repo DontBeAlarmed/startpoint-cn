@@ -139,6 +139,12 @@ export class ServerTimeStore {
         this.syncParentDirectory = options.syncParentDirectory ?? syncParentDirectoryDefault
     }
 
+    /** S5：legacy 偏移损坏降级——WARN 后视为不存在 */
+    private warnLegacyUnavailable(reason: string): number | null {
+        console.warn(`[TIME] legacy time offset ignored (${reason}): ${this.legacyFilePath ?? ""}`)
+        return null
+    }
+
     read(): ServerTimeState | null {
         let stats: fs.Stats
         try {
@@ -156,8 +162,14 @@ export class ServerTimeStore {
         }
     }
 
+    /**
+     * S5（stale-guard 自愈专项）：legacy 偏移损坏 → WARN + 视为不存在（该偏移
+     * 本就允许为 null），不再一票否决启动。本体 server-time.json 的 fail-closed
+     * （read → invalidState）是反作弊底线，保留不动。
+     */
     readLegacyOffset(): number | null {
         if (this.legacyFilePath === null) return null
+        // symlink/非普通文件保持 fail-closed（与本体 read 同防御族，不因 S5 放宽）
         let stats: fs.Stats
         try {
             stats = fs.lstatSync(this.legacyFilePath)
@@ -169,18 +181,20 @@ export class ServerTimeStore {
             return invalidState("legacy active account state must be a regular file")
         }
 
+        // S5：仅内容损坏（JSON/结构/类型）→ WARN + 视为不存在（该偏移本就允许 null），
+        // 不再一票否决启动；本体 server-time.json 的 fail-closed 保留（反作弊底线）
         let value: unknown
         try {
             value = JSON.parse(fs.readFileSync(this.legacyFilePath, "utf8"))
         } catch {
-            return invalidState("invalid legacy active account JSON")
+            return this.warnLegacyUnavailable("invalid legacy active account JSON")
         }
 
-        if (!isRecord(value)) return invalidState("invalid legacy active account structure")
+        if (!isRecord(value)) return this.warnLegacyUnavailable("invalid legacy active account structure")
         const offset = value.timeOffset
         if (offset === undefined || offset === null) return null
         if (typeof offset !== "number" || !Number.isFinite(offset)) {
-            return invalidState("invalid legacy active account time offset")
+            return this.warnLegacyUnavailable("invalid legacy active account time offset")
         }
         return offset
     }

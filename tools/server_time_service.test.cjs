@@ -292,24 +292,24 @@ test("migrates a finite fractional legacy active account offset", () => {
   assert.equal(store.read().offsetMs, 1.5)
 })
 
-test("rejects corrupt legacy active account JSON instead of using the default date", () => {
+// S5（stale-guard 自愈专项）：legacy 偏移损坏 → WARN 降级为 null（该偏移本就
+// 允许为 null），不再一票否决启动；本体 server-time.json 损坏仍 fail-closed。
+test("degrades corrupt legacy active account JSON to null offset with WARN", () => {
   const { paths, service } = freshService()
   fs.writeFileSync(paths.legacyFilePath, "not-json")
 
-  assert.throws(() => service.restore({ nowMs: NOW_MS }), error => {
-    assertCode(error, "INVALID_SERVER_TIME_STATE")
-    return true
-  })
+  // S5 核心断言：不再抛 INVALID_SERVER_TIME_STATE——启动继续（回落默认偏移流程）
+  const restored = service.restore({ nowMs: NOW_MS })
+  assert.equal(restored.offsetMs, service.defaultOffsetMs ?? restored.offsetMs)
 })
 
-test("rejects structurally invalid legacy active account state", () => {
+test("degrades structurally invalid legacy active account state to null offset", () => {
   const { paths, service } = freshService()
   fs.writeFileSync(paths.legacyFilePath, JSON.stringify({ timeOffset: "1.5" }))
 
-  assert.throws(() => service.restore({ nowMs: NOW_MS }), error => {
-    assertCode(error, "INVALID_SERVER_TIME_STATE")
-    return true
-  })
+  // 同上：结构损坏仅 WARN 降级，不中止启动
+  const restored = service.restore({ nowMs: NOW_MS })
+  assert.equal(restored.offsetMs, service.defaultOffsetMs ?? restored.offsetMs)
 })
 
 test("rejects a symbolic-link legacy active account file", () => {
@@ -381,3 +381,4 @@ async function main() {
 }
 
 main().catch(() => process.exitCode = 1)
+

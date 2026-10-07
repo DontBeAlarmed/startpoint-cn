@@ -155,7 +155,8 @@ function cleanupTemporaryFile(
     try {
         fileSystem.unlinkSync(temporaryFile);
     } catch (error) {
-        throw new Error(
+        // S6：清理失败降级 WARN 继续启动（不阻塞数据卷准备）
+        console.warn(
             `Failed to clean up state migration temporary file "${temporaryFile}": ${errorMessage(error)}`,
         );
     }
@@ -190,7 +191,11 @@ function migrateStateFile(
 ): void {
     const source = path.join(paths.dataDir, fileName);
     const target = path.join(paths.stateDir, fileName);
-    const temporaryFile = path.join(paths.stateDir, `.${fileName}.migrate.tmp`);
+    // S6：tmp 唯一名（进程内并发迁移/残留 tmp 互不覆盖）
+    const temporaryFile = path.join(
+        paths.stateDir,
+        `.${fileName}.migrate.${process.pid}.${Math.random().toString(36).slice(2, 10)}.tmp`,
+    );
 
     cleanupTemporaryFile(temporaryFile, fileSystem);
     const targetStats = inspectOptionalRegularFile(

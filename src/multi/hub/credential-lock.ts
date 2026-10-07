@@ -55,8 +55,17 @@ function parseRecord(text: string): LockRecord {
 }
 function inspectLock(lockPath: string): InspectedLock {
     const before = fs.lstatSync(lockPath)
-    if (before.isSymbolicLink() || !before.isFile() || (before.mode & 0o777) !== 0o600) {
+    if (before.isSymbolicLink() || !before.isFile()) {
         return lockError("MULTI_HUB_CREDENTIAL_LOCK_UNSAFE")
+    }
+    // S3：部分 Android 存储/备份恢复会丢权限位——fchmod 尽力修正而非一票否决
+    //（否则凭据增删在该环境永久 UNSAFE/500）；修正失败才维持 UNSAFE
+    if ((before.mode & 0o777) !== 0o600) {
+        try {
+            fs.chmodSync(lockPath, 0o600)
+        } catch {
+            return lockError("MULTI_HUB_CREDENTIAL_LOCK_UNSAFE")
+        }
     }
     const descriptor = fs.openSync(lockPath, fs.constants.O_RDONLY | NOFOLLOW)
     try {
@@ -193,7 +202,29 @@ export function acquireMultiHubCredentialLock(
             if (!(error instanceof MultiHubCredentialLockError)
                 || error.code !== "MULTI_HUB_CREDENTIAL_LOCK_REPLACED") throw error
         }
+        cleanupStaleCandidates(credentialsPath, pid)
     }
+}
+
+/**
+ * S3：清扫本 pid 的 SIGKILL 残留候选 tmp（*.lock.<pid>.<rand>.tmp）。
+ * 只删匹配本 pid 的条目（他人候选不动），清扫失败静默（尽力而为）。
+ */
+function cleanupStaleCandidates(credentialsPath: string, pid: number): void {
+    const lockPath = `${credentialsPath}.lock`
+    // readdirSync 返回 basename：prefix 必须用 basename 比较（绝对路径永不匹配）
+    const prefix = `${path.basename(lockPath)}.${pid}.`
+    const directory = path.dirname(lockPath)
+    try {
+        for (const entry of fs.readdirSync(directory)) {
+            if (!entry.startsWith(prefix) || !entry.endsWith(".tmp")) continue
+            const candidatePath = path.join(directory, entry)
+            try {
+                const stat = fs.lstatSync(candidatePath)
+                if (stat.isFile()) fs.unlinkSync(candidatePath)
+            } catch { /* 尽力而为 */ }
+        }
+    } catch { /* 尽力而为 */ }
 }
 export function withMultiHubCredentialLock<T>(credentialsPath: string, operation: () => T): T {
     const lock = acquireMultiHubCredentialLock(credentialsPath)
