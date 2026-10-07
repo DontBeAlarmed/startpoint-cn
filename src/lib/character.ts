@@ -3,8 +3,10 @@ import { getPlayerCharacterSync, insertPlayerCharacterSync } from "../data/domai
 import type { PlayerCharacter } from "../data/types"
 import { getCharacterFacts } from "./character-content";
 import { getRealNow } from "../runtime/time/game-time";
+import { getServerDate } from "../utils";
 import { GivePlayerCharacterResult } from "./types";
 import { recordHundredCharactersMilestoneSync } from "./player-history-milestones";
+import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement";
 import {
     grantCharacterExp,
     grantCharacterExpWithinTransactionSync,
@@ -72,6 +74,10 @@ function givePlayerCharacterInCurrentScopeSync(
         }
         insertPlayerCharacterSync(playerId, characterId, character)
         recordHundredCharactersMilestoneSync(playerId, joinTime)
+        // 新角色入队是「持有角色数」事实的产生时点：当场结算 characters_count
+        // 族/伙伴数称号族（非扭蛋路径——扭蛋已在自身奖励流内结算）。与调用方
+        // 事务同连接，原子性随宿主；复用扭蛋的窄域结算器（角色/装备种类/伙伴数）。
+        settleGachaAcquisitionMissions(playerId, getServerDate())
 
         return {
             isNew: true,
