@@ -2,6 +2,26 @@
 
 require("ts-node/register/transpile-only")
 
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+
+// Degree stat derivation reads rescue/newbie battle counters (cond20/cond92,
+// e6c8451f) through the shared database; every fixture consumer therefore
+// needs an initialized database before any Session is derived. Each suite
+// process gets its own throwaway data volume so concurrent `node --test`
+// workers never race migrations on the shared runtime database.
+const fixtureDataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-degree-fixture-db-"))
+const previousFixtureDataDirectory = process.env.DATA_DIR
+process.env.DATA_DIR = fixtureDataDirectory
+process.once("exit", () => {
+    if (previousFixtureDataDirectory === undefined) delete process.env.DATA_DIR
+    else process.env.DATA_DIR = previousFixtureDataDirectory
+    fs.rmSync(fixtureDataDirectory, { recursive: true, force: true })
+})
+const { initializeDatabase } = require("../../src/data")
+initializeDatabase()
+
 const { productionContentSnapshotProvider } = require("../../src/content/runtime/content-snapshot")
 const { MissionEvaluationSession } = require("../../src/lib/mission/evaluation-session")
 const { MissionFactLoaderRegistry } = require("../../src/lib/mission/fact-loaders")

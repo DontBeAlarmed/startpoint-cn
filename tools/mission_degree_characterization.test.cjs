@@ -27,8 +27,11 @@ test("all 1288 Degree rules build and compute without post-context external acce
     const rules = buildDegreeRuleCatalog(catalog).rules
     assert.equal(rules.size, 1288)
     assert.equal([...rules.values()].filter(rule => rule.kind === "persisted").length, 100)
-    assert.equal([...rules.values()].filter(rule => rule.kind === "unsupported").length, 6)
-    assert.equal([...rules.values()].filter(rule => !["persisted", "unsupported"].includes(rule.kind)).length, 1182)
+    // The semantic rule engine now recognizes every bundled Degree row, so
+    // nothing falls through to "unsupported" anymore (was 6 before the
+    // rescue/newbie/MVP semantic families landed).
+    assert.equal([...rules.values()].filter(rule => rule.kind === "unsupported").length, 0)
+    assert.equal([...rules.values()].filter(rule => !["persisted", "unsupported"].includes(rule.kind)).length, 1188)
 
     const loaderCalls = []
     const session = createSession(catalog, missionIds, allFacts(), loaderCalls)

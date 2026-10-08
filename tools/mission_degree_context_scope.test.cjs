@@ -105,8 +105,9 @@ questDomain.insertPlayerQuestProgressSync(playerId, 21, {
     questId: 1001,
     finished: true,
 })
-grantInventoryFixtureItemSync(playerId, 70014, 9)
-
+// 探针必须先于 production-fact-loaders 的首次加载安装：grant 走 inventory
+// 链，会顺带加载该模块并把当时的 domain 函数引用固化进 productionDomains；
+// 探针晚于它安装就只能拦到过期引用。
 const calls = []
 function instrument(domain, functionName, family) {
     const original = domain[functionName]
@@ -127,6 +128,10 @@ instrument(shopDomain, "getPlayerShopPurchasesMapSync", "shop")
 instrument(itemDomain, "getPlayerCollectedItemTotalsByIdsSync", "selectedItems")
 instrument(questDomain, "getPlayerQuestProgressSync", "questProgress")
 instrument(equipmentDomain, "getPlayerEquipmentListSync", "equipment")
+
+// grantInventoryFixtureItemSync 会加载 production-fact-loaders（固化 domain
+// 引用），必须发生在探针安装之后。
+grantInventoryFixtureItemSync(playerId, 70014, 9)
 
 // Domain instrumentation must be installed before this import.
 const {
@@ -214,11 +219,16 @@ assert.equal(
 )
 
 resetCalls()
-const fallbackContext = buildMissionComputerContext(playerId, 5, [25000, 70004, 999999], {
+// 回退/持久化型任务：8000（degree_abilitiesoul_use_1）是 persisted 规则，
+// 999999 不存在于目录——两者 compute 都必须回退 dbProgress，且构建上下文时
+// 零 facts 读取。曾列于此处的 25000（rescue semantic 落地后成为可计算
+// metric 规则）与 70004（boss aggregate 真实存在，requirement 声明
+// missionBattleCounters）都不再属于回退清单。
+const fallbackContext = buildMissionComputerContext(playerId, 5, [8000, 999999], {
     computer: DegreeComputer,
     evaluationTime,
 })
-for (const missionId of [25000, 70004, 999999]) {
+for (const missionId of [8000, 999999]) {
     assert.equal(DegreeComputer.compute(missionId, fallbackContext, 7), 7)
 }
 assertUntouched([

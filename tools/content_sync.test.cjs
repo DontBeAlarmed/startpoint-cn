@@ -35,6 +35,7 @@ const {
 const {
     ContentSyncCleanupError,
     runContentSync,
+    serverSourceDigest,
 } = require("../src/content/sync/engine")
 const {
     parseContentSyncArguments,
@@ -917,7 +918,12 @@ test("check reuses current release objects without rereading its summary", async
                     current,
                     manifest,
                     objects: {
-                        [manifest.summary.object]: { patchSourceDigest: null },
+                        // c5135348 起 check 复用还要求 summary 携带与 server 源
+                        // 一致的 serverSourceDigest；引擎按主仓库根计算 digest。
+                        [manifest.summary.object]: {
+                            patchSourceDigest: null,
+                            serverSourceDigest: serverSourceDigest(projectRoot, TEST_TABLE_SOURCES),
+                        },
                     },
                 }
             },

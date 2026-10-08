@@ -2,6 +2,24 @@
 
 require("ts-node/register/transpile-only")
 
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+
+// Degree stat derivation reads rescue/newbie battle counters through the
+// shared database; give this suite its own throwaway data volume so the
+// counters table exists and concurrent `node --test` workers stay isolated.
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-degree-selection-db-"))
+const previousDataDirectory = process.env.DATA_DIR
+process.env.DATA_DIR = databaseDirectory
+process.once("exit", () => {
+    if (previousDataDirectory === undefined) delete process.env.DATA_DIR
+    else process.env.DATA_DIR = previousDataDirectory
+    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+})
+const { initializeDatabase } = require("../src/data")
+initializeDatabase()
+
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()
 process.once("exit", () => { restoreContentSnapshot() })

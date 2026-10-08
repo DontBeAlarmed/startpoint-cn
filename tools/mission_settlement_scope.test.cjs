@@ -267,7 +267,14 @@ const daily = settleWithCandidates(
 )
 assert.deepEqual(daily.candidates, [{ category: 2, count: dailyMissionIds.length }])
 assert.deepEqual(calls.buildContext[0].missionIds, enabledDailyMissionIds)
-assert.deepEqual(calls.compute.map(call => call.missionId), enabledDailyMissionIds)
+// Battle-pipeline settlement also carries the degree/regular candidates that
+// became eligible once this player's battle facts landed (counter families
+// 40/66/41000+); scope assertions above own the category-2 boundary, so the
+// compute assertion filters to daily missions instead of the whole pipeline.
+assert.deepEqual(
+    calls.compute.filter(call => call.category === 2).map(call => call.missionId),
+    enabledDailyMissionIds,
+)
 assert.equal(realGetPlayerCategoryMissionsSync(dailyPlayerId, 2)[17].progress, 4)
 
 resetCalls()
