@@ -46,7 +46,8 @@ function currentContentState() {
     const snapshot = getContentSnapshot()
     return {
         targetVersion: snapshot.cdn.targetVersion,
-        contentDigest: snapshot.repository.info().multiBattleContentDigest,
+        // 旧版内容仓库可能没有 multiBattleContentDigest（bundled fixture 等）
+        contentDigest: snapshot.repository.info().multiBattleContentDigest ?? null,
     }
 }
 
@@ -54,6 +55,7 @@ async function performApply(
     projectRoot: string,
     gameCalendarUtcOffsetMinutes: number,
     runSync: (options: Parameters<typeof runContentSync>[0]) => Promise<ContentSyncResult>,
+    reload: typeof reloadContentSnapshot,
 ): Promise<ApplyOutcome> {
     const before = currentContentState()
     let syncResult: ContentSyncResult
@@ -75,7 +77,7 @@ async function performApply(
     }
 
     try {
-        await reloadContentSnapshot()
+        await reload()
     } catch (error) {
         return {
             applied: false,
@@ -121,7 +123,12 @@ export function registerContentManagementRoutes(
                 message: "请等待当前任务完成后再试",
             })
         }
-        applyInFlight = performApply(projectRoot, gameCalendarUtcOffsetMinutes, runSync)
+        applyInFlight = performApply(
+            projectRoot,
+            gameCalendarUtcOffsetMinutes,
+            runSync,
+            reload,
+        )
         try {
             const outcome = await applyInFlight
             if (outcome.applied) {
