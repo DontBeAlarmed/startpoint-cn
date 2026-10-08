@@ -14,6 +14,7 @@ export type {
 export interface GetRoomsBody {
     event_id?: number
     viewer_id: number
+    party_id?: number
     category_id: number
 }
 

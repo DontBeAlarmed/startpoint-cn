@@ -1,15 +1,54 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
 import { getQuestFromCategorySync } from "../../lib/quest-content"
-import { generateDataHeaders } from "../../utils"
+import { generateDataHeaders, getServerTime } from "../../utils"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
 import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
 import { issueRoomAdmission } from "./room-admission"
+import { listActiveRoomSharesSync } from "../../data/domains/social-room-shares"
+import { getSharedFollowRelationSync } from "../../data/domains/social-follow"
+import { parseEstablisherSnapshot } from "../../data/domains/attention"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
+}
+
+/**
+ * 好友房间大厅（房间条目渲染在关卡列表的房号输入格旁）。
+ *
+ * 数据源是 social_room_shares 注册表（share_room 持久化房主的可见性位），
+ * 过滤用请求者与房主的真实 follow 关系（social_follows，mutual ⊃ single ⊃
+ * none），establisher_follow 徽章与过滤同源。跨服计费/UI 的 follow=1 投影
+ * 是 F0-F4 契约，不用于本过滤——可见性是房主的访问控制意图，投影会让
+ * 互关房退化成全服房。bit3（随机招募）只走铃铛，注册表位掩码里本来就不含。
+ */
+function buildFriendRoomLobby(viewerId: number, categoryId: number): Record<string, unknown>[] {
+    if (!Number.isSafeInteger(categoryId)) return []
+    const nowMs = getServerTime() * 1000
+    const rooms: Record<string, unknown>[] = []
+    for (const row of listActiveRoomSharesSync(categoryId, nowMs)) {
+        const relation = getSharedFollowRelationSync(viewerId, row.host_viewer_id)
+        const visible = ((row.share_bits & 1) !== 0 && relation === "mutual")
+            || ((row.share_bits & 2) !== 0 && relation !== "none")
+        if (!visible) continue
+        const snapshot = parseEstablisherSnapshot(row.establisher_json)
+        rooms.push({
+            category_id: row.category_id,
+            quest_id: row.quest_id,
+            room_number: row.room_number,
+            establisher_name: snapshot.name ?? `Player${row.host_viewer_id}`,
+            establisher_character: Number(snapshot.character) || 0,
+            establisher_character_evolution_img_level: Number(snapshot.evolutionImgLevel) || 0,
+            establisher_follow: relation === "mutual" ? 1 : 0,
+            host_entry_time: Number(snapshot.hostEntryTime) || 0,
+            mates: row.mates,
+            raising_state: row.raising_state,
+            is_pickup: false,
+        })
+    }
+    return rooms
 }
 
 function unavailableConnection(roomNumber: string, raisingState: 3 | 7 | 9) {
@@ -44,7 +83,7 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "rooms": [] }
+            "data": { "rooms": buildFriendRoomLobby(viewerId, body.category_id) }
         })
     })
 

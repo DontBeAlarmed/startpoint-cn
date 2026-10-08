@@ -25,5 +25,5 @@ export function ensureSocialRoomSharesSchema(database: Database): void {
         expires_at_ms INTEGER NOT NULL
     )`).run()
     database.prepare(`CREATE INDEX IF NOT EXISTS idx_social_room_shares_category
-        ON social_room_shares (category_id, raising_state, expires_at)`).run()
+        ON social_room_shares (category_id, raising_state, expires_at_ms)`).run()
 }
