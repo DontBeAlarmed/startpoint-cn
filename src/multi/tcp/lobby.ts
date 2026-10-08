@@ -71,11 +71,22 @@ export function cancelReconnectLease(participant: ParticipantIdentity): void {
     reconnectLeases.delete(key)
 }
 
+// 好友房间大厅注册行同步（惰性 require 规避循环；无注册行 no-op）
+function syncShareRow(roomNumber: string): void {
+    try {
+        const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
+        syncRoomShareRow(roomNumber)
+    } catch (error) {
+        console.warn("[LOBBY] room share sync failed", roomNumber, error)
+    }
+}
+
 // 按连接身份清理 mate：同一 viewerId 重连会获得新 connectionId，
 // 裸 viewerId 清理会误删重连玩家（僵尸旧连接晚检测场景）。幂等。
 function removeDisconnectedMate(roomNumber: string, connectionId: string): void {
     const room = getRoom(roomNumber)
     if (!room) return
+    syncShareRow(roomNumber)
     const hostClient = findHostClient(roomNumber)
     for (const connectedClient of sessionManager.getClientsInRoom(roomNumber)) {
         connectedClient.mates = connectedClient.mates
@@ -244,6 +255,7 @@ function commitRoomMates(client: SessionClient, room: MultiRoom, mates: any[]): 
     const hostClient = findHostClient(client.roomNumber)
     if (hostClient) hostClient.mates = client.mates
     room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+    syncShareRow(room.room_number)
 }
 
 export function reconcileRematchSlots(client: SessionClient, room: MultiRoom): void {
@@ -519,7 +531,10 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         } else {
             client.mates = [client.yourself!]
         }
-        if (room) room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+        if (room) {
+            room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+            syncShareRow(room.room_number)
+        }
     }
 
     const yourself = client.yourself
@@ -576,6 +591,9 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     if (getRoom(client.roomNumber) && hostClient && hostClient !== client) {
         sessionManager.broadcastMateListToRoom(client.roomNumber, hostClient.mates)
     }
+    // 显式离席（Bye）路径从不重写 room.mates（现存固有 staleness）——注册行
+    // 同步至少把 raising_state/expires_at 续上，mates 用当前内存值近似
+    if (getRoom(client.roomNumber)) syncShareRow(client.roomNumber)
     try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client left: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
 }
@@ -655,6 +673,7 @@ function updateCurrentMateSettings(
             viewer_id: mate.viewerId ?? null,
             com_id: mate.comId ?? 0,
         }))
+        syncShareRow(room.room_number)
     }
     sessionManager.broadcastMateListToRoom(client.roomNumber, updatedMates)
 }

@@ -17,11 +17,15 @@ export interface AttentionRecruitment {
     status: "open" | "closed" | "expired"
 }
 
-/** 铃铛展示用的房主快照（share_room 时捕获，check 时原样下发） */
+/** 铃铛展示用的房主快照（share_room 时捕获，check 时原样下发）。
+ * name/evolutionImgLevel 由好友房间大厅（social_room_shares）扩展使用；
+ * parse 对缺失字段 fail-open，attention 消费方不受影响。 */
 export interface EstablisherSnapshot {
     character: number
     rankLevel: number
     hostEntryTime: number
+    name?: string
+    evolutionImgLevel?: number
 }
 
 // 房主客户端每 15s（attention_recruitment_interval_seconds）重发一次 share_room

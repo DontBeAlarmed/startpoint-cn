@@ -25,6 +25,13 @@ export function installDisbandLifecycleListener(): void {
         } catch (error) {
             console.error(`[MULTI] abandoned host release failed: room=${roomNumber}: ${describe(error)}`)
         }
+        try {
+            // 好友房间大厅注册行清理（覆盖 timer/lease 等全部解散路径）
+            const { deleteRoomShareRowForDisband } = require("./share-sync") as typeof import("./share-sync")
+            deleteRoomShareRowForDisband(roomNumber)
+        } catch (error) {
+            console.error(`[MULTI] room share disband cleanup failed: room=${roomNumber}: ${describe(error)}`)
+        }
     })
 }
 

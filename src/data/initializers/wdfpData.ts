@@ -11,6 +11,7 @@ import {
 import { ensureSchemaColumn } from "../schema";
 import { ensureAttentionSchema } from "../social/attention-schema";
 import { ensureSocialFollowsSchema } from "../social/social-follows-schema";
+import { ensureSocialRoomSharesSchema } from "../social/social-room-shares-schema";
 import { initializeServerNewsSchemaSync } from "../schema/server-news";
 import { initializeServerGiftsSchemaSync } from "../schema/server-gifts";
 import { initializePlayerFollowsSchemaSync } from "../schema/player-follows";
@@ -1293,6 +1294,7 @@ export default function init(
     //（与共享社交库 MULTI_SOCIAL_DB_PATH 同源，保证 schema 永远一致）
     ensureAttentionSchema(database)
     ensureSocialFollowsSchema(database)
+    ensureSocialRoomSharesSchema(database)
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_active_quests (
         player_id INTEGER PRIMARY KEY,

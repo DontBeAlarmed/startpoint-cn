@@ -19,6 +19,9 @@ import {
     pruneExpiredRecruitments,
 } from "../../data/domains/attention";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
+import { upsertRoomShareRowSync } from "../../data/domains/social-room-shares";
+import { getCharactersEvolutionImgLevels } from "../../lib/character";
+import { getRoom as getLocalRoom } from "../room/manager";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import { getPlayerRankLevel } from "../player-context";
 import { scheduleNpcRelease } from "../npc/release";
@@ -331,6 +334,43 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             // 发布门（三模式参数）：publishBell off（NPC 快速预设）时按钮退化为
             // 纯 NPC 开关——不落招募行，其他玩家收不到铃铛（客户端忽略响应体）
             && getServerGameplaySettingsSync().multiRandomRecruitmentPublishEnabled;
+
+        // 好友房间大厅：bit1（互关）/bit2（单向）持久化到 social_room_shares。
+        // bit3 不进此表（随机招募只走全服铃铛）。合并语义是 OR-merge——客户端
+        // 对 [1,3]/[2,3] 的报文次序是 [3] 与 [1]/[2] 交错（[3] 每 15s 恒发），
+        // REPLACE 或按 bits=0 删行都会把已公开的位在铃铛重发间隙静默拆除；
+        // 行回收只走 disband 钩子 + TTL 兜底（客户端无取消分享 UI）。
+        const shareBits = (Array.isArray(body.share_type_list)
+            && body.share_type_list.includes(1) ? 1 : 0)
+            | (Array.isArray(body.share_type_list) && body.share_type_list.includes(2) ? 2 : 0);
+        if (shareBits > 0) {
+            // 尽力而为：注册表失败不影响铃铛分支与响应（15s 内的 [1]/[2] 一次性
+            // 报文没有重发自愈，失败由用户重新勾选恢复）
+            try {
+                upsertRoomShareRowSync({
+                    roomNumber: body.room_number,
+                    hostViewerId: viewerId,
+                    categoryId: room.value.category,
+                    questId: room.value.questId,
+                    shareBits,
+                    raisingState: room.value.raisingState,
+                    mates: Math.max(1, getRoomMateCount(body.room_number)),
+                    establisherJson: buildEstablisherSnapshot({
+                        character: room.value.hostMainCharacterId,
+                        rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
+                        hostEntryTime: room.value.hostEntryTime,
+                        name: hostContext.player.name,
+                        evolutionImgLevel: getCharactersEvolutionImgLevels(
+                            hostContext.playerId,
+                            [room.value.hostMainCharacterId],
+                        )[0] ?? 0,
+                    }),
+                    nowMs: getServerTime() * 1000,
+                })
+            } catch (error) {
+                console.warn("[MULTI] room share lobby persist failed", error)
+            }
+        }
         if (wantsRecruitment) {
             // 尽力而为：招募落库/过期清理失败不得阻断分享主流程（15s 重发自愈）
             try {
@@ -398,6 +438,14 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             "data": {}
         });
     });
+}
+
+function getRoomMateCount(roomNumber: string): number {
+    try {
+        return getLocalRoom(roomNumber)?.mates.length ?? 1
+    } catch {
+        return 1
+    }
 }
 
 function unavailableRoomData(roomNumber: string, raisingState: number): Record<string, unknown> {

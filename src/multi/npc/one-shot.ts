@@ -67,6 +67,12 @@ export function clearRoomNpcRoster(roomNumber: string, battleSessionId?: string)
             // 无 host 连接：房内权威视图直接过滤，客户端视图待回房重建
             room.mates = room.mates.filter(mate => (mate.com_id ?? 0) <= 0)
         }
+        try {
+            const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
+            syncRoomShareRow(roomNumber)
+        } catch (error) {
+            console.warn(`[MULTI] one-shot share sync failed: room=${roomNumber}`, error)
+        }
         console.log(`[MULTI] one-shot NPC roster cleared: room=${roomNumber}`)
     } catch (error) {
         console.warn(`[MULTI] one-shot NPC roster clear failed: room=${roomNumber}`, error)

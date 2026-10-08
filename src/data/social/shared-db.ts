@@ -3,6 +3,7 @@ import fs from "node:fs"
 import pathLib from "node:path"
 import { ensureAttentionSchema, ensurePresenceSchema } from "./attention-schema"
 import { ensureSocialFollowsSchema } from "./social-follows-schema"
+import { ensureSocialRoomSharesSchema } from "./social-room-shares-schema"
 
 /**
  * 共享社交库：多节点/多进程部署时社交状态（铃铛招募、投递、presence）的
@@ -29,6 +30,7 @@ export function openSharedSocialDb(path: string): Database {
     ensureAttentionSchema(database)
     ensurePresenceSchema(database)
     ensureSocialFollowsSchema(database)
+    ensureSocialRoomSharesSchema(database)
     return database
 }
 

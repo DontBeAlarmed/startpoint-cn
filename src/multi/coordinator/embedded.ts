@@ -447,6 +447,12 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         if (hostClient) {
             sessionManager.broadcastToRoom(room.room_number, [1, [1, hostClient.mates]])
         }
+        try {
+            const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
+            syncRoomShareRow(room.room_number)
+        } catch (error) {
+            console.warn(`[MULTI] node cleanup share sync failed: room=${room.room_number}`, error)
+        }
         return true
     }
 
