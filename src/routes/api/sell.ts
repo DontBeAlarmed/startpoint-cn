@@ -7,7 +7,7 @@ import {
     normalizeEquipmentBatchIds, updatePlayerEquipmentStacksToZeroSync, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import { getSession } from "../../data/domains/session";
-import { generateDataHeaders, getServerDate } from "../../utils";
+import { generateDataHeaders } from "../../utils";
 import { buildFullEquipmentList } from "../../lib/equipment";
 import { calculateDissolveRewards } from "../../lib/equipment-dissolve";
 import { asAccountId, asPlayerId, AccountId, PlayerId } from "../../lib/types";
@@ -25,7 +25,6 @@ import {
     settleDirectItemOverflowsWithinTransactionSync,
     type PlannedItemOverflowDisposition,
 } from "../../lib/item-overflow";
-import { settleCraftPointMissions } from "../../lib/craft-point-mission-settlement";
 import {
     composeMissionSettlementResponse,
     projectMissionSettlementFragment,
@@ -103,10 +102,10 @@ function grantDissolveRewardsWithinTransactionSync(
                 playerId,
                 overflows: pendingOverflows,
             })
-        // 锻块到账是「累计获得锻造石」事实的产生时点,结算与发放同事务
-        const missionSettlement = craftPoints > 0
-            ? settleCraftPointMissions(playerId, getServerDate())
-            : null
+        // 锻块到账是「累计获得锻造石」事实的产生时点,结算与发放同事务;
+        // 结算发生在 batch flush 的 craft-point gate 内,这里只复用其结果
+        // (再次结算会因阶段已领而返回空 mission_info)。
+        const missionSettlement = inventory.craftPointMissionSettlement
         return {
             itemList,
             itemOverflowDispositions: overflowSettlement?.dispositions ?? [],

@@ -4,11 +4,13 @@ import {
     InventoryTransactionError,
     InventoryValidationError,
 } from "./errors"
+import type { MissionSettlementResult } from "../mission/settlement"
 import type { InventoryGrantResult, InventoryItemResult, InventoryMutationKind } from "./model"
 import {
     InventorySqliteRepository,
     type InventoryStoredItem,
 } from "./sqlite-repository"
+import { maybeSettleCraftPointMissions } from "./craft-point-settlement-gate"
 
 interface PendingInventoryItem {
     readonly stored: InventoryStoredItem
@@ -33,6 +35,13 @@ export interface InventoryBatchContext {
     restore(itemId: number, amount: number): InventoryItemResult
     results(): readonly InventoryItemResult[]
     flush(): readonly InventoryItemResult[]
+    /**
+     * flush 对锻块入账触发的窄域任务结算结果（craft-point gate）。null 表示
+     * 本次 flush 无锻块入账、结算未触发或已由重入护栏/降级吸收；响应投影必须
+     * 复用该结果而不是再次调用 settleCraftPointMissions（二次结算会因阶段
+     * 已领而返回空 mission_info）。
+     */
+    readonly craftPointMissionSettlement: MissionSettlementResult | null
 }
 
 export interface InventoryBatchCheckpoint {
@@ -136,6 +145,10 @@ class DeferredInventoryBatchContext implements InventoryBatchContext {
         return this.active.flush()
     }
 
+    get craftPointMissionSettlement(): MissionSettlementResult | null {
+        return this.active?.craftPointMissionSettlement ?? null
+    }
+
     closeCallbackScope(completedNormally: boolean): void {
         this.closed = true
         this.active?.closeCallbackScope(completedNormally)
@@ -232,6 +245,11 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
     private readonly pending = new Map<number, PendingInventoryItem>()
     private closed = false
     private flushed = false
+    private craftPointMissionSettlementValue: MissionSettlementResult | null = null
+
+    get craftPointMissionSettlement(): MissionSettlementResult | null {
+        return this.craftPointMissionSettlementValue
+    }
 
     constructor(
         options: InventoryBatchContextOptions,
@@ -341,6 +359,14 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
         }
         this.repository.writeAbsoluteItemsBatchSync(this.playerId, absoluteRows)
         this.repository.recordPositiveObtainedBatchSync(this.playerId, obtainedRows)
+        // 锻块入账是「累计获得锻造石」事实的产生时点：flush 内当场窄域结算并
+        // 保留结果供响应投影复用（结算与发放同事务）。
+        for (const row of obtainedRows) {
+            const settled = maybeSettleCraftPointMissions(this.playerId, row.itemId)
+            if (settled !== null && this.craftPointMissionSettlementValue === null) {
+                this.craftPointMissionSettlementValue = settled
+            }
+        }
         this.flushed = true
         return Object.freeze(rows.map(({ result }) => result))
     }

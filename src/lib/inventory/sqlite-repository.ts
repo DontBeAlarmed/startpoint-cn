@@ -273,7 +273,8 @@ export class InventorySqliteRepository {
                   AND players_collected_items.total_obtained <= ? - excluded.total_obtained
             `).run(...values)
             if (result.changes === chunk.length) {
-                for (const row of chunk) maybeSettleCraftPointMissions(ownerId, row.itemId)
+                // 锻块行的窄域结算上移到 batch-context.flush()（结算结果需透出
+                // 给响应投影）；此处只负责入账写入，避免双重结算。
                 continue
             }
             // Diagnose the failing row without further writes; errors mirror the
