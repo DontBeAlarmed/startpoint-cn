@@ -13,12 +13,15 @@ import { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
 import type { ServerRoutesOptions } from "./server"
 import type { MultiManagementRoutesOptions } from "./multi-management"
 import type { ContentRoutesOptions } from "./content"
+import { registerContentManagementRoutes } from "./content-management"
 
 export { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
 
 export interface WebApiRoutesOptions extends ServerRoutesOptions {
     readonly getMultiManagementService?: MultiManagementRoutesOptions["getMultiManagementService"]
     readonly getAvatarCdnRoot?: ContentRoutesOptions["getCdnRoot"]
+    /** 服务端启动锁定的日历偏移（惰性 getter）；热更新 apply 用（不端点内 parse env）。 */
+    readonly getGameCalendarUtcOffsetMinutes?: () => number
 }
 
 const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) => {
@@ -56,6 +59,12 @@ const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) =>
         prefix: "/server/multiplayer",
         getMultiManagementService: options.getMultiManagementService ?? (() => null),
     })
+    if (options.getGameCalendarUtcOffsetMinutes !== undefined) {
+        fastify.register(registerContentManagementRoutes, {
+            prefix: "/content-management",
+            getGameCalendarUtcOffsetMinutes: options.getGameCalendarUtcOffsetMinutes,
+        })
+    }
 }
 
 export default routes;

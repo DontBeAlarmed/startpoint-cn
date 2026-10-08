@@ -298,6 +298,13 @@ fastify.register(indexWebApiPlugin, {
     getMultiManagementService: () => multiManagementService,
     getRuntimeConfig: () => startupRuntimeConfig,
     serverTimeService,
+    // loadConfig（启动序列）后必有值；请求期 getter 惰性读取
+    getGameCalendarUtcOffsetMinutes: () => {
+        if (startupRuntimeConfig === null) {
+            throw new Error("runtime config not loaded");
+        }
+        return startupRuntimeConfig.gameCalendarUtcOffsetMinutes;
+    },
     // Lazy: CDN_DIR may resolve to a directory that only exists under the
     // local asset mode; avatar requests degrade to 404 when it is absent.
     getAvatarCdnRoot: () => {

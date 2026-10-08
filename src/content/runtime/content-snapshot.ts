@@ -170,13 +170,21 @@ export class ContentSnapshotProvider {
      */
     async reload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
         const previous = this.snapshot
-        const current = await this.initialize()
-        if (previous !== null && current === previous) {
+        // 绕过 initialize 的实例记忆化：reload 的语义就是"重新读盘"。
+        const loaded = this.snapshotSource
+            ? this.snapshotSource.load()
+            : loadSnapshotPair(
+                () => (this.catalogSource as ContentCatalogSource).load(),
+                () => (this.repositorySource as ContentRepositorySource).load(),
+            )
+        const current = deepFreeze(await loaded)
+        if (this.snapshot !== null && current === this.snapshot) {
             throw new ContentSnapshotError(
                 "CONTENT_SNAPSHOT_RELOAD_NOOP",
-                "content reload produced the same snapshot instance; the load path is memoized",
+                "content reload produced the same snapshot instance; the load path returned the memoized snapshot",
             )
         }
+        this.snapshot = current
         return { previous: previous as ContentSnapshot, current }
     }
 }
