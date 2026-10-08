@@ -95,6 +95,10 @@ export function parseEstablisherSnapshot(json: string | null | undefined): Estab
             character: Number(raw.character) || 0,
             rankLevel: Number(raw.rankLevel) || 0,
             hostEntryTime: Number(raw.hostEntryTime) || 0,
+            // 好友房间大厅扩展字段（缺字段 fail-open）；attention 消费方只取
+            // 上面三个已知键，不受影响
+            ...(typeof raw.name === "string" && raw.name !== "" ? { name: raw.name } : {}),
+            ...(Number(raw.evolutionImgLevel) > 0 ? { evolutionImgLevel: Number(raw.evolutionImgLevel) } : {}),
         }
     } catch {
         return { character: 0, rankLevel: 0, hostEntryTime: 0 }

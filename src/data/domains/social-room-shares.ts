@@ -59,6 +59,9 @@ export function upsertRoomShareRowSync(input: RoomShareUpsertInput): void {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(room_number) DO UPDATE SET
             share_bits = share_bits | excluded.share_bits,
+            host_viewer_id = excluded.host_viewer_id,
+            category_id = excluded.category_id,
+            quest_id = excluded.quest_id,
             raising_state = excluded.raising_state,
             mates = excluded.mates,
             establisher_json = excluded.establisher_json,

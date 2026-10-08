@@ -28,6 +28,8 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const sqlite3 = require("better-sqlite3")
 const { getSharedFollowRelationSync } = require("../src/data/domains/social-follow")
+const { insertSessionWithToken } = require("../src/data/domains/session")
+const { SessionType } = require("../src/data/types")
 
 data.initializeDatabase()
 
@@ -47,7 +49,7 @@ function makeViewerPair(tag) {
         idpId: `social-follows-shared-${tag}-${randomUUID()}`, status: "normal",
     })
     const playerId = insertDefaultPlayerSync(account.id).id
-    return { viewerId: 740000000 + playerId, playerId }
+    return { viewerId: 740000000 + playerId, playerId, account }
 }
 
 test("共享形态：本模块写共享文件，第二连接（模拟节点 B）读到同一行", () => {
@@ -84,6 +86,57 @@ test("共享形态：双行 mutual / 单行 single / 零行 none", () => {
     assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "single")
     deleteSharedFollowEdgeSync(a.viewerId, b.viewerId)
     assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "none")
+})
+
+test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本地权威不受影响）", async () => {
+    const { resetSharedSocialDbForTest } = require("../src/data/social/shared-db")
+    resetSharedSocialDbForTest()
+    const previousPath = process.env.MULTI_SOCIAL_DB_PATH
+    process.env.MULTI_SOCIAL_DB_PATH = "/proc/definitely-not-writable/social.sqlite"
+    try {
+        const Fastify = require("fastify")
+        const app = Fastify({ logger: false })
+        app.addContentTypeParser(
+            "application/x-www-form-urlencoded",
+            { parseAs: "string" },
+            (_request, body, done) => done(null, require("msgpackr").unpack(Buffer.from(body, "base64"))),
+        )
+        const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
+        registerCnMsgpackOnSend(app)
+        const { registerFollowWriteRoutes } = require("../src/routes/api/follow/write-routes")
+        await app.register(async instance => {
+            registerFollowWriteRoutes(instance)
+        }, { prefix: "/api/index.php/follow" })
+        await app.ready()
+
+        const self = makeViewerPair("degrade-self")
+        const target = makeViewerPair("degrade-target")
+        const viewerId = self.viewerId
+        await insertSessionWithToken({
+            token: String(viewerId), accountId: self.account.id,
+            expires: new Date("2099-01-01"), type: SessionType.VIEWER,
+        })
+        await insertSessionWithToken({
+            token: String(target.viewerId), accountId: target.account.id,
+            expires: new Date("2099-01-01"), type: SessionType.VIEWER,
+        })
+
+        const response = await app.inject({
+            method: "POST",
+            url: "/api/index.php/follow/add",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: require("msgpackr").pack({
+                viewer_id: viewerId,
+                follow_id: target.viewerId,
+            }).toString("base64"),
+        })
+        assert.equal(response.statusCode, 200, "共享写失败必须降级，不得 500")
+        const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+        assert.equal(payload.data_headers.result_code, 1, "本地权威写成功")
+    } finally {
+        process.env.MULTI_SOCIAL_DB_PATH = previousPath
+        resetSharedSocialDbForTest()
+    }
 })
 
 test("共享库不可用时 relation fail-closed 为 none", () => {

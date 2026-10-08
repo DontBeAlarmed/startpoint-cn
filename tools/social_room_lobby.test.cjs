@@ -25,7 +25,7 @@ process.env.DATA_DIR = databaseDirectory
 
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const { registerLobbyRoutes } = require("../src/multi/http/lobby")
@@ -125,6 +125,7 @@ test.before(async () => {
     await app.ready()
 
     host = await createPlayer("host")
+    updatePlayerSync({ id: host.playerId, name: "HostLobby" })
     mutualFriend = await createPlayer("mutual")
     oneWayFriend = await createPlayer("oneway")
     stranger = await createPlayer("stranger")
@@ -214,6 +215,17 @@ test("纯随机招募 [3] 不进列表；[1] 后接 [3] 铃铛重发行仍在（
     assert.ok(row, "[3] 重发不得删除注册行")
     assert.equal(row.share_bits & 1, 1, "[3] 重发不得收缩位")
     assert.ok(findRoom(await getRooms(mutualFriend.viewerId), hybrid.roomNumber), "[1,3] 混合房仍对互关好友可见")
+
+    // 空列表与未知数值（[7]）：bits=0 → 不得触碰注册行、响应仍 200（双审补测）
+    const emptyShare = await makeRoom(host)
+    const emptyResponse = await shareAsHost(emptyShare, [])
+    assert.equal(emptyResponse.statusCode, 200)
+    assert.equal(readRow(emptyShare.roomNumber), undefined)
+
+    const unknownValue = await makeRoom(host)
+    const unknownResponse = await shareAsHost(unknownValue, [7])
+    assert.equal(unknownResponse.statusCode, 200)
+    assert.equal(readRow(unknownValue.roomNumber), undefined, "未知数值不得建行")
 })
 
 test("raising_state=4（战斗中）仍在列表（好友可见战斗中状态，客户端灰显）", async () => {
@@ -253,6 +265,8 @@ test("投影 11 字段类型逐个断言（模拟客户端强校验）", async (
     assert.equal(typeof entry.room_number, "string")
     assert.equal(typeof entry.establisher_name, "string")
     assert.notEqual(entry.establisher_name, "")
+    assert.equal(entry.establisher_name, "HostLobby", "房主真名必须来自快照（双审 P0：parse 端丢字段会让兜底值蒙混过关）")
+    assert.ok(Number(entry.establisher_character_evolution_img_level) >= 0)
     assert.equal(typeof entry.establisher_character, "number")
     assert.equal(typeof entry.establisher_character_evolution_img_level, "number")
     assert.equal(typeof entry.establisher_follow, "number")

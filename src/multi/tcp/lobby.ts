@@ -86,7 +86,6 @@ function syncShareRow(roomNumber: string): void {
 function removeDisconnectedMate(roomNumber: string, connectionId: string): void {
     const room = getRoom(roomNumber)
     if (!room) return
-    syncShareRow(roomNumber)
     const hostClient = findHostClient(roomNumber)
     for (const connectedClient of sessionManager.getClientsInRoom(roomNumber)) {
         connectedClient.mates = connectedClient.mates
@@ -101,6 +100,8 @@ function removeDisconnectedMate(roomNumber: string, connectionId: string): void 
     }
     // 无 host 连接时 room.mates 由房间权威状态在下次 host 广播时重建；
     // 裸 viewer_id 过滤同样会误伤重连者，故不做按 id 的删除。
+    // 同步放在重建之后（双审 P1：先删后同步会把移除前的旧人数写进注册行）
+    syncShareRow(roomNumber)
 }
 
 function expireReconnectLease(key: string): void {
