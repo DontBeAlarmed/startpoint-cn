@@ -8,6 +8,31 @@ import {
     deleteLocalFollowSync,
 } from "../../../data/domains/follow"
 import { resolveFollowTarget, resolveFollowViewer } from "./context"
+import {
+    deleteSharedFollowEdgeSync,
+    upsertSharedFollowEdgeSync,
+} from "../../../data/domains/social-follow"
+
+// 共享 follow 边副本（social_follows）的尽力而为双写：本地 players_follows
+// 是权威（计费/lists 读者不切换），副本只服务好友房间大厅的跨节点可见性
+// 判定。副本写失败不回滚本地、不影响响应；漂移由后续同边写自然修复。
+function mirrorSharedFollowEdge(
+    viewerId: number,
+    targetViewerId: number,
+    action: "add" | "delete",
+    followedAtMs: number,
+): void {
+    if (viewerId === targetViewerId) return
+    try {
+        if (action === "add") {
+            upsertSharedFollowEdgeSync(viewerId, targetViewerId, followedAtMs)
+        } else {
+            deleteSharedFollowEdgeSync(viewerId, targetViewerId)
+        }
+    } catch (error) {
+        console.warn("[SOCIAL-FOLLOW] shared edge mirror failed", { viewerId, targetViewerId, action }, error)
+    }
+}
 
 // F0 冻结：add 的 A-error 1451=我方关注超限（FollowCountOver）、
 // 1452=对方被关注超限（PartnerFollowedCountOver）；其余业务结果按官方语义。
@@ -55,12 +80,16 @@ export function registerFollowWriteRoutes(fastify: FastifyInstance): void {
         // 自关注按幂等成功处理（客户端 UI 不会发出；服务端不产生边）
         if (targetPlayerId === viewer.playerId) return ok(viewer.viewerId, reply)
 
+        const followedAtMs = getRealNowMs()
         const result = addLocalFollowSync({
             sourcePlayerId: viewer.playerId,
             targetPlayerId,
-            followedAtMs: getRealNowMs(),
+            followedAtMs,
         })
-        if (result.ok) return ok(viewer.viewerId, reply)
+        if (result.ok) {
+            mirrorSharedFollowEdge(viewer.viewerId, followId as number, "add", followedAtMs)
+            return ok(viewer.viewerId, reply)
+        }
         const resultCode = ADD_FAILURE_RESULT_CODE[result.reason]
         if (resultCode === undefined) return badRequest(reply, "Invalid follow target.")
         return aError(viewer.viewerId, resultCode, reply)
@@ -74,6 +103,7 @@ export function registerFollowWriteRoutes(fastify: FastifyInstance): void {
         const targetPlayerId = await resolveFollowTarget(followId as number)
         if (targetPlayerId === null) return badRequest(reply, "Unknown follow target.")
         deleteLocalFollowSync({ sourcePlayerId: viewer.playerId, targetPlayerId })
+        mirrorSharedFollowEdge(viewer.viewerId, followId as number, "delete", getRealNowMs())
         return ok(viewer.viewerId, reply)
     })
 
@@ -85,6 +115,7 @@ export function registerFollowWriteRoutes(fastify: FastifyInstance): void {
         const followerPlayerId = await resolveFollowTarget(followedId as number)
         if (followerPlayerId === null) return badRequest(reply, "Unknown follower target.")
         deleteLocalFollowerSync({ playerId: viewer.playerId, followerPlayerId })
+        mirrorSharedFollowEdge(followedId as number, viewer.viewerId, "delete", getRealNowMs())
         return ok(viewer.viewerId, reply)
     })
 
@@ -115,13 +146,26 @@ export function registerFollowWriteRoutes(fastify: FastifyInstance): void {
             deleteTargetPlayerIds.push(targetPlayerId)
         }
 
+        const bulkFollowedAtMs = getRealNowMs()
         const result = bulkEditLocalFollowsSync({
             sourcePlayerId: viewer.playerId,
             addTargetPlayerIds,
             deleteTargetPlayerIds,
-            followedAtMs: getRealNowMs(),
+            followedAtMs: bulkFollowedAtMs,
         })
-        if (result.ok) return bulkOk(viewer.viewerId, reply)
+        if (result.ok) {
+            for (const followId of addList) {
+                if (Number.isSafeInteger(followId)) {
+                    mirrorSharedFollowEdge(viewer.viewerId, followId as number, "add", bulkFollowedAtMs)
+                }
+            }
+            for (const followId of deleteList) {
+                if (Number.isSafeInteger(followId)) {
+                    mirrorSharedFollowEdge(viewer.viewerId, followId as number, "delete", bulkFollowedAtMs)
+                }
+            }
+            return bulkOk(viewer.viewerId, reply)
+        }
         const resultCode = ADD_FAILURE_RESULT_CODE[result.reason]
         if (resultCode === undefined) return badRequest(reply, "Invalid follow target.")
         return aError(viewer.viewerId, resultCode, reply)

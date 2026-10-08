@@ -2,6 +2,7 @@ import sqlite3, { type Database } from "better-sqlite3"
 import fs from "node:fs"
 import pathLib from "node:path"
 import { ensureAttentionSchema, ensurePresenceSchema } from "./attention-schema"
+import { ensureSocialFollowsSchema } from "./social-follows-schema"
 
 /**
  * 共享社交库：多节点/多进程部署时社交状态（铃铛招募、投递、presence）的
@@ -27,6 +28,7 @@ export function openSharedSocialDb(path: string): Database {
     database.pragma("foreign_keys = OFF")
     ensureAttentionSchema(database)
     ensurePresenceSchema(database)
+    ensureSocialFollowsSchema(database)
     return database
 }
 
