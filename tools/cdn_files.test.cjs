@@ -116,13 +116,19 @@ async function createFixture(t, options = {}) {
     const previousContentStateDir = process.env.CONTENT_STATE_DIR
     process.env.CONTENT_STATE_DIR = contentStateDir
     app.register(cdnFilesPlugin, {
-        getSnapshot: () => {
-            const archives = options.archives?.({ cdnRoot, patchesRoot, outsideRoot, zipBytes }) ?? [
-                archive("archive-common-full/base.zip", zipBytes.length),
-                archive("archive-common-full/outside.zip", zipBytes.length, 2),
-            ]
-            return snapshot(archives, options.sources?.(archives) ?? new Map())
-        },
+        // 定格单例（对齐生产 getContentSnapshot 的单例语义）：allowlist 按快照
+        // 实例缓存，防篡改 size 校验依赖"注册后同一实例不重建"
+        getSnapshot: (() => {
+            const instance = () => {
+                const archives = options.archives?.({ cdnRoot, patchesRoot, outsideRoot, zipBytes }) ?? [
+                    archive("archive-common-full/base.zip", zipBytes.length),
+                    archive("archive-common-full/outside.zip", zipBytes.length, 2),
+                ]
+                return snapshot(archives, options.sources?.(archives) ?? new Map())
+            }
+            const fixed = instance()
+            return () => fixed
+        })(),
         paths: { cdnRoot, patchesRoot },
         patchUploadRoot,
         ...(options.fileSystemFactory

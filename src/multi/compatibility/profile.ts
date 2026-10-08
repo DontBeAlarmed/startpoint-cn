@@ -90,6 +90,10 @@ function resolveProfileSource(
 export function createCompatibilityProfileFactory(
     dependencies: CompatibilityProfileDependencies = {},
 ): (headers: CompatibilityHeaders) => CoordinatorResult<MultiCompatibilityProfile> {
+    // 显式注入的 source 是调用方的固定选择，保持一次解析；
+    // 从快照派生的缓存按快照实例比较——内容热重载（provider.reload 换新
+    // 快照实例）后自动重算，避免对外宣告的 contentDigest 滞留旧值。
+    let cachedFor: ContentSnapshot | null = null
     let cachedSource = dependencies.source
         ? resolveProfileSource(dependencies)
         : null
@@ -103,9 +107,13 @@ export function createCompatibilityProfileFactory(
             })
             return { ok: false, error: "INCOMPATIBLE_ROOM" }
         }
-        if (cachedSource === null) {
+        const currentSnapshot = dependencies.source
+            ? cachedFor
+            : (dependencies.getContentSnapshot ?? getContentSnapshot)()
+        if (cachedSource === null || cachedFor !== currentSnapshot) {
             try {
                 cachedSource = resolveProfileSource(dependencies)
+                cachedFor = currentSnapshot
             } catch (error) {
                 if (error instanceof ContentSnapshotError
                     && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {

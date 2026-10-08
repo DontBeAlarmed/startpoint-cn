@@ -86,8 +86,10 @@ function replacePlatformArchives(
     return Object.freeze({ ...edge, archives: Object.freeze([...shared, ...platform]) })
 }
 
-// 冻结的 iOS 目录视图缓存：key = cdnRoot，扫描一次，之后不再重扫磁盘（含"不可用"状态）。
-const iosCompatCache = new Map<string, IosCompatState>()
+// 冻结的 iOS 目录视图缓存：一级键 = 快照实例（内容热重载换新快照后自动重扫），
+// 二级键 = cdnRoot（双审 P1-4：仅按 cdnRoot 字符串键会让 reload 后的 iOS 视图
+// 永久滞留旧目录，Android/iOS 版本混用）。
+const iosCompatCache = new WeakMap<ContentSnapshot, Map<string, IosCompatState>>()
 
 /**
  * 构建并冻结 iOS 目录视图（幂等，模块级缓存）。
@@ -95,7 +97,12 @@ const iosCompatCache = new Map<string, IosCompatState>()
  *   或任一 edge 缺失 iOS 归档 → 明确"不可用"（不回退 Android platform 归档）。
  */
 export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): IosCompatState {
-    const cached = iosCompatCache.get(cdnRoot)
+    let byRoot = iosCompatCache.get(snapshot)
+    if (byRoot === undefined) {
+        byRoot = new Map()
+        iosCompatCache.set(snapshot, byRoot)
+    }
+    const cached = byRoot.get(cdnRoot)
     if (cached !== undefined) return cached
 
     const entityList = resolveIosEntityList(snapshot.cdn, cdnRoot)
@@ -104,7 +111,7 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
             kind: "unavailable",
             reason: "missing ios entity list",
         })
-        iosCompatCache.set(cdnRoot, state)
+        byRoot.set(cdnRoot, state)
         return state
     }
 
@@ -118,7 +125,7 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
             kind: "unavailable",
             reason: "ios archive directory is unreadable",
         })
-        iosCompatCache.set(cdnRoot, state)
+        byRoot.set(cdnRoot, state)
         return state
     }
     if (iosFull.length === 0 && iosDiff.length === 0) {
@@ -126,7 +133,7 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
             kind: "unavailable",
             reason: "missing ios archive directories",
         })
-        iosCompatCache.set(cdnRoot, state)
+        byRoot.set(cdnRoot, state)
         return state
     }
 
@@ -136,7 +143,7 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
             kind: "unavailable",
             reason: "missing ios archive edge",
         })
-        iosCompatCache.set(cdnRoot, state)
+        byRoot.set(cdnRoot, state)
         return state
     }
     const catalog = Object.freeze({
@@ -149,11 +156,11 @@ export function prepareIosCompat(snapshot: ContentSnapshot, cdnRoot: string): Io
             kind: "unavailable",
             reason: "invalid ios entity list",
         })
-        iosCompatCache.set(cdnRoot, state)
+        byRoot.set(cdnRoot, state)
         return state
     }
     const state: IosCompatState = Object.freeze({ kind: "ready", catalog, installedBytes })
-    iosCompatCache.set(cdnRoot, state)
+    byRoot.set(cdnRoot, state)
     return state
 }
 
@@ -199,7 +206,7 @@ function readEntityListInstalledBytes(cdnRoot: string, entityList: string): numb
     }
 }
 
-const iosAllowlistCache = new Map<string, ReadonlyMap<string, number>>()
+const iosAllowlistCache = new WeakMap<ContentSnapshot, Map<string, ReadonlyMap<string, number>>>()
 
 /**
  * archive-ios-* 独立 ZIP allowlist：仅包含冻结 iOS 目录视图中解析出的归档
@@ -208,7 +215,12 @@ const iosAllowlistCache = new Map<string, ReadonlyMap<string, number>>()
 export function getIosZipAllowlist(snapshot: ContentSnapshot, cdnRoot: string): ReadonlyMap<string, number> {
     const state = prepareIosCompat(snapshot, cdnRoot)
     if (state.kind !== "ready") return EMPTY_ALLOWLIST
-    const cached = iosAllowlistCache.get(cdnRoot)
+    let byRoot = iosAllowlistCache.get(snapshot)
+    if (byRoot === undefined) {
+        byRoot = new Map()
+        iosAllowlistCache.set(snapshot, byRoot)
+    }
+    const cached = byRoot.get(cdnRoot)
     if (cached !== undefined) return cached
     const allowlist = new Map<string, number>()
     for (const edge of state.catalog.edges) {
@@ -219,7 +231,7 @@ export function getIosZipAllowlist(snapshot: ContentSnapshot, cdnRoot: string): 
         }
     }
     const frozen: ReadonlyMap<string, number> = Object.freeze(allowlist)
-    iosAllowlistCache.set(cdnRoot, frozen)
+    byRoot.set(cdnRoot, frozen)
     return frozen
 }
 

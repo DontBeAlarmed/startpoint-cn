@@ -255,3 +255,13 @@ export function getMediumArchiveIndex(directory: string): MediumArchiveIndex {
     }
     return index
 }
+
+/**
+ * 内容热重载后的索引失效：补丁包（patches/<版本>）应用会向归档目录引入新
+ * ZIP，process-lifetime 索引滞留旧目录视图会让新立绘 404。reload 成功路径
+ * 调用；下次请求按目录重建。
+ */
+export function resetMediumArchiveIndexes(): void {
+    indexesByDirectory.clear()
+}
+

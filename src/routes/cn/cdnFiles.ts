@@ -377,8 +377,30 @@ async function sendFile(
     }
 }
 
+// zip allowlist 按快照实例缓存（Promise 值：并发首请求 in-flight 去重）。
+// 构建失败时删除条目，使下个请求重试——否则 rejected promise 会让该快照的
+// 所有 zip 请求 404 直到下一次内容重载。
+const zipAllowlistBySnapshot = new WeakMap<ContentSnapshot, Promise<ReadonlyMap<string, CatalogZipLocation>>>()
+
+async function resolveZipAllowlist(
+    snapshot: ContentSnapshot,
+    paths: Pick<ContentPaths, "cdnRoot" | "patchesRoot">,
+    fileSystem: CdnFileSystem,
+): Promise<ReadonlyMap<string, CatalogZipLocation>> {
+    const cached = zipAllowlistBySnapshot.get(snapshot)
+    if (cached) return cached
+    const building = buildCatalogZipAllowlist(snapshot, paths, fileSystem)
+    zipAllowlistBySnapshot.set(snapshot, building)
+    try {
+        return await building
+    } catch (error) {
+        zipAllowlistBySnapshot.delete(snapshot)
+        throw error
+    }
+}
+
 const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions) => {
-    const snapshot = (options.getSnapshot ?? getContentSnapshot)()
+    const getSnapshot = options.getSnapshot ?? getContentSnapshot
     const paths = options.paths ?? resolveContentPaths({
         projectRoot: path.resolve(__dirname, "../../.."),
     })
@@ -386,11 +408,11 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
     const observer = options.handleObserver
     const logicalRoot = path.resolve(paths.cdnRoot)
     const physicalRoot = await fileSystem.realpath(logicalRoot)
-    const zipAllowlist = await buildCatalogZipAllowlist(
-        snapshot,
-        paths,
-        fileSystem,
-    )
+    // 注册时即按当前快照构建 allowlist 并 await（与基线同时序：app.ready 前
+    // 完成，expectedIdentity 定格于构建时刻——路由注册后对归档文件的物理替
+    // 换会因文件身份不匹配被拒）。结果按快照实例缓存：内容热重载换新快照后
+    // WeakMap miss，首个 zip 请求按新快照重建——新基线同样定格于重建时刻。
+    await resolveZipAllowlist(getSnapshot(), paths, fileSystem)
 
     const patchUploadRoot = options.patchUploadRoot === undefined
         ? null
@@ -445,6 +467,8 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
             const relativePath = requestRelativePath(request)
             if (relativePath === null) return reply.status(404).send("Not Found")
             if (path.posix.extname(relativePath).toLowerCase() === ".zip") {
+                // 每请求重取快照：内容热重载（provider.reload）后自动按新目录重建白名单
+                const snapshot = getSnapshot()
                 if (options.iosCompat?.enabled === true) {
                     // archive-ios-* 独立 allowlist：仅放行冻结 iOS 目录视图中解析出的归档
                     // （relativePath → 期望压缩字节数），不按目录名前缀放行未解析来源。
@@ -464,6 +488,7 @@ const routes = async (fastify: FastifyInstance, options: CnCdnFilesRouteOptions)
                         )
                     }
                 }
+                const zipAllowlist = await resolveZipAllowlist(snapshot, paths, fileSystem)
                 const location = zipAllowlist.get(relativePath)
                 return location === undefined
                     ? reply.status(404).send("Not Found")
