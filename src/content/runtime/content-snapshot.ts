@@ -41,7 +41,9 @@ export interface ContentSnapshot {
     readonly repository: ReadonlyContentRepository
 }
 
-export type ContentSnapshotErrorCode = "CONTENT_SNAPSHOT_NOT_INITIALIZED"
+export type ContentSnapshotErrorCode =
+    | "CONTENT_SNAPSHOT_NOT_INITIALIZED"
+    | "CONTENT_SNAPSHOT_RELOAD_NOOP"
 
 export class ContentSnapshotError extends Error {
     readonly code: ContentSnapshotErrorCode
@@ -106,8 +108,8 @@ export class ContentSnapshotProvider {
     private readonly catalogSource: ContentCatalogSource | null
     private readonly repositorySource: ContentRepositorySource | null
     private readonly snapshotSource: ContentSnapshotSource | null
-    private snapshot: ContentSnapshot | null = null
-    private initialization: Promise<ContentSnapshot> | null = null
+    protected snapshot: ContentSnapshot | null = null
+    protected initialization: Promise<ContentSnapshot> | null = null
 
     constructor(options: ContentSnapshotProviderOptions) {
         const pairedSources = Boolean(options.catalogSource && options.repositorySource)
@@ -158,6 +160,24 @@ export class ContentSnapshotProvider {
             )
         }
         return this.snapshot
+    }
+
+    /**
+     * 内容热重载：重新从磁盘加载并原子替换 this.snapshot。失败（磁盘/构建
+     * 错误）时保留旧快照并向上抛错——线上服务永不因新内容损坏而下线。
+     * 与 initialize 共用 initialization 槽位串行，杜绝"initialize 后完成
+     * 用旧快照反向覆盖 reload 结果"。
+     */
+    async reload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+        const previous = this.snapshot
+        const current = await this.initialize()
+        if (previous !== null && current === previous) {
+            throw new ContentSnapshotError(
+                "CONTENT_SNAPSHOT_RELOAD_NOOP",
+                "content reload produced the same snapshot instance; the load path is memoized",
+            )
+        }
+        return { previous: previous as ContentSnapshot, current }
     }
 }
 
@@ -264,6 +284,8 @@ function lockRuntimeConfiguration(
 
 export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
     private readonly runtimeState: ConfiguredContentSnapshotState
+    private readonly configuredDependencies: ConfiguredContentSnapshotProviderDependencies
+    private reloadInFlight: Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> | null = null
 
     constructor(dependencies: ConfiguredContentSnapshotProviderDependencies) {
         const state: ConfiguredContentSnapshotState = {
@@ -284,11 +306,53 @@ export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
             }),
         })
         this.runtimeState = state
+        this.configuredDependencies = dependencies
     }
 
     initialize(options: InitializeContentSnapshotOptions = {}): Promise<ContentSnapshot> {
         lockRuntimeConfiguration(this.runtimeState, normalizeRuntimeConfiguration(options))
         return super.initialize()
+    }
+
+    /**
+     * 内容热重载（双审 P0 修订）：基类 reload 走 snapshotSource.load() 会命中
+     * 双层缓存（state.provider 单例 + inner initialize 记忆化）而拿到启动时的
+     * 同一旧快照。此处用**已锁定的 runtime configuration** 构造全新 inner
+     * provider（fresh 读盘），加载成功后原子替换外层快照。失败保留旧快照
+     * （fail-safe）。reload 之间/与 initialize 之间经 in-flight 槽位串行。
+     */
+    override async reload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+        if (this.reloadInFlight) return this.reloadInFlight
+        this.reloadInFlight = this.doReload()
+        try {
+            return await this.reloadInFlight
+        } finally {
+            this.reloadInFlight = null
+        }
+    }
+
+    private async doReload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+        const previous = this.snapshot
+        if (previous !== null && this.initialization !== null) {
+            // 等待在飞的 initialize 落地，避免旧值反向覆盖
+            await this.initialization.catch(() => {})
+        }
+        if (this.runtimeState.configuration === null) {
+            throw new ContentSnapshotError(
+                "CONTENT_SNAPSHOT_NOT_INITIALIZED",
+                "content snapshot has not been initialized",
+            )
+        }
+        const fresh = this.configuredDependencies.createProvider(this.runtimeState.configuration)
+        const current = deepFreeze(await fresh.initialize())
+        if (this.snapshot !== null && current === this.snapshot) {
+            throw new ContentSnapshotError(
+                "CONTENT_SNAPSHOT_RELOAD_NOOP",
+                "content reload produced the same snapshot instance; the load path is memoized",
+            )
+        }
+        this.snapshot = current
+        return { previous: previous as ContentSnapshot, current }
     }
 }
 
@@ -481,4 +545,12 @@ export function initializeContentSnapshot(
 
 export function getContentSnapshot(): ContentSnapshot {
     return productionContentSnapshotProvider.get()
+}
+
+/**
+ * 内容热重载：重新从磁盘加载 release 并原子替换运行时快照。
+ * 失败保留旧快照（fail-safe）；成功后新请求即服务新内容。
+ */
+export function reloadContentSnapshot(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+    return productionContentSnapshotProvider.reload()
 }
