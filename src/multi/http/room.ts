@@ -19,9 +19,8 @@ import {
     pruneExpiredRecruitments,
 } from "../../data/domains/attention";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
-import { upsertRoomShareRowSync } from "../../data/domains/social-room-shares";
 import { getCharactersEvolutionImgLevels } from "../../lib/character";
-import { getRoom as getLocalRoom } from "../room/manager";
+import { openRoomShareRow } from "../room/share-sync";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import { getPlayerRankLevel } from "../player-context";
 import { scheduleNpcRelease } from "../npc/release";
@@ -347,14 +346,12 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             // 尽力而为：注册表失败不影响铃铛分支与响应（15s 内的 [1]/[2] 一次性
             // 报文没有重发自愈，失败由用户重新勾选恢复）
             try {
-                upsertRoomShareRowSync({
+                openRoomShareRow({
                     roomNumber: body.room_number,
                     hostViewerId: viewerId,
                     categoryId: room.value.category,
                     questId: room.value.questId,
                     shareBits,
-                    raisingState: room.value.raisingState,
-                    mates: Math.max(1, getRoomMateCount(body.room_number)),
                     establisherJson: buildEstablisherSnapshot({
                         character: room.value.hostMainCharacterId,
                         rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
@@ -365,7 +362,6 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                             [room.value.hostMainCharacterId],
                         )[0] ?? 0,
                     }),
-                    nowMs: getServerTime() * 1000,
                 })
             } catch (error) {
                 console.warn("[MULTI] room share lobby persist failed", error)
@@ -438,14 +434,6 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             "data": {}
         });
     });
-}
-
-function getRoomMateCount(roomNumber: string): number {
-    try {
-        return getLocalRoom(roomNumber)?.mates.length ?? 1
-    } catch {
-        return 1
-    }
 }
 
 function unavailableRoomData(roomNumber: string, raisingState: number): Record<string, unknown> {

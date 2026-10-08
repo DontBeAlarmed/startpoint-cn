@@ -28,7 +28,25 @@ function buildFriendRoomLobby(viewerId: number, categoryId: number): Record<stri
     if (!Number.isSafeInteger(categoryId)) return []
     const nowMs = getServerTime() * 1000
     const rooms: Record<string, unknown>[] = []
-    for (const row of listActiveRoomSharesSync(categoryId, nowMs)) {
+    // 注册表查询失败（如未初始化数据库的 stub/降级环境）→ 空列表安全终态：
+    // get_rooms 任何情况下都不 500
+    let rows: readonly {
+        host_viewer_id: number
+        share_bits: number
+        category_id: number
+        quest_id: number
+        room_number: string
+        raising_state: number
+        mates: number
+        establisher_json: string
+    }[] = []
+    try {
+        rows = listActiveRoomSharesSync(categoryId, nowMs)
+    } catch (error) {
+        console.warn("[LOBBY] friend room registry unavailable, returning empty list", error)
+        return rooms
+    }
+    for (const row of rows) {
         const relation = getSharedFollowRelationSync(viewerId, row.host_viewer_id)
         const visible = ((row.share_bits & 1) !== 0 && relation === "mutual")
             || ((row.share_bits & 2) !== 0 && relation !== "none")

@@ -28,6 +28,39 @@ export function syncRoomShareRow(roomNumber: string): void {
     }
 }
 
+/**
+ * share_room 的注册行公开（HTTP 层门面）：房间权威节点内读 mates/raising_state
+ * 并落 upsert。HTTP 层不 import room manager（架构守卫），统一经此入口。
+ * 失败由调用方 WARN 降级（无重发自愈的一次性报文，靠用户重新勾选恢复）。
+ */
+export function openRoomShareRow(input: {
+    readonly roomNumber: string
+    readonly hostViewerId: number
+    readonly categoryId: number
+    readonly questId: number
+    readonly shareBits: number
+    readonly establisherJson: string
+}): void {
+    try {
+        const { getRoom } = require("./manager") as typeof import("./manager")
+        const { upsertRoomShareRowSync } = require("../../data/domains/social-room-shares") as typeof import("../../data/domains/social-room-shares")
+        const room = getRoom(input.roomNumber)
+        upsertRoomShareRowSync({
+            roomNumber: input.roomNumber,
+            hostViewerId: input.hostViewerId,
+            categoryId: input.categoryId,
+            questId: input.questId,
+            shareBits: input.shareBits,
+            raisingState: room?.raising_state ?? 2,
+            mates: Math.max(1, room?.mates.length ?? 1),
+            establisherJson: input.establisherJson,
+            nowMs: getShareNowMs(),
+        })
+    } catch (error) {
+        console.warn("[SOCIAL-SHARE] room share open failed", input.roomNumber, error)
+    }
+}
+
 /** 解散钩子：删除注册行（尽力而为，不阻断解散主流程） */
 export function deleteRoomShareRowForDisband(roomNumber: string): void {
     try {
