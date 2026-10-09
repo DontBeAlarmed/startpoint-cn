@@ -3,6 +3,8 @@ import path from "node:path"
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 
 import { runContentSync, type ContentSyncResult } from "../../content/sync/engine"
+import { sanitizeErrorMessage } from "../../content/sync/cli"
+import { resetMediumArchiveIndexes } from "../../content/cdn/medium-archive-index"
 import {
     getContentSnapshot,
     reloadContentSnapshot,
@@ -72,7 +74,7 @@ async function performApply(
             applied: false,
             stage: "sync",
             currentVersion: before.targetVersion,
-            note: `内容同步失败：旧内容继续服务（${error instanceof Error ? error.message : String(error)}）`,
+            note: `内容同步失败：旧内容继续服务（${sanitizeErrorMessage(error instanceof Error ? error.message : String(error), projectRoot)}）`,
         }
     }
 
@@ -83,9 +85,12 @@ async function performApply(
             applied: false,
             stage: "reload",
             currentVersion: before.targetVersion,
-            note: `内容重载失败：旧快照继续服务（${error instanceof Error ? error.message : String(error)}）；磁盘已更新，重启将生效新版本`,
+            note: `内容重载失败：旧快照继续服务（${sanitizeErrorMessage(error instanceof Error ? error.message : String(error), projectRoot)}）；磁盘已更新，重启将生效新版本`,
         }
     }
+
+    // reload 成功：失效 admin 立绘/头像的目录索引缓存（新补丁的归档才能被看到）
+    resetMediumArchiveIndexes()
 
     const after = currentContentState()
     return {

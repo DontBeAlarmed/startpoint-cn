@@ -75,12 +75,13 @@ function readVersionHeader(
 
 function resolveProfileSource(
     dependencies: CompatibilityProfileDependencies,
+    snapshot?: ContentSnapshot,
 ): CompatibilityProfileSource {
     if (dependencies.source) return Object.freeze({ ...dependencies.source })
-    const snapshot = (dependencies.getContentSnapshot ?? getContentSnapshot)()
+    const resolved = snapshot ?? (dependencies.getContentSnapshot ?? getContentSnapshot)()
     return Object.freeze({
-        cdnTargetVersion: snapshot.cdn.targetVersion,
-        contentDigest: snapshot.repository.info().multiBattleContentDigest,
+        cdnTargetVersion: resolved.cdn.targetVersion,
+        contentDigest: resolved.repository.info().multiBattleContentDigest,
         modeDigest: buildModeDigest(
             (dependencies.getLoadedModeIdentities ?? listLoadedModeIdentities)(),
         ),
@@ -107,24 +108,27 @@ export function createCompatibilityProfileFactory(
             })
             return { ok: false, error: "INCOMPATIBLE_ROOM" }
         }
-        const currentSnapshot = dependencies.source
-            ? cachedFor
-            : (dependencies.getContentSnapshot ?? getContentSnapshot)()
-        if (cachedSource === null || cachedFor !== currentSnapshot) {
-            try {
-                cachedSource = resolveProfileSource(dependencies)
+        // 每请求取当前快照实例（内容热重载换实例后缓存自动重算，对外
+        // contentDigest 不滞留旧值）。取值在 try 内：快照未初始化期间保持
+        // 受控 INCOMPATIBLE_ROOM（不得向 multi 请求逸出 500）。
+        try {
+            const currentSnapshot = dependencies.source
+                ? cachedFor
+                : (dependencies.getContentSnapshot ?? getContentSnapshot)()
+            if (cachedSource === null || cachedFor !== currentSnapshot) {
+                cachedSource = resolveProfileSource(dependencies, currentSnapshot ?? undefined)
                 cachedFor = currentSnapshot
-            } catch (error) {
-                if (error instanceof ContentSnapshotError
-                    && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
-                    dependencies.onCompatibilityRejection?.({
-                        code: "INCOMPATIBLE_ROOM",
-                        differences: [],
-                    })
-                    return { ok: false, error: "INCOMPATIBLE_ROOM" }
-                }
-                throw error
             }
+        } catch (error) {
+            if (error instanceof ContentSnapshotError
+                && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
+                dependencies.onCompatibilityRejection?.({
+                    code: "INCOMPATIBLE_ROOM",
+                    differences: [],
+                })
+                return { ok: false, error: "INCOMPATIBLE_ROOM" }
+            }
+            throw error
         }
         return {
             ok: true,

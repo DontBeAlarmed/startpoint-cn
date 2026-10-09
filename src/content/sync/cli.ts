@@ -67,7 +67,7 @@ function printableResult(result: ContentSyncResult): ContentSyncResult {
     }
 }
 
-function sanitizeErrorMessage(message: string, projectRoot: string): string {
+export function sanitizeErrorMessage(message: string, projectRoot: string): string {
     const withoutProject = message.split(projectRoot).join("<PROJECT_ROOT>")
     return withoutProject
         .replace(/(["'])(?:[A-Za-z]:[\\/]|\\\\|\/)[^"'\r\n]*\1/g, "$1<PATH>$1")

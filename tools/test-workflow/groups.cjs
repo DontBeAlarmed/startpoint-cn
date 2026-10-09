@@ -43,6 +43,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_hub_token.test.cjs",
             "tools/multi_runtime_config.test.cjs",
             "tools/multi_client_fallback.test.cjs",
+            "tools/content_snapshot_reload.test.cjs",
+            "tools/content_management.test.cjs",
             "tools/account_identity_provider.test.cjs",
             "tools/multi_runtime_session_options.test.cjs",
             "tools/api_index_time_semantics.test.cjs",
@@ -235,6 +237,9 @@ const TEST_GROUPS = Object.freeze({
             "tools/cdn_paths.test.cjs",
             "tools/cdn_planner.test.cjs",
             "tools/cdn_types.test.cjs",
+            "tools/cdn_files.test.cjs",
+            "tools/social_room_lobby.test.cjs",
+            "tools/social_room_lobby_ttl.test.cjs",
         ],
     },
     "quick:content": {

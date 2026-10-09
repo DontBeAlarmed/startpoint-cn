@@ -61,10 +61,14 @@ function profile(overrides = {}) {
 test("profile source is resolved on first valid request and caches only the successful source", () => {
     let snapshotCalls = 0
     let modeCalls = 0
+    // 生产语义：getContentSnapshot 返回单例（reload 才换实例）——stub 必须
+    // 对齐，否则实例轮询缓存会每请求重算。
+    let cachedSnapshot = null
     const factory = createCompatibilityProfileFactory({
         getContentSnapshot: () => {
             snapshotCalls++
-            return snapshot()
+            if (cachedSnapshot === null) cachedSnapshot = snapshot()
+            return cachedSnapshot
         },
         getLoadedModeIdentities: () => {
             modeCalls++
@@ -88,7 +92,9 @@ test("profile source is resolved on first valid request and caches only the succ
     assert.equal(second.ok, true)
     assert.equal(first.value.contentDigest, MULTI_BATTLE_DIGEST)
     assert.equal(second.value.contentDigest, MULTI_BATTLE_DIGEST)
-    assert.equal(snapshotCalls, 1)
+    // 内容热重载契约：每请求取一次当前快照实例（reload 换实例后 digest 自动
+    // 重算，不滞留旧值）；同实例命中 profile 缓存，仅 getter 计数随请求递增。
+    assert.equal(snapshotCalls, 2)
     assert.equal(modeCalls, 1)
 })
 
@@ -96,6 +102,7 @@ test("profile source failure is controlled, not cached, and recovers after initi
     let initialized = false
     let snapshotCalls = 0
     let modeCalls = 0
+    let cachedSnapshot = null
     const factory = createCompatibilityProfileFactory({
         getContentSnapshot: () => {
             snapshotCalls++
@@ -105,7 +112,8 @@ test("profile source failure is controlled, not cached, and recovers after initi
                     "controlled test",
                 )
             }
-            return snapshot()
+            if (cachedSnapshot === null) cachedSnapshot = snapshot()
+            return cachedSnapshot
         },
         getLoadedModeIdentities: () => {
             modeCalls++
@@ -127,7 +135,8 @@ test("profile source failure is controlled, not cached, and recovers after initi
 
     assert.equal(recovered.ok, true)
     assert.equal(cached.ok, true)
-    assert.equal(snapshotCalls, 2)
+    // 每请求一次快照 getter（未初始化抛错 1 次 + 恢复 1 次 + 同实例缓存请求 1 次）
+    assert.equal(snapshotCalls, 3)
     assert.equal(modeCalls, 1)
 })
 

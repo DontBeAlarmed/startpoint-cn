@@ -341,8 +341,9 @@ export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
 
     private async doReload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
         const previous = this.snapshot
-        if (previous !== null && this.initialization !== null) {
-            // 等待在飞的 initialize 落地，避免旧值反向覆盖
+        // 无条件等待在飞的 initialize 落地：否则首次初始化在飞时 reload 抢先
+        // 替换，随后 initialize 完成链会把旧值反向覆盖（双审 P2 窗口）。
+        if (this.initialization !== null) {
             await this.initialization.catch(() => {})
         }
         if (this.runtimeState.configuration === null) {
@@ -360,7 +361,10 @@ export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
             )
         }
         this.snapshot = current
-        return { previous: previous as ContentSnapshot, current }
+        return {
+            previous: (previous ?? current) as ContentSnapshot,
+            current,
+        }
     }
 }
 
