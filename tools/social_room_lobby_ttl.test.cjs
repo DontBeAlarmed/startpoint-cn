@@ -142,8 +142,11 @@ test("TTL 过期后房间从 get_rooms 消失（边界：恰等时刻不可见�
     const before = decode(await postMulti("get_rooms", { viewer_id: friend.viewerId, party_id: 1, category_id: 2 }))
     assert.ok(before.data.rooms.some(entry => entry.room_number === roomNumber), "TTL 内可见")
 
-    // 500ms TTL：等待 800ms 后（严格 > 判定，恰等也不可见）
-    await new Promise(resolve => setTimeout(resolve, 800))
+    // 500ms TTL：服务端时间为秒截断，过期判定以秒为粒度。等待必须保证
+    // 任何写入相位下读取都跨过至少一个秒界（TTL 500ms + 1500ms 裕量；
+    // 800ms 会在写入落在秒前 ~200ms 相位时仍读同一秒，造成 ~20-30% 假失败）。
+    // 恰等时刻不可见由 expires > now 的严格大于语义保证。
+    await new Promise(resolve => setTimeout(resolve, 2000))
     const after = decode(await postMulti("get_rooms", { viewer_id: friend.viewerId, party_id: 1, category_id: 2 }))
     assert.equal(after.data.rooms.some(entry => entry.room_number === roomNumber), false, "TTL 过期后不可见")
 })
