@@ -1,4 +1,5 @@
 import * as net from "net"
+import { describeError } from "../describe-error"
 import { sessionManager, SessionClient, SessionMate } from "../state/SessionManager"
 import {
     disbandRoom,
@@ -77,7 +78,7 @@ function syncShareRow(roomNumber: string): void {
         const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
         syncRoomShareRow(roomNumber)
     } catch (error) {
-        console.warn("[LOBBY] room share sync failed", roomNumber, error)
+        console.warn("[LOBBY] room share sync failed", roomNumber, describeError(error))
     }
 }
 
@@ -760,7 +761,7 @@ function beginBattle(client: SessionClient): boolean {
     try {
         closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber)
     } catch (error) {
-        console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, error)
+        console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, describeError(error))
     }
     client.enterData = null
     return true

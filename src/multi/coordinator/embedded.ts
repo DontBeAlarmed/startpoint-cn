@@ -1,4 +1,5 @@
 import type { MultiRoom, QuestCategory } from "../types"
+import { describeError } from "../describe-error"
 import {
     createRoom as createLocalRoom,
     disbandRoom as disbandLocalRoom,
@@ -414,7 +415,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             try {
                 this.onBattleReleased(roomNumber, battleSessionId)
             } catch (error) {
-                console.warn(`[MULTI] onBattleReleased callback failed: room=${roomNumber}`, error)
+                console.warn(`[MULTI] onBattleReleased callback failed: room=${roomNumber}`, describeError(error))
             }
         }
         return true
@@ -451,7 +452,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
             syncRoomShareRow(room.room_number)
         } catch (error) {
-            console.warn(`[MULTI] node cleanup share sync failed: room=${room.room_number}`, error)
+            console.warn(`[MULTI] node cleanup share sync failed: room=${room.room_number}`, describeError(error))
         }
         return true
     }

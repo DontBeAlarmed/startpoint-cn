@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
+import { describeError } from "../describe-error"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
 import { getQuestFromCategorySync } from "../../lib/quest-content"
 import { generateDataHeaders, getServerTime } from "../../utils"
@@ -43,7 +44,7 @@ function buildFriendRoomLobby(viewerId: number, categoryId: number): Record<stri
     try {
         rows = listActiveRoomSharesSync(categoryId, nowMs)
     } catch (error) {
-        console.warn("[LOBBY] friend room registry unavailable, returning empty list", error)
+        console.warn("[LOBBY] friend room registry unavailable, returning empty list", describeError(error))
         return rooms
     }
     for (const row of rows) {

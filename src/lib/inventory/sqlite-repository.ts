@@ -1,5 +1,6 @@
 import { getDb } from "../../data/db"
 import { maybeSettleCraftPointMissions } from "./craft-point-settlement-gate"
+import type { MissionSettlementResult } from "../mission/settlement"
 import {
     InventoryTransactionError,
     InventoryValidationError,
@@ -159,7 +160,11 @@ export class InventorySqliteRepository {
         }
     }
 
-    recordPositiveObtainedSync(playerId: number, itemId: number, obtainedAmount: number): void {
+    recordPositiveObtainedSync(
+        playerId: number,
+        itemId: number,
+        obtainedAmount: number,
+    ): MissionSettlementResult | null {
         requireActiveTransaction()
         const ownerId = positiveId(playerId, "INVALID_PLAYER_ID", "playerId")
         const id = positiveId(itemId, "INVALID_ITEM_ID", "itemId")
@@ -178,10 +183,6 @@ export class InventorySqliteRepository {
               AND total_obtained >= 0
               AND total_obtained <= ? - excluded.total_obtained
         `).run(ownerId, id, obtainedAmount, MAX_SAFE_INTEGER)
-        // 锻块入账是「累计获得锻造石」事实（任务 66 族）的产生时点：当场窄域结算
-        //（门为 .cjs 惰性 require，规避低层仓库 → 任务域依赖环）
-        require("./craft-point-settlement-gate.cjs")
-            .maybeSettleCraftPointMissions(ownerId, id)
         if (result.changes !== 1) {
             const stored = getDb().prepare(`
                 SELECT total_obtained, typeof(total_obtained) AS storage_type
@@ -203,6 +204,12 @@ export class InventorySqliteRepository {
                 `collected total for item ${id} is invalid or exceeds the safe integer range`,
             )
         }
+        // 锻块入账是「累计获得锻造石」事实（任务 66 族）的产生时点：当场窄域
+        // 结算。fragment 透出给调用方（与 flush 门批量路径同语义，响应投影
+        // 复用，避免二次结算拿到「阶段已领」空结果）；此前经字面 `.cjs`
+        // 惰性 require 调用——该后缀在编译产物中不可解析（潜在
+        // MODULE_NOT_FOUND），且顶层 import 已证明依赖环不存在。
+        return maybeSettleCraftPointMissions(ownerId, id)
     }
 
     /** Batch absolute write; per-row semantics identical to writeAbsoluteItemSync. */

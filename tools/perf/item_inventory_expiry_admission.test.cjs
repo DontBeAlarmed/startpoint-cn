@@ -185,12 +185,14 @@ test("production expiry load keeps Content, SQL and transaction work bounded", (
         setPlayerItemForMaintenanceSync(singlePlayer, batchIds[0], 3)
         const single = measureSettlement(singlePlayer)
         assert.equal(single.result.status, "converted")
+        // +1 玩家读取 / +1 事务（savepoint 轮）：锻块入账门的当场窄域结算
+        //（任务 66 族在事实写入点结清，特性预期成本，仅锻块条目触发）
         assert.deepEqual(single.counts, {
             candidateReads: 1,
-            playerReads: 2,
+            playerReads: 3,
             itemWrites: 1,
             playerWrites: 1,
-            transactions: 1,
+            transactions: 2,
         })
 
         const batchPlayer = createPlayer("batch")
@@ -199,12 +201,13 @@ test("production expiry load keeps Content, SQL and transaction work bounded", (
         }
         const batch = measureSettlement(batchPlayer)
         assert.equal(batch.result.status, "converted")
+        // 同 single：锻块门的结算成本 O(1)（整批一次，不随条目数增长）
         assert.deepEqual(batch.counts, {
             candidateReads: 1,
-            playerReads: 2,
+            playerReads: 3,
             itemWrites: batchIds.length,
             playerWrites: 1,
-            transactions: 1,
+            transactions: 2,
         })
 
         assert.deepEqual(policyProbe.counts, {

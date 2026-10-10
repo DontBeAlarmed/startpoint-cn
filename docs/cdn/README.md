@@ -17,6 +17,7 @@
 - CDN 保存客户端资源归档和可提取的内容源。
 - `content:sync` 根据受支持输入生成或复用 Content Release；CDN 版本、生成器版本或服务端表注册契约变化时自动重建。
 - 内容热重载（服务端不重启）：补丁包放入 `.cdn/patches/<目标版本>/` → 管理后台「内容更新」点击应用（引擎 force sync → `reloadContentSnapshot()` 原子换运行时快照）→ 失败保留旧快照继续服务。应用期间事件循环有秒级停顿；`multi` 存量房间的 contentDigest 偏斜窗口持续到房间自然轮换；admin 立绘/头像索引在 reload 成功路径自动失效重建。
+- `/api/content-management/*`（内容状态查询 + 热更新应用）是高权限管理端点，与全部管理 API 一致由部署层负责认证：**必须经带认证的反代/部署层暴露，禁止直接对公网开放**；跨站提交风险同样由该层（同源/Origin 校验）承担。
 - `content:audit` 是显式运行的只读发布门禁：检查全部 Registry 运行表，并对任务关键表执行官方提取源一致性与引用闭包校验；它不参与服务启动。
 - Content Runtime 在进程启动时加载固定 snapshot，向业务模块提供已接入的运行表。
 - 服务端通过 Catalog 向客户端声明版本、大小和下载归档。

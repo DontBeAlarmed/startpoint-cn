@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { describeError } from "../describe-error";
 import { PrepareBody, SummonBody, RestoreRoomBody, ShareRoomBody } from "../types";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { serializeRoomStatusConnection } from "../room/serializer";
@@ -211,7 +212,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                 nowMs,
             });
         } catch (error) {
-            console.warn("[MULTI] summon candidate decision failed; serving candidates", error);
+            console.warn("[MULTI] summon candidate decision failed; serving candidates", describeError(error));
         }
 
         const mates = buildNpcMates(body.quest_id, room.value.category);
@@ -364,7 +365,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                     }),
                 })
             } catch (error) {
-                console.warn("[MULTI] room share lobby persist failed", error)
+                console.warn("[MULTI] room share lobby persist failed", describeError(error))
             }
         }
         if (wantsRecruitment) {
@@ -389,7 +390,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                 // 私服混合：发布后挂服务端 NPC 释放点（W>0 时启用；回调内惰性重读配置）
                 scheduleNpcRelease(body.room_number);
             } catch (error) {
-                console.warn("[MULTI] share_room recruitment bookkeeping failed", error);
+                console.warn("[MULTI] share_room recruitment bookkeeping failed", describeError(error));
             }
         }
 
@@ -424,7 +425,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             try {
                 closeRecruitmentForRoom(viewerId, body.room_number);
             } catch (error) {
-                console.warn("[MULTI] close recruitment on disband failed", error);
+                console.warn("[MULTI] close recruitment on disband failed", describeError(error));
             }
         }
 

@@ -1,6 +1,7 @@
 import { settleMissionCategories } from "./mission/settlement"
 import { getMissionCatalog } from "./mission/mission-catalog"
 import { DEGREE_SUPPORTED_FAMILIES } from "./mission/degree-context-requirements"
+import { getServerDate } from "../utils"
 import type { MissionSettlementResult } from "./mission/settlement"
 
 // 角色获得(新角色入队)是「持有角色数」状态事实的产生时点:任务 32 族
@@ -30,4 +31,22 @@ export function settleGachaAcquisitionMissions(
         ],
         evaluationTime,
     )
+}
+
+// 获得写入点钩子（character/equipment）的失败策略门——与锻块入账结算门
+// 同一口径：任务进度是派生态、可由下次进关全量结算修复，settle 抛错降级
+// WARN 不连坐角色/装备获得本身。in-flight 护栏同时封顶「任务奖励再发
+// 角色/装备」的重入级联（角色侧原护栏语义并入此处）。
+let settlingAtWritePoint = false
+
+export function settleAcquisitionMissionsAtWritePoint(playerId: number): void {
+    if (settlingAtWritePoint) return
+    settlingAtWritePoint = true
+    try {
+        settleGachaAcquisitionMissions(playerId, getServerDate())
+    } catch (error) {
+        console.warn("[MISSION] acquisition mission settle at write point failed", error)
+    } finally {
+        settlingAtWritePoint = false
+    }
 }

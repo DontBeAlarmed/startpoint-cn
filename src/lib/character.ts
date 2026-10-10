@@ -3,11 +3,9 @@ import { getPlayerCharacterSync, insertPlayerCharacterSync } from "../data/domai
 import type { PlayerCharacter } from "../data/types"
 import { getCharacterFacts } from "./character-content";
 import { getRealNow } from "../runtime/time/game-time";
-import { getServerDate } from "../utils";
 import { GivePlayerCharacterResult } from "./types";
 import { recordHundredCharactersMilestoneSync } from "./player-history-milestones";
-import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement";
-let settleAcquisitionMissionsReentryGuard = false;
+import { settleAcquisitionMissionsAtWritePoint } from "./gacha-acquisition-mission-settlement";
 import {
     grantCharacterExp,
     grantCharacterExpWithinTransactionSync,
@@ -77,16 +75,8 @@ function givePlayerCharacterInCurrentScopeSync(
         recordHundredCharactersMilestoneSync(playerId, joinTime)
         // 新角色入队是「持有角色数」事实的产生时点：当场结算 characters_count
         // 族/伙伴数称号族（非扭蛋路径——扭蛋已在自身奖励流内结算）。与调用方
-        // 事务同连接，原子性随宿主；复用扭蛋的窄域结算器（角色/装备种类/伙伴数）。
-        // 重入护栏：任务奖励再发角色时经 givePlayerCharacter 重入本结算，深度 1 封顶
-        if (!settleAcquisitionMissionsReentryGuard) {
-            settleAcquisitionMissionsReentryGuard = true
-            try {
-                settleGachaAcquisitionMissions(playerId, getServerDate())
-            } finally {
-                settleAcquisitionMissionsReentryGuard = false
-            }
-        }
+        // 事务同连接；失败策略随结算门（WARN 降级不连坐获得，重入深度 1 封顶）。
+        settleAcquisitionMissionsAtWritePoint(playerId)
 
         return {
             isNew: true,

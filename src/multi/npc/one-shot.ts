@@ -1,4 +1,5 @@
 import { getRoom } from "../room/manager"
+import { describeError } from "../describe-error"
 import { sessionManager } from "../state/SessionManager"
 import { advanceRecruitmentGeneration } from "../tcp/lobby"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
@@ -71,10 +72,10 @@ export function clearRoomNpcRoster(roomNumber: string, battleSessionId?: string)
             const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
             syncRoomShareRow(roomNumber)
         } catch (error) {
-            console.warn(`[MULTI] one-shot share sync failed: room=${roomNumber}`, error)
+            console.warn(`[MULTI] one-shot share sync failed: room=${roomNumber}`, describeError(error))
         }
         console.log(`[MULTI] one-shot NPC roster cleared: room=${roomNumber}`)
     } catch (error) {
-        console.warn(`[MULTI] one-shot NPC roster clear failed: room=${roomNumber}`, error)
+        console.warn(`[MULTI] one-shot NPC roster clear failed: room=${roomNumber}`, describeError(error))
     }
 }

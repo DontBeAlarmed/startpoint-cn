@@ -1,4 +1,5 @@
 import { randomBytes, randomInt } from "crypto";
+import { describeError } from "../describe-error";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getServerTime } from "../../utils";
 import { getRealNowMs } from "../../runtime/time/game-time";
@@ -329,7 +330,7 @@ export function updateRoomState(
         const { syncRoomShareRow } = require("./share-sync") as typeof import("./share-sync")
         syncRoomShareRow(roomNumber)
     } catch (error) {
-        console.warn(`[MULTI] room share sync failed: ${roomNumber}`, error)
+        console.warn(`[MULTI] room share sync failed: ${roomNumber}`, describeError(error))
     }
     return true;
 }

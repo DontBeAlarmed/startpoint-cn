@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { describeError } from "../describe-error";
 import { getRealNow } from "../../runtime/time/game-time";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
@@ -282,7 +283,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             try {
                 recordResponse(bellRecruitment.id, viewer_id, "accepted", getServerTime() * 1000);
             } catch (error) {
-                console.warn("[MULTI] bell accepted bookkeeping failed", error);
+                console.warn("[MULTI] bell accepted bookkeeping failed", describeError(error));
             }
         }
         const activeQuest = {
@@ -577,5 +578,3 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         });
     });
 }
-
-

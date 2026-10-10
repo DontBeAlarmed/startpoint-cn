@@ -1,7 +1,7 @@
 import type { Database } from "better-sqlite3"
 
 /**
- * social_room_shares 的 DDL 单一来源（双挂点：wdfpData 初始化器 + 
+ * social_room_shares 的 DDL 单一来源（双挂点：wdfpData 初始化器 +
  * openSharedSocialDb，与 social_follows/attention 同模式）。
  *
  * 好友房间大厅的招募房间注册表：share_room 持久化房主选择的可见性位

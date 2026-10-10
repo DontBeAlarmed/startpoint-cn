@@ -1,4 +1,5 @@
 import { getRoom } from "../room/manager"
+import { describeError } from "../describe-error"
 import { sessionManager } from "../state/SessionManager"
 import { scheduleLobbyTask, type LobbyLifecycleGuard } from "../tcp/lobby-lifecycle"
 import { handleEnterComs } from "../tcp/lobby"
@@ -37,14 +38,14 @@ export function scheduleNpcRelease(roomNumber: string): void {
             try {
                 fireOrReschedule(lifecycle, roomNumber)
             } catch (error) {
-                console.warn(`[MULTI] npc release failed: room=${roomNumber}`, error)
+                console.warn(`[MULTI] npc release failed: room=${roomNumber}`, describeError(error))
             }
         }, getServerGameplaySettingsSync().multiNpcReleaseSeconds * 1000)) {
             return // lobby lifecycle 未启动（如纯内存测试）：跳过，summon 路径不受影响
         }
         pendingReleases.set(roomNumber, true)
     } catch (error) {
-        console.warn(`[MULTI] npc release schedule failed: room=${roomNumber}`, error)
+        console.warn(`[MULTI] npc release schedule failed: room=${roomNumber}`, describeError(error))
     }
 }
 
@@ -74,7 +75,7 @@ function fireOrReschedule(lifecycle: LobbyLifecycleGuard, roomNumber: string): v
             try {
                 fireOrReschedule(nextLifecycle, roomNumber)
             } catch (error) {
-                console.warn(`[MULTI] npc release retry failed: room=${roomNumber}`, error)
+                console.warn(`[MULTI] npc release retry failed: room=${roomNumber}`, describeError(error))
             }
         }, remainingMs)) {
             pendingReleases.set(roomNumber, true)
@@ -110,6 +111,6 @@ export function applyNpcPostFill(roomNumber: string): void {
             refreshRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs, getRecruitmentLifetimeMs())
         }
     } catch (error) {
-        console.warn(`[MULTI] npc post-fill bookkeeping failed: room=${roomNumber}`, error)
+        console.warn(`[MULTI] npc post-fill bookkeeping failed: room=${roomNumber}`, describeError(error))
     }
 }

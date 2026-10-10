@@ -1,6 +1,7 @@
 import {
     refreshRoomShareRowSync,
 } from "../../data/domains/social-room-shares"
+import { describeError } from "../describe-error"
 
 /**
  * social_room_shares 注册行的生命周期同步（好友房间大厅）。
@@ -24,7 +25,7 @@ export function syncRoomShareRow(roomNumber: string): void {
             getShareNowMs(),
         )
     } catch (error) {
-        console.warn("[SOCIAL-SHARE] room share sync failed", roomNumber, error)
+        console.warn("[SOCIAL-SHARE] room share sync failed", roomNumber, describeError(error))
     }
 }
 
@@ -57,7 +58,7 @@ export function openRoomShareRow(input: {
             nowMs: getShareNowMs(),
         })
     } catch (error) {
-        console.warn("[SOCIAL-SHARE] room share open failed", input.roomNumber, error)
+        console.warn("[SOCIAL-SHARE] room share open failed", input.roomNumber, describeError(error))
     }
 }
 
@@ -67,7 +68,7 @@ export function deleteRoomShareRowForDisband(roomNumber: string): void {
         const { deleteRoomShareRowSync } = require("../../data/domains/social-room-shares") as typeof import("../../data/domains/social-room-shares")
         deleteRoomShareRowSync(roomNumber)
     } catch (error) {
-        console.warn("[SOCIAL-SHARE] room share disband cleanup failed", roomNumber, error)
+        console.warn("[SOCIAL-SHARE] room share disband cleanup failed", roomNumber, describeError(error))
     }
 }
 

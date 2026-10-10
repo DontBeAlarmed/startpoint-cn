@@ -21,6 +21,9 @@ import {
  * gameCalendarUtcOffsetMinutes 由服务端启动锁定的 runtimeConfig 注入——
  * 不得端点内自行 parse env（服务进程不加载 .env，错误日历的 release 重启
  * 即启动失败）。
+ *
+ * 鉴权姿态：与全部管理 API 一致，应用层不做身份校验，由部署层承担——
+ * 本端点必须经带认证的反代暴露，禁止直接对公网开放。
  */
 
 export interface ContentManagementRoutesOptions {
@@ -142,12 +145,13 @@ export function registerContentManagementRoutes(
             return reply.status(200).send({ data: outcome })
         } catch (error) {
             // performApply 内部已全兜；此 catch 防御注入依赖的意外抛错
+            // （消息同样经脱敏——与主路径同一卫生约定）
             return reply.status(200).send({
                 data: {
                     applied: false,
                     stage: "sync" as const,
                     currentVersion: currentContentState().targetVersion,
-                    note: error instanceof Error ? error.message : String(error),
+                    note: `内容更新失败（${sanitizeErrorMessage(error instanceof Error ? error.message : String(error), projectRoot)}）`,
                 },
             })
         } finally {

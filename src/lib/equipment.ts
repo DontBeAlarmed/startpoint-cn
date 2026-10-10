@@ -40,8 +40,7 @@ export function serializeFullEquipmentList(
     return list
 }
 
-import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement"
-import { getServerDate } from "../utils"
+import { settleAcquisitionMissionsAtWritePoint } from "./gacha-acquisition-mission-settlement"
 
 /**
  * Gives a player an amount of equipment.
@@ -71,7 +70,8 @@ export function givePlayerEquipmentSync(
         insertPlayerEquipmentSync(playerId, equipmentId, owned)
         // 新装备种类是 got_equip_kind_count 事实（任务 33 族）的产生时点：
         // 当场窄域结算（同角色获得钩子；max 语义对未变化族幂等无害）。
-        settleGachaAcquisitionMissions(playerId, getServerDate())
+        // 失败策略随结算门（WARN 降级不连坐获得，重入深度 1 封顶）。
+        settleAcquisitionMissionsAtWritePoint(playerId)
     } else {
         // simply increase the stack
         const newStack = owned.stack + amount

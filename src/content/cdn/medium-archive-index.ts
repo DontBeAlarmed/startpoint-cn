@@ -264,4 +264,3 @@ export function getMediumArchiveIndex(directory: string): MediumArchiveIndex {
 export function resetMediumArchiveIndexes(): void {
     indexesByDirectory.clear()
 }
-
