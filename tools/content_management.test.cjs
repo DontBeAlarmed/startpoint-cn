@@ -23,6 +23,8 @@ process.env.DATA_DIR = databaseDirectory
 const data = require("../src/data")
 const { registerContentManagementRoutes } = require("../src/routes/web_api/content-management")
 const { resetMediumArchiveIndexes } = require("../src/content/cdn/medium-archive-index")
+const { getContentSnapshot } = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 
 data.initializeDatabase()
 
@@ -31,6 +33,7 @@ let runSyncCalls
 let runSyncImpl
 let reloadImpl
 let lastReloadError
+let restoreReloadedSnapshot = null
 
 function decode(response) {
     return JSON.parse(response.body)
@@ -54,15 +57,17 @@ test.before(async () => {
         reload: async () => {
             if (lastReloadError) throw lastReloadError
             resetMediumArchiveIndexes()
-            // 模拟热重载语义：原子替换生产 provider 的快照引用（新 targetVersion）
-            const runtime = require("../src/content/runtime/content-snapshot")
-            const previous = runtime.getContentSnapshot()
-            const current = {
-                ...previous,
-                cdn: { ...previous.cdn, targetVersion: "1.4.55" },
-            }
-            runtime.productionContentSnapshotProvider.snapshot = current
-            return { previous, current }
+            // 模拟热重载语义：经统一 fixture 助手安装新 targetVersion 的冻结
+            // 快照（fixture 权威约定——业务测试不直写生产 provider 单例，
+            // 见 content_runtime_test_fixture_authority）
+            restoreReloadedSnapshot?.()
+            const previous = getContentSnapshot()
+            const installed = installFrozenTestContentSnapshot({
+                tables: {},
+                targetVersion: "1.4.55",
+            })
+            restoreReloadedSnapshot = installed.restore
+            return { previous, current: installed.snapshot }
         },
         })
     }, { prefix: "/api/content-management" })
@@ -81,6 +86,7 @@ test.before(async () => {
 })
 
 test.after(async () => {
+    restoreReloadedSnapshot?.()
     await app.close()
     data.closeDatabase()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
