@@ -64,6 +64,12 @@ const SERVER_INFRASTRUCTURE_TABLES = new Set([
     "server_gift_rewards",
     "server_news",
     "sessions",
+    // hub 共享社交层的本地库投影：social_follows 是跨节点关注关系副本
+    // （读 fail-closed 为 none，只影响发现不影响正确性）；social_room_shares
+    // 是好友房间发现注册表（15s 心跳刷新 + 30min TTL，行回收走 disband
+    // 钩子）。均为运行时共享状态，不属于玩家存档。
+    "social_follows",
+    "social_room_shares",
 ])
 
 initializeDatabase()
