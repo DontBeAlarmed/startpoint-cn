@@ -28,7 +28,10 @@ for (const [name, settlementPath, valueAdapterPath, responsePath] of [
         assert.match(source, /\{\s*settlementTime,\s*valuePlan\s*\}/)
         assert.match(source, /rewardCampaignRates[,\n]/)
         assert.match(source, /rewardDate:\s*settlementTime/)
-        assert.match(source, /recordMissionBattleFacts\(finishCtx, settlementTime\)/)
+        // 首参可为 finishCtx 或 LoseBattle 语义的展开对象
+        //（{ ...finishCtx, questAccomplished: ... }）；不变量是战斗事实
+        // 复用与价值计划同一 settlementTime
+        assert.match(source, /recordMissionBattleFacts\((?:\{\s*\.\.\.)?finishCtx[\s\S]*?,\s*settlementTime\)/)
         assert.match(source, /\.\.\.playerValues/)
         assert.match(responseSource, /"reward_pool_exp":\s*fixedPoolExpReward/)
     })

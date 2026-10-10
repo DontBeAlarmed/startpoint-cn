@@ -56,8 +56,6 @@ const SERVER_INFRASTRUCTURE_TABLES = new Set([
     "attention_deliveries",
     "attention_recruitments",
     "device_bindings",
-    // 存量漏登（dev 上即未登记，守护在 dev 同样红）；随本批一并补登恢复全绿
-    "players_mission_counters",
     "raid_event_boss_states",
     "server_gameplay_settings",
     "server_gift_codes",

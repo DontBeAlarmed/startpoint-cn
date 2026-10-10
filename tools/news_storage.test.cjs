@@ -199,7 +199,8 @@ test("validates required fields, enum ranges, and UTF-16 lengths", () => {
     assert.throws(() => validateNewsDraft(null), error => {
         assert.ok(error instanceof NewsValidationError)
         assert.ok(error instanceof TypeError)
-        assert.equal(error.message, "News validation failed")
+        // 形状原因透传给管理路由的 400 文案（不再报笼统的默认消息）
+        assert.equal(error.message, "News draft must be an object")
         return true
     })
     assert.throws(() => validateNewsDraft(null), TypeError)

@@ -49,6 +49,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
     table("players_party_member_co_clears", "missions", 3),
     table("players_party_race_clears", "missions", 3),
     table("players_mission_battle_counters", "missions", 5),
+    table("players_mission_counters", "missions", 30),
     table("players_degree_battle_stats", "missions", 8),
     table("players_degrees", "missions", 5),
     table("players_periodic_snapshots", "missions", 3),

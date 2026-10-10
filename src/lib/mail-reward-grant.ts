@@ -285,12 +285,14 @@ function settleDedicatedMailBalance(
         if (field === null) continue
         if (field === "starCrumb"
             && balance.starCrumb + mail.number > currencyPolicy.maxStarCrumb) {
-            // 降级策略(2026-10-03 用户确认):星碎片超容量时跳过该附件并告警,
-            // 不阻塞邮件其余附件的正常领取(容量仅邮件路径检查,其他路径无此限制)
-            console.warn(
-                `[MAIL] star crumb attachment skipped: balance ${balance.starCrumb} + ${mail.number} > max ${currencyPolicy.maxStarCrumb}`,
+            // 容量策略(2026-10-03 定):星碎片超容量不发放。每封邮件只有一个
+            // 附件,跳过即整封颗粒无收——静默消费会让奖励永久丢失,因此以
+            // 容量错误呈现:单件领取 400 且邮件保留(花费后可再领),批量
+            // 领取计入 blocked 继续处理其余邮件(2026-10-10 修订:原 WARN
+            // 跳过路径会照常消费邮件,造成溢出附件静默丢失)。
+            throw new MailRewardCapacityError(
+                `Star crumb attachment exceeds capacity: balance ${balance.starCrumb} + ${mail.number} > max ${currencyPolicy.maxStarCrumb}.`,
             )
-            continue
         }
         addDedicatedReward(balance, field, mail.number)
         update[field] = balance[field]

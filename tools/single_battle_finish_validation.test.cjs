@@ -109,6 +109,7 @@ async function assertRejectedWithoutWrites(harness, {
     playerOverrides,
     messagePattern = /active quest|settlement identity|boost points/i,
     expectPersistedActive = true,
+    lateFinishTerminal = false,
 }) {
     resetSettlement(harness)
     if (playerOverrides) harness.updatePlayer(playerOverrides)
@@ -127,8 +128,10 @@ async function assertRejectedWithoutWrites(harness, {
     })
     const after = captureSettlementState(harness)
 
-    assert.equal(measured.value.statusCode, 400)
-    assert.match(measured.value.message, messagePattern)
+    // 迟到 finish（payload/内存中的 play_id 与当前局不一致）走幂等零奖励
+    // 终态（200）而非 400——与多人路径同型，不结算、不消费活跃任务
+    assert.equal(measured.value.statusCode, lateFinishTerminal ? 200 : 400)
+    if (!lateFinishTerminal) assert.match(measured.value.message, messagePattern)
     assert.equal(measured.sql.writeStatements, 0)
     assert.deepEqual(after, before)
     assert.equal(after.settlement.databaseActive !== null, expectPersistedActive)
@@ -200,9 +203,10 @@ test("single finish validates settlement authority before writing", async t => {
     await withSingleBattleHarness("finish-validation", async harness => {
         const rejectionCases = [
             {
-                title: "rejects a mismatched play_id",
+                title: "returns an idempotent terminal state for a mismatched play_id",
                 name: "play-id-mismatch",
                 payloadOverrides: { play_id: "different-play-id" },
+                lateFinishTerminal: true,
             },
             ...[
                 ["quest_id", MAIN_QUEST_ID + 1],
@@ -236,11 +240,12 @@ test("single finish validates settlement authority before writing", async t => {
                 `).run("persisted-different-play-id", current.playerId),
             },
             {
-                title: "rejects a memory-only identity mismatch",
+                title: "returns an idempotent terminal state for a memory-only identity mismatch",
                 name: "memory-identity-mismatch",
                 memoryMutation: activeQuest => {
                     activeQuest.playId = "memory-different-play-id"
                 },
+                lateFinishTerminal: true,
             },
             {
                 title: "rejects a missing persisted active quest",
