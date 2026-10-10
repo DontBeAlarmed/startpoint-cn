@@ -60,10 +60,12 @@ const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) =>
         getMultiManagementService: options.getMultiManagementService ?? (() => null),
     })
     if (options.getGameCalendarUtcOffsetMinutes !== undefined) {
+        // 收窄需在闭包外完成：async 闭包不保留 `!== undefined` 的可选类型收窄
+        const getGameCalendarUtcOffsetMinutes = options.getGameCalendarUtcOffsetMinutes
         // 同步双参函数需 async 包装，否则 avvio 等待 done 直到超时（http startup failed）
         fastify.register(async instance => {
             registerContentManagementRoutes(instance, {
-                getGameCalendarUtcOffsetMinutes: options.getGameCalendarUtcOffsetMinutes,
+                getGameCalendarUtcOffsetMinutes,
             })
         }, { prefix: "/content-management" })
     }
