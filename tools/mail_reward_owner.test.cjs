@@ -69,14 +69,34 @@ function mail(id, type, typeId, number) {
     }
 }
 
+// 玛纳/角色/装备获得结算钩子会在同一事务里追加各自的窄域结算语句
+// （玩家快照读取，包裹在结算 SAVEPOINT 内）。邮件所有者路径自身必须
+// 保持快照驱动：玩家 SELECT 只允许出现在结算 SAVEPOINT 块内（钩子所有物），
+// grant 的 UPDATE players 不得依赖任何玩家读取；显式事务边界
+// （BEGIN/COMMIT/ROLLBACK）仍然禁止——嵌套只允许 better-sqlite3 的
+// SAVEPOINT/RELEASE 包装。
+function playerSelectsOutsideSettlementSavepoints(statements) {
+    let depth = 0
+    let count = 0
+    for (const raw of statements) {
+        const statement = raw.replace(/\s+/g, " ").trim()
+        if (/^SAVEPOINT\b/i.test(statement)) depth += 1
+        else if (/^(?:RELEASE|ROLLBACK)\b/i.test(statement)) depth = Math.max(0, depth - 1)
+        else if (depth === 0
+            && /^\s*SELECT/i.test(raw)
+            && /\bFROM\s+players\b/i.test(raw)) count += 1
+    }
+    return count
+}
+
 function assertOwnerSql(statements, expectedPlayerSelects = 0) {
     assert.equal(
-        statements.filter(statement => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(statement)).length,
+        playerSelectsOutsideSettlementSavepoints(statements),
         expectedPlayerSelects,
         statements.join("\n---\n"),
     )
     assert.equal(
-        statements.filter(statement => /^\s*(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(statement)).length,
+        statements.filter(statement => /^\s*(?:BEGIN|COMMIT|ROLLBACK)\b/i.test(statement)).length,
         0,
         statements.join("\n---\n"),
     )

@@ -244,7 +244,10 @@ test("real character Score group 3001 matches compatibility response without ext
     )
     assert.deepEqual(singleMeasured.result.joined_character_id_list, [])
     assert.equal(characterReadCount(singleMeasured.statements), characterReadCount(compatibilityMeasured.statements))
-    assert.equal(characterReadCount(singleMeasured.statements), 1)
+    // 基础 1 次之外，角色获得结算钩子（characters_count + cat5 学位族）
+    // 会附加一次 players_characters 事实读取——单局路径与兼容路径同享，
+    // 上面的相对断言保证两者一致
+    assert.equal(characterReadCount(singleMeasured.statements), 2)
 })
 
 test("real duplicate character Score group projects compensation delta while DB keeps final inventory", () => {

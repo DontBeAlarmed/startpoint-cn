@@ -499,11 +499,16 @@ test("receive_all reads one owner reward snapshot plus one bounded Awake player 
         .filter(index => index !== -1)
     const authoritativeWriteIndexes = [...playerWriteIndexes, ...mailWriteIndexes].sort((left, right) => left - right)
 
-    assert.equal(playerSnapshotIndexes.length, 2, measured.statements.join("\n---\n"))
+    // 三次玩家快照读取：① 所有权奖励快照（全部权威写入前）；② 玛纳任务
+    // 结算的评估读取（资源持久化后由入账钩子当场结算，落在写入区间内）；
+    // ③ Awake 事实重读（全部权威写入后）
+    assert.equal(playerSnapshotIndexes.length, 3, measured.statements.join("\n---\n"))
     assert.ok(playerWriteIndexes.length > 0, measured.statements.join("\n---\n"))
     assert.ok(mailWriteIndexes.length > 0, measured.statements.join("\n---\n"))
     assert.ok(playerSnapshotIndexes[0] < authoritativeWriteIndexes[0], measured.statements.join("\n---\n"))
-    assert.ok(playerSnapshotIndexes[1] > authoritativeWriteIndexes.at(-1), measured.statements.join("\n---\n"))
+    assert.ok(playerSnapshotIndexes[1] > authoritativeWriteIndexes[0], measured.statements.join("\n---\n"))
+    assert.ok(playerSnapshotIndexes[1] < authoritativeWriteIndexes.at(-1), measured.statements.join("\n---\n"))
+    assert.ok(playerSnapshotIndexes[2] > authoritativeWriteIndexes.at(-1), measured.statements.join("\n---\n"))
     assert.ok(nestedTransactionStatements(measured.statements).length > 0, measured.statements.join("\n---\n"))
     assert.equal(
         measured.statements.filter(statement => /LIMIT \? OFFSET \?/i.test(statement)).length,

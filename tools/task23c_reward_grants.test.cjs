@@ -132,7 +132,9 @@ test("Carnival standard callback preserves standard response, degree domain writ
     assert.equal(getPlayerItemSync(playerId, itemId), 2)
     assert.equal(getPlayerEquipmentSync(playerId, equipmentId).stack, 2)
     assert.deepEqual(getPlayerDegreeIdsSync(playerId), [degreeId])
-    assert.equal(playerAfter.freeVmoney, playerBefore.freeVmoney + 7)
+    // +10 vmoney 来自任务 33（got_equip_kind_count）阶段 1 奖励：装备获得
+    // 结算钩子在写入点同事务补发（任务写入点结算特性的预期行为）
+    assert.equal(playerAfter.freeVmoney, playerBefore.freeVmoney + 17)
     assert.equal(playerAfter.freeMana, playerBefore.freeMana + 11)
     assert.equal(playerAfter.expPool, playerBefore.expPool + 13)
     assert.equal(playerAfter.totalManaObtained, playerBefore.totalManaObtained + 11)
@@ -347,7 +349,9 @@ test("Mission standard callback grants a degree without replacing the equipped d
     assert.deepEqual(getPlayerDegreeIdsSync(playerId), [degreeId])
     assert.equal(playerAfter.degreeId, playerBefore.degreeId)
     assert.equal(getPlayerPassCardStateSync(playerId, 3).point, 10)
-    assert.equal(playerAfter.freeVmoney, playerBefore.freeVmoney + 7)
+    // +10 vmoney 来自任务 33（got_equip_kind_count）阶段 1 奖励：装备获得
+    // 结算钩子在写入点同事务补发；granter 响应投影不含钩子补发（下行断言）
+    assert.equal(playerAfter.freeVmoney, playerBefore.freeVmoney + 17)
     assert.equal(playerAfter.freeMana, playerBefore.freeMana + 11)
     assert.equal(playerAfter.expPool, playerBefore.expPool + 13)
     assert.equal(playerAfter.totalManaObtained, playerBefore.totalManaObtained + 11)

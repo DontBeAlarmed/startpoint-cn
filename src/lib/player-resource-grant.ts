@@ -100,26 +100,43 @@ export function persistPlayerResourceGrantsWithinTransactionSync(
         && normalizedAfter.freeVmoney === normalizedBefore.freeVmoney
         && normalizedAfter.expPool === normalizedBefore.expPool) return
 
+    const vmoneyDelta = normalizedAfter.freeVmoney - normalizedBefore.freeVmoney
+    const expPoolDelta = normalizedAfter.expPool - normalizedBefore.expPool
+    // 追加式（delta）持久化：同事务的结算钩子（角色/装备获得、玛纳任务）
+    // 会在调用方读取快照之后合法写入资源，绝对值 + before 相等 CAS 会把
+    // 协调写入误判为写冲突并回滚整单（2026-10-10：礼包兑换/邮件领取 500）。
+    // 写事务内不存在并发写者，delta 叠合即正确语义；守卫保留行存在性
+    // （changes=1）、结果非负与安全整数上界。
     const result = getDb().prepare(`
         UPDATE players
-        SET free_vmoney = ?, free_mana = ?, exp_pool = ?,
+        SET free_vmoney = free_vmoney + ?, free_mana = free_mana + ?,
+            exp_pool = exp_pool + ?,
             total_mana_obtained = total_mana_obtained + ?
         WHERE id = ?
-          AND free_vmoney = ?
-          AND free_mana = ?
-          AND exp_pool = ?
+          AND free_vmoney + ? >= 0
+          AND free_vmoney + ? <= ?
+          AND free_mana + ? >= 0
+          AND free_mana + ? <= ?
+          AND exp_pool + ? >= 0
+          AND exp_pool + ? <= ?
           AND typeof(total_mana_obtained) = 'integer'
           AND total_mana_obtained >= 0
           AND total_mana_obtained <= ? - ?
     `).run(
-        normalizedAfter.freeVmoney,
-        normalizedAfter.freeMana,
-        normalizedAfter.expPool,
+        vmoneyDelta,
+        manaDelta,
+        expPoolDelta,
         manaDelta,
         normalizedAfter.playerId,
-        normalizedBefore.freeVmoney,
-        normalizedBefore.freeMana,
-        normalizedBefore.expPool,
+        vmoneyDelta,
+        vmoneyDelta,
+        Number.MAX_SAFE_INTEGER,
+        manaDelta,
+        manaDelta,
+        Number.MAX_SAFE_INTEGER,
+        expPoolDelta,
+        expPoolDelta,
+        Number.MAX_SAFE_INTEGER,
         Number.MAX_SAFE_INTEGER,
         manaDelta,
     )

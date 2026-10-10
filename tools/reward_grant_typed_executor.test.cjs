@@ -278,7 +278,9 @@ test("transaction-owner binds player identity and batches repeated Item and Curr
         ))
     })()
 
-    assert.equal(measured.statements.filter(sql => /SELECT[\s\S]*FROM players\b/i.test(sql)).length, 0)
+    // 玛纳入账触发任务 40 族窄域结算：钩子自带一次评估用玩家读取
+    // （SAVEPOINT 包裹）；executor 自身的持久化仍不得读取玩家行
+    assert.equal(measured.statements.filter(sql => /SELECT[\s\S]*FROM players\b/i.test(sql)).length, 1)
     assert.equal(measured.statements.filter(sql => /SELECT[\s\S]*FROM players_items\b/i.test(sql)).length, 1)
     assert.equal(measured.statements.filter(sql => /INSERT INTO players_items/i.test(sql)).length, 1)
     assert.equal(measured.statements.filter(sql => /INSERT INTO players_collected_items/i.test(sql)).length, 1)
