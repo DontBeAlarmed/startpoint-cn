@@ -673,11 +673,12 @@ test("500-entry owner admission keeps reads and transaction structure constant",
     assert.equal(getPlayerSync(playerId).freeMana, 1000)
     assert.equal(getPlayerItemSync(playerId, COST_ITEM_ID), 500)
     assert.equal(getPlayerItemSync(playerId, REWARD_ITEM_ID), 500)
-    // One read above is the owner's after-write player snapshot for the
-    // in-transaction Active Mission publication.
+    // Owner's after-write player snapshot for the in-transaction Active
+    // Mission publication (1) + mana 奖励入账触发的玛纳任务结算钩子的评估
+    // 读取（+1，任务写入点结算特性的预期成本，整批 O(1)）。
     assert.equal(measured.statements.filter(statement => (
         /FROM players\s+WHERE id =/i.test(statement)
-    )).length, 2)
+    )).length, 3)
     assert.equal(measured.statements.filter(statement => (
         /CROSS JOIN players_shop_purchase_counters/i.test(statement)
     )).length, 1)

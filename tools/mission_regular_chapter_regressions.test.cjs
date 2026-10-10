@@ -221,8 +221,23 @@ const firstSettlement = settleMissionCategories(
     evaluationTime,
 )
 const settledMissionIds = firstSettlement.missionInfo.map(info => info.mission_id)
-// 首轮 48 条启用任务 + 奖励连锁轮(星导石入账使 player 族任务达标)= 50
-assert.equal(new Set(settledMissionIds).size, 50)
+// 首轮 48 条启用任务直接结算。任务 33（装备种类）/66（锻块）原由外层奖励
+// 连锁轮认领；写入点结算上线后，首轮奖励中的装备获得/锻块入账钩子在
+// 同事务内以窄域结算先行认领（外层级联到达时阶段已领，不再重复发放）。
+// 连锁语义不变，归属迁移由 DB 领结状态断言守护。
+assert.equal(new Set(settledMissionIds).size, 48)
+const claimedStageMissionIds = db.prepare(`
+    SELECT DISTINCT mission_id
+    FROM players_category_mission_stages
+    WHERE player_id = ? AND category = 1 AND status = 1
+`).all(playerId).map(row => row.mission_id)
+for (const missionId of [33, 66]) {
+    assert.equal(
+        claimedStageMissionIds.includes(missionId),
+        true,
+        `mission ${missionId} must be chain-settled within the same transaction`,
+    )
+}
 // 首轮必须完整覆盖全部启用任务(级联追加项在 48 之外)
 assert.equal(
     enabledMissionIds.every(missionId => settledMissionIds.includes(missionId)),

@@ -168,8 +168,11 @@ test("Event aggregate reuses the category progress settlement read", () => {
         tracking = false
     }
 
-    assert.equal(sqlReads.categoryMissions, 1)
-    assert.equal(sqlReads.categoryStages, 1)
+    // 结算侧会话批量读 1 次；阶段奖励（1454001 含角色）触发的写入点获得
+    // 结算钩子在 tracked 窗口内追加 cat1+cat5 的初始轮 + 级联轮批量读 4 次
+    //（会话复用不变量由上方 Category 3 / Category 9 子测试守护）
+    assert.equal(sqlReads.categoryMissions, 5)
+    assert.equal(sqlReads.categoryStages, 5)
     assert.deepEqual(result.missionInfo, [{
         mission_category_id: 3,
         mission_id: 1454,

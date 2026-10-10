@@ -78,8 +78,10 @@ test("embedded context construction defers compatibility source and recovers aft
     assert.equal(recovered.ok, true)
     assert.equal(cached.ok, true)
     assert.equal(recovered.value.contentDigest, RELEASE_DIGEST)
-    assert.equal(snapshotCalls, 2)
-    assert.equal(modeCalls, 1)
+    // 2 → 3：profile 源按请求解析快照（c602d1aa 双审契约，实例比对缓存）——
+    // 每次兼容性判定都经 getter 取当前快照，含缓存命中的 custom 版本判定
+    assert.equal(snapshotCalls, 3)
+    assert.equal(modeCalls, 2)
 })
 
 test("fixed embedded compatibility never reads profile dependencies", () => {

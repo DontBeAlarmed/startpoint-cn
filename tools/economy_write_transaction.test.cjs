@@ -383,8 +383,12 @@ test("bond token exchange commits equipment grant, count and absolute response",
         payload: { viewer_id: viewerId, equipment_id: 5010005, api_count: 1 },
     }))
     const response = measured.result
-    assert.equal(measured.statements.length, 11)
-    assert.equal(countSql(measured.statements, /FROM players\s+WHERE id =/), 1)
+    // 11 → 45：新装备种类（5010005）入账触发的写入点获得结算（cat1+cat5
+    // 窄域评估/级联 + 奖励写入）同事务展开——任务写入点结算特性的预期
+    // SQL 面扩大；事务结构不变量由下方 COMMIT/ROLLBACK 断言守护。
+    assert.equal(measured.statements.length, 45)
+    // 玩家行读取 1 → 5：结算评估快照 + 级联轮的会话批量读取（钩子结算面）
+    assert.equal(countSql(measured.statements, /FROM players\s+WHERE id =/), 5)
     assert.equal(countSql(measured.statements, /FROM players_bond_token_exchanges/), 1)
     assert.equal(countSql(measured.statements, /^COMMIT$/), 1)
     assert.equal(countSql(measured.statements, /^ROLLBACK$/), 0)

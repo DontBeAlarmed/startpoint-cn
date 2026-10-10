@@ -88,6 +88,10 @@ db.exec(`
         multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
         multi_rescue_host_rewards_enabled INTEGER NOT NULL DEFAULT 1,
         rush_700011_to_700017_compatibility_enabled INTEGER NOT NULL DEFAULT 1,
+        multi_random_recruitment_publish_enabled INTEGER NOT NULL DEFAULT 0,
+        multi_npc_release_seconds INTEGER NOT NULL DEFAULT 0,
+        multi_npc_close_recruitment_after_fill INTEGER NOT NULL DEFAULT 1,
+        multi_npc_one_shot_lifecycle INTEGER NOT NULL DEFAULT 0,
         updated_at TEXT NOT NULL
     );
     INSERT INTO server_gameplay_settings (id, updated_at) VALUES (1, '2026-09-10T00:00:00.000Z');

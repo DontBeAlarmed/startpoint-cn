@@ -61,10 +61,15 @@ test("Category 4 settlement uses Session then computes and writes without more f
     let sessionContexts = 0
     let computeStarted = false
     let readsAfterCompute = 0
+    let settlementSession = null
     const loads = []
     CollectComputer.buildContext = () => { throw new Error("Category 4 settlement used legacy context") }
     CollectComputer.buildContextFromSession = (...args) => {
         sessionContexts++
+        // 结算自身的会话（首个进入会话构建的实例）；阶段奖励触发的写入点
+        // 结算钩子会另建会话结算，其事实读取不属于本套件守护的
+        // 「结算会话计算后不再加载事实」不变量，按实例身份排除。
+        settlementSession ??= args[0]
         return originalSession.call(CollectComputer, ...args)
     }
     CollectComputer.compute = (...args) => {
@@ -72,11 +77,11 @@ test("Category 4 settlement uses Session then computes and writes without more f
         return originalCompute.call(CollectComputer, ...args)
     }
     MissionEvaluationSession.prototype.getFact = function trackedGetFact(...args) {
-        if (computeStarted) readsAfterCompute++
+        if (computeStarted && this === settlementSession) readsAfterCompute++
         return originalGetFact.apply(this, args)
     }
     MissionEvaluationSession.prototype.getFactFromPlan = function trackedGetFactFromPlan(...args) {
-        if (computeStarted) readsAfterCompute++
+        if (computeStarted && this === settlementSession) readsAfterCompute++
         return originalGetFactFromPlan.apply(this, args)
     }
     let settlement

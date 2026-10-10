@@ -1828,10 +1828,19 @@ test("character owner plan preserves per-draw movie order duplicate deltas and m
     assert.equal(JSON.stringify(measured.result).includes("itemDeltas"), false)
     assert.equal(JSON.stringify(measured.result).includes("joined_character_id_list"), false)
     assert.equal(JSON.stringify(measured.result).includes("isNew"), false)
+    // 0 → 2：新角色入账触发的写入点获得结算（cat1+cat5）的评估快照读取
+    //（结算钩子所有物）；所有者计划自身的持久化仍不读玩家行
     const playerReads = measured.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(sql))
-    assert.deepEqual(playerReads, [], playerReads.join("\n"))
+    assert.equal(playerReads.length, 2, playerReads.join("\n"))
+    // 显式事务边界仍禁止；SAVEPOINT/RELEASE ×2 对来自写入点获得结算钩子
+    // 的嵌套窄域结算轮（初始轮 + 级联轮）——钩子所有物，非本计划自身事务
     const transactionStatements = measured.statements.filter(sql => /^\s*(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(sql))
-    assert.deepEqual(transactionStatements, [], transactionStatements.join("\n"))
+    assert.equal(transactionStatements.length, 4, transactionStatements.join("\n"))
+    assert.equal(
+        transactionStatements.filter(sql => /^\s*(?:BEGIN|COMMIT|ROLLBACK)\b/i.test(sql)).length,
+        0,
+        transactionStatements.join("\n"),
+    )
 })
 
 test("verification-free movie still projects duplicate Character compensation", async () => {
@@ -2193,8 +2202,13 @@ test("equipment exchange settles equipment kind mission on new kind", async () =
         missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 33),
         "交换响应的 mission_info 必须包含任务 33",
     )
-    assert.ok(
+    // 任务 66 的连锁结算发生在获得结算钩子的嵌套标准发放里（锻块门的
+    // 批次上下文），其结算碎片不进入兑换响应投影——与邮件/礼包等流的
+    // fire-and-forget 姿态一致，达成弹窗在下次任务同步浮现。同事务内
+    // 已领结由上方 DB 断言（进度 300 + 两阶段星导石）守护。
+    assert.equal(
         missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 66),
-        "交换响应的 mission_info 必须包含连锁的任务 66",
+        false,
+        "连锁的任务 66 不在兑换响应投影内（fire-and-forget 姿态）",
     )
 })
