@@ -330,19 +330,24 @@ test("duplicate Character compensation flush failure rolls stack and Item back",
     assert.equal(getPlayerItemSync(playerId, COMPENSATION_ITEM_ID), null)
 })
 
-test("transaction-owner rejects stale Player resource state without partial update", () => {
+test("transaction-owner composes grants over same-transaction resource writes", () => {
+    // F10 修订后的契约：写事务内不存在并发写者，调用方快照陈旧（同事务的
+    // 结算钩子在读取之后合法写入资源）时不再拒写，而是追加合成——钩子写入
+    // 不丢失、不被 clobber，total_mana_obtained 只按本次 delta 递增。
     const playerId = createPlayer("stale-resource")
     const before = knownPlayer(playerId)
-    assert.throws(() => getDb().transaction(() => {
+    const totalManaBefore = getPlayerSync(playerId).totalManaObtained
+    getDb().transaction(() => {
         updatePlayerSync({ id: playerId, freeMana: before.freeMana + 1 })
         executeRewardGrantExecutionPlanAsTransactionOwnerSync(
             playerId,
             createRewardGrantExecutionPlan([{ type: RewardType.MANA, count: 2 }]),
             before,
         )
-    })(), error => error instanceof PlayerResourceGrantError
-        && error.field === "totalManaObtained")
-    assert.equal(getPlayerSync(playerId).freeMana, before.freeMana)
+    })()
+    const after = getPlayerSync(playerId)
+    assert.equal(after.freeMana, before.freeMana + 3)
+    assert.equal(after.totalManaObtained, totalManaBefore + 2)
 })
 
 test("typed execution normalizes forged plan containers before any write", () => {
