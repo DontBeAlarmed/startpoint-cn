@@ -118,7 +118,8 @@ test("admin news routes support ordinary announcement CRUD with exact revisions"
 test("admin news routes reject invalid requests and unknown announcements", async () => {
     const invalid = await inject("POST", "/api/news", { ...draft, label: 9 })
     assert.equal(invalid.statusCode, 400)
-    assert.deepEqual(json(invalid), { error: "公告内容无效" })
+    // NewsValidationError 的具体字段原因透传到 400 文案（不再笼统）
+    assert.deepEqual(json(invalid), { error: "公告内容无效：标签 必须是 1 到 8 的整数" })
 
     assert.equal((await inject("GET", "/api/news/999999")).statusCode, 404)
     assert.deepEqual(
@@ -138,14 +139,14 @@ test("admin news routes reject invalid requests and unknown announcements", asyn
             revision,
         })
         assert.equal(invalidUpdateRevision.statusCode, 400, String(revision))
-        assert.deepEqual(json(invalidUpdateRevision), { error: "公告内容无效" })
+        assert.match(json(invalidUpdateRevision).error, /^公告内容无效/)
 
         const invalidToggleRevision = await inject("PATCH", "/api/news/999999/enabled", {
             enabled: true,
             revision,
         })
         assert.equal(invalidToggleRevision.statusCode, 400, String(revision))
-        assert.deepEqual(json(invalidToggleRevision), { error: "公告内容无效" })
+        assert.match(json(invalidToggleRevision).error, /^公告内容无效/)
     }
 })
 

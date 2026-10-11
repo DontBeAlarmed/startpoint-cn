@@ -28,6 +28,15 @@ function createSandbox(t) {
         contentRuntimeDir: path.join(projectRoot, "assets"),
     }
     fs.mkdirSync(paths.cdnRoot, { recursive: true })
+    // server 表（SERVER_TABLE_NAMES）从 <projectRoot>/assets/ 读取，
+    // 沙盒按仓库自带的同名资产播种
+    fs.mkdirSync(paths.contentRuntimeDir, { recursive: true })
+    for (const tableName of ["cdn_general_shop_whitelist.json", "config.json", "payment_products.json"]) {
+        fs.copyFileSync(
+            path.join(__dirname, "..", "..", "assets", tableName),
+            path.join(paths.contentRuntimeDir, tableName),
+        )
+    }
     t.after(() => fs.rmSync(projectRoot, { force: true, recursive: true }))
     return { paths, projectRoot }
 }

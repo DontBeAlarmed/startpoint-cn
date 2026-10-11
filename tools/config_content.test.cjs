@@ -26,6 +26,8 @@ function rawConfig(overrides = {}) {
         max_virtual_money: 999999,
         max_mana: 99999999,
         max_star_crumb: 9999,
+        newbie_rank: 80,
+        newbie_days: 30,
         stamina_recovery_virtual_money: 50,
         stamina_recovery_seconds: 300,
         stamina_recovery_value: 100,
@@ -61,7 +63,13 @@ test("narrow Config policies cache by repository identity and read raw Config on
     const first = countedRepository(rawConfig())
     const currency = getCurrencyCapacityPolicySync(first.repository)
     assert.strictEqual(getCurrencyCapacityPolicySync(first.repository), currency)
-    assert.deepEqual(currency, { maxVmoney: 999999, maxMana: 99999999, maxStarCrumb: 9999 })
+    assert.deepEqual(currency, {
+        maxVmoney: 999999,
+        maxMana: 99999999,
+        maxStarCrumb: 9999,
+        newbieRank: 80,
+        newbieDays: 30,
+    })
     assert.deepEqual(getStaminaPolicySync(first.repository), {
         recoveryVmoneyCost: 50,
         recoverySeconds: 300,
@@ -96,6 +104,8 @@ test("each policy validates only its consumed fields and preserves zero semantic
         max_virtual_money: 0,
         max_mana: 0,
         max_star_crumb: 0,
+        newbie_rank: 0,
+        newbie_days: 0,
         stamina_recovery_virtual_money: 0,
         stamina_recovery_value: 0,
         max_stamina_overflow: 0,
@@ -109,6 +119,8 @@ test("each policy validates only its consumed fields and preserves zero semantic
         maxVmoney: 0,
         maxMana: 0,
         maxStarCrumb: 0,
+        newbieRank: 0,
+        newbieDays: 0,
     })
     assert.deepEqual(getEquipmentCurrencyPolicySync(zeros.repository), {
         craftPointItemId: 100000,

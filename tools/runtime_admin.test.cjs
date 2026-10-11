@@ -63,17 +63,20 @@ test("admin UI owns root, compatibility redirects, assets, and client routes", a
     await app.ready()
     t.after(() => app.close())
 
+    // 旧页面 URL 已退役（0a115d13）：仅 / 与 /admin 重定向进后台，
+    // /player /mail /seeds 不再挂 shim，落到 404（不回 admin shell）
     for (const [url, location] of [
         ["/", "/admin/"],
         ["/admin", "/admin/"],
-        ["/player", "/admin/accounts"],
-        ["/player/42", "/admin/players/42"],
-        ["/mail", "/admin/mail"],
-        ["/seeds", "/admin/seeds"],
     ]) {
         const response = await app.inject({ method: "GET", url })
         assert.equal(response.statusCode, 302, url)
         assert.equal(response.headers.location, location, url)
+    }
+    for (const url of ["/player", "/player/42", "/mail", "/seeds"]) {
+        const retired = await app.inject({ method: "GET", url })
+        assert.equal(retired.statusCode, 404, url)
+        assert.doesNotMatch(retired.body, /admin shell/, url)
     }
 
     const clientRoute = await app.inject({ method: "GET", url: "/admin/accounts/active" })
@@ -207,8 +210,9 @@ test("legacy admin Tailwind build chain and assets are removed", () => {
 
 test("operator copy and embedded docs describe one required built-in admin", () => {
     const dashboard = fs.readFileSync(path.join(repositoryRoot, "admin/src/pages/Dashboard.tsx"), "utf8")
-    assert.match(dashboard, /唯一内置管理后台/)
-    assert.doesNotMatch(dashboard, /新版 React 管理后台|旧后台页面保持冻结/)
+    // hero note 已随 095f0e6 删除（单一后台无需再自我说明）；
+    // 不得回退到双后台时期的措辞
+    assert.doesNotMatch(dashboard, /唯一内置管理后台|新版 React 管理后台|旧后台页面保持冻结/)
 
     const embeddedContract = fs.readFileSync(path.join(repositoryRoot, "docs/embedded-runtime-contract.md"), "utf8")
     assert.match(embeddedContract, /必需管理后台产物/)

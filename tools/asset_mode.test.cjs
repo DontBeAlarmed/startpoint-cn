@@ -428,8 +428,10 @@ test("non-local snapshot initialization ignores CDN_DIR and uses bundled 1.4.54 
         generatorVersion: 3,
         gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: null,
-        contentDigest: "sha256:a8949d32877de0dc0a689159a0f329789d579fadde1204252df97f23a15bc198",
-        multiBattleContentDigest: "sha256:be3d9148c416cf089156d1003b274c25cc5c00165eb117854d2ab7b414d8fa29",
+        // 10-06 assets/config.json（max_star_crumb 等）变更后 bundled digest
+        // 失同步——按 9dca3130 先例重算钉值（digest 由仓库冻结资产决定）
+        contentDigest: "sha256:19cbd24077d82171dd0a88079802ac2264799c48dec1f23851ae2cad99d62a14",
+        multiBattleContentDigest: "sha256:172f9c4ec4e400727ea73a2db814cf7a85a349115a246a8751c765a4c9784c09",
     })
     assert.equal(localValidationCalls, 0)
 })

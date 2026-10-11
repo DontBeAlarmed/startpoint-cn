@@ -392,8 +392,21 @@ transactionDb.exec(`
         play_id TEXT NOT NULL,
         quest_id INTEGER NOT NULL,
         category INTEGER NOT NULL,
+        use_boss_boost_point INTEGER NOT NULL DEFAULT 0,
+        use_boost_point INTEGER NOT NULL DEFAULT 0,
+        is_auto_start_mode INTEGER NOT NULL DEFAULT 0,
+        is_multi INTEGER NOT NULL DEFAULT 0,
+        room_number TEXT,
+        battle_session_id TEXT,
+        coordinator_origin TEXT,
         entry_item_id INTEGER,
-        entry_item_count INTEGER
+        entry_item_count INTEGER,
+        stamina_cost INTEGER,
+        daily_challenge_point_id INTEGER,
+        event_id INTEGER,
+        rescue_fragment_eligible INTEGER NOT NULL DEFAULT 0,
+        newbie_rescue_eligible INTEGER NOT NULL DEFAULT 0,
+        continue_count INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE players_items (
         player_id INTEGER NOT NULL,
@@ -401,8 +414,9 @@ transactionDb.exec(`
         amount INTEGER NOT NULL,
         PRIMARY KEY (player_id, id)
     );
-    INSERT INTO players_active_quests VALUES
-        (7, 'ticket-play-1', 200076009, 7, 10000072, 1);
+    INSERT INTO players_active_quests
+        (player_id, play_id, quest_id, category, entry_item_id, entry_item_count)
+    VALUES (7, 'ticket-play-1', 200076009, 7, 10000072, 1);
     INSERT INTO players_items VALUES (7, 10000072, 0);
     CREATE TRIGGER reject_active_delete
     BEFORE DELETE ON players_active_quests
@@ -529,6 +543,15 @@ activeQuestStorage.ensureActiveQuestRescueFragmentEligibilityStorageSync(legacyD
 assert.ok(
     legacyDb.prepare("PRAGMA table_info(players_active_quests)").all()
         .some(column => column.name === "rescue_fragment_eligible"),
+)
+assert.equal(
+    typeof activeQuestStorage.ensureActiveQuestNewbieRescueEligibilityStorageSync,
+    "function",
+)
+activeQuestStorage.ensureActiveQuestNewbieRescueEligibilityStorageSync(legacyDb)
+assert.ok(
+    legacyDb.prepare("PRAGMA table_info(players_active_quests)").all()
+        .some(column => column.name === "newbie_rescue_eligible"),
 )
 
 const dbModulePath = require.resolve("../src/data/db")
