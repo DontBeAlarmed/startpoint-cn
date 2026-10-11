@@ -64,7 +64,9 @@ export default function ContentManagement() {
     })
 
     const stateData = state.data
-    const busy = stateData?.busy === true || apply.isPending
+    // 初始拉取期间同样视为 busy：状态未知时不给点应用（apply 的前置 check
+    // 虽会兜底，但页面不应呈现"看似加载中、按钮却可点"的矛盾态）
+    const busy = state.isPending || stateData?.busy === true || apply.isPending
     const upToDate = stateData?.pending?.upToDate === true
 
     return (
