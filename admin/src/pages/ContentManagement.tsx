@@ -1,8 +1,9 @@
 import { useState } from "react"
 
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Alert, Button, Card, Descriptions, Typography } from "antd"
 
+import { AdminPage } from "../components/AdminPage"
 import { apiGet, apiPost } from "../api/client"
 
 interface PendingContentCheck {
@@ -34,6 +35,13 @@ interface ApplyOutcome {
 /** 内容管理：线上内容热更新（补丁包应用 → 运行时快照热重载，服务端不重启）。 */
 export default function ContentManagement() {
     const [lastError, setLastError] = useState<string | null>(null)
+    const queryClient = useQueryClient()
+
+    // 与 Dashboard 同款页头刷新：手动拉取最新待应用状态
+    //（全局关闭了 refetchOnWindowFocus，放补丁后靠此按钮或重进页面解灰）
+    const refreshState = () => {
+        queryClient.invalidateQueries({ queryKey: ["content-management"] })
+    }
 
     const state = useQuery({
         queryKey: ["content-management", "state"],
@@ -60,7 +68,14 @@ export default function ContentManagement() {
     const upToDate = stateData?.pending?.upToDate === true
 
     return (
-        <Card title="内容热更新" style={{ maxWidth: 720 }}>
+        <AdminPage
+            eyebrow="OPERATIONS"
+            title="内容热更新"
+            description="查看当前内容快照与磁盘待应用状态，应用补丁包并热重载（进程不重启）。"
+            onRefresh={refreshState}
+            refreshing={state.isFetching}
+        >
+        <Card style={{ maxWidth: 720 }}>
             <Typography.Paragraph type="secondary">
                 把补丁包放入 .cdn/patches/&lt;目标版本&gt;/ 后，点击「应用内容更新」：
                 服务端同步并热重载内容快照（进程不重启）。应用期间线上服务会短暂卡顿，
@@ -136,5 +151,6 @@ export default function ContentManagement() {
                 应用内容更新
             </Button>
         </Card>
+        </AdminPage>
     )
 }
