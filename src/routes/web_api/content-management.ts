@@ -13,10 +13,12 @@ import {
 /**
  * 内容管理（管理后台）：线上内容热更新。
  *
- * 「应用内容更新」= content:sync（force，读 .cdn/patches/<版本>）→ 成功后
- * reloadContentSnapshot()（原子换运行时快照）。任何一步失败保留旧快照继续
- * 服务（fail-safe），返回结构化结果供前端展示；磁盘上 current 可能已翻转
- * （重启将生效新版本），失败响应会明示。
+ * 「应用内容更新」= content:sync 前置 check（秒级扫描 + digest 比对，不取锁
+ * 不重建）→ 磁盘已是最新则直接返回不动作；有待应用更新才进 force 全量重建
+ * （读 .cdn/patches/<版本>）→ 成功后 reloadContentSnapshot()（原子换运行时
+ * 快照）。任何一步失败保留旧快照继续服务（fail-safe），返回结构化结果供
+ * 前端展示；磁盘上 current 可能已翻转（重启将生效新版本），失败响应会明示。
+ * /state 附带同一 check 的待应用状态（pending），前端据此置灰无更新时的按钮。
  *
  * gameCalendarUtcOffsetMinutes 由服务端启动锁定的 runtimeConfig 注入——
  * 不得端点内自行 parse env（服务进程不加载 .env，错误日历的 release 重启
@@ -42,6 +44,15 @@ interface ApplyOutcome {
     currentVersion: string
     releaseDigest?: string
     note?: string
+    /** applied=false 且因磁盘无新内容跳过（前置 check 判定 up-to-date）。 */
+    upToDate?: boolean
+}
+
+interface PendingContentCheck {
+    /** 磁盘待应用内容的版本（check 扫描结果）。 */
+    diskVersion: string
+    reason: string
+    upToDate: boolean
 }
 
 let applyInFlight: Promise<ApplyOutcome> | null = null
@@ -56,6 +67,30 @@ function currentContentState() {
     }
 }
 
+async function runPendingContentCheck(
+    projectRoot: string,
+    gameCalendarUtcOffsetMinutes: number,
+    runSync: (options: Parameters<typeof runContentSync>[0]) => Promise<ContentSyncResult>,
+): Promise<PendingContentCheck | null> {
+    try {
+        const check = await runSync({
+            projectRoot,
+            env: process.env,
+            mode: "check",
+            gameCalendarUtcOffsetMinutes,
+        })
+        return {
+            diskVersion: check.targetVersion,
+            reason: check.reason,
+            upToDate: check.reason === "up-to-date",
+        }
+    } catch {
+        // check 不可用（磁盘异常等）时状态未知：返回 null，前端不置灰，
+        // 由 apply 的权威前置 check 兜底
+        return null
+    }
+}
+
 async function performApply(
     projectRoot: string,
     gameCalendarUtcOffsetMinutes: number,
@@ -63,6 +98,33 @@ async function performApply(
     reload: typeof reloadContentSnapshot,
 ): Promise<ApplyOutcome> {
     const before = currentContentState()
+    try {
+        // 前置 check（秒级扫描 + digest 比对，不取锁不重建）：磁盘已是最新
+        // 则不进 force——避免无变化时的全量重建与 reload 停顿。check 失败
+        // 视为同步失败（force 依赖同一扫描/读取，失败原因一致）。
+        const pending = await runSync({
+            projectRoot,
+            env: process.env,
+            mode: "check",
+            gameCalendarUtcOffsetMinutes,
+        })
+        if (pending.reason === "up-to-date") {
+            return {
+                applied: false,
+                upToDate: true,
+                currentVersion: before.targetVersion,
+                note: "磁盘内容已是最新，未执行重建与热重载",
+            }
+        }
+    } catch (error) {
+        return {
+            applied: false,
+            stage: "sync",
+            currentVersion: before.targetVersion,
+            note: `内容同步失败：旧内容继续服务（${sanitizeErrorMessage(error instanceof Error ? error.message : String(error), projectRoot)}）`,
+        }
+    }
+
     let syncResult: ContentSyncResult
     try {
         // sync 失败（含 lock 超时）以异常呈现：旧内容继续服务
@@ -115,11 +177,17 @@ export function registerContentManagementRoutes(
 
     fastify.get("/state", async (_request: FastifyRequest, reply: FastifyReply) => {
         const state = currentContentState()
+        const pending = await runPendingContentCheck(
+            projectRoot,
+            gameCalendarUtcOffsetMinutes,
+            runSync,
+        )
         return reply.status(200).send({
             targetVersion: state.targetVersion,
             contentDigest: state.contentDigest,
             appliedAt: lastAppliedAt,
             busy: applyInFlight !== null,
+            pending,
         })
     })
 

@@ -31,7 +31,7 @@ data.initializeDatabase()
 let app
 let runSyncCalls
 let runSyncImpl
-let reloadImpl
+let reloadCalls
 let lastReloadError
 let restoreReloadedSnapshot = null
 
@@ -55,6 +55,7 @@ test.before(async () => {
             return runSyncImpl(options)
         },
         reload: async () => {
+            reloadCalls.push(1)
             if (lastReloadError) throw lastReloadError
             resetMediumArchiveIndexes()
             // 模拟热重载语义：经统一 fixture 助手安装新 targetVersion 的冻结
@@ -81,7 +82,7 @@ test.before(async () => {
         reason: "source-state",
         releaseDigest: `sha256:${"a".repeat(64)}`,
     })
-    reloadImpl = null
+    reloadCalls = []
     lastReloadError = null
 })
 
@@ -104,7 +105,8 @@ test("GET /state 返回当前内容版本与 busy 标志", async () => {
     assert.equal(payload.appliedAt, null)
 })
 
-test("apply 成功：sync → reload 串联并返回新旧版本", async () => {
+test("apply 成功：check → force → reload 串联并返回新旧版本", async () => {
+    runSyncCalls.length = 0
     const response = await app.inject({
         method: "POST",
         url: "/api/content-management/apply",
@@ -114,9 +116,76 @@ test("apply 成功：sync → reload 串联并返回新旧版本", async () => {
     const payload = decode(response)
     assert.equal(payload.data.applied, true)
     assert.equal(payload.data.currentVersion, "1.4.55")
-    assert.equal(runSyncCalls.length, 1)
-    assert.equal(runSyncCalls[0].mode, "force")
-    assert.equal(runSyncCalls[0].gameCalendarUtcOffsetMinutes, 480, "日历偏移必须来自注入的启动锁定值")
+    // 前置 check（无锁扫描比对）+ force 全量重建，两段调用
+    assert.equal(runSyncCalls.length, 2)
+    assert.deepEqual(runSyncCalls.map(call => call.mode), ["check", "force"])
+    for (const call of runSyncCalls) {
+        assert.equal(call.gameCalendarUtcOffsetMinutes, 480, "日历偏移必须来自注入的启动锁定值")
+    }
+})
+
+test("apply 在磁盘已是最新时不进 force（前置 check 短路）", async () => {
+    runSyncCalls.length = 0
+    reloadCalls.length = 0
+    runSyncImpl = async options => {
+        if (options.mode === "check") {
+            return {
+                status: "check",
+                action: "skip",
+                targetVersion: "1.4.54",
+                currentVersion: "1.4.54",
+                reason: "up-to-date",
+            }
+        }
+        throw new Error("force must not run when up-to-date")
+    }
+    const response = await app.inject({
+        method: "POST",
+        url: "/api/content-management/apply",
+        payload: {},
+    })
+    assert.equal(response.statusCode, 200)
+    const payload = decode(response)
+    assert.equal(payload.data.applied, false)
+    assert.equal(payload.data.upToDate, true)
+    assert.ok(payload.data.note.includes("已是最新"))
+    assert.equal(runSyncCalls.length, 1, "只有前置 check，force 不得执行")
+    assert.equal(reloadCalls.length, 0, "无新内容不得热重载")
+})
+
+test("/state 的 pending 反映磁盘待应用状态", async () => {
+    runSyncImpl = async () => ({
+        status: "check",
+        action: "synchronize",
+        targetVersion: "1.4.55",
+        currentVersion: "1.4.54",
+        reason: "source-state",
+    })
+    const pendingUpdate = decode(await app.inject({ method: "GET", url: "/api/content-management/state" }))
+    assert.deepEqual(pendingUpdate.pending, {
+        diskVersion: "1.4.55",
+        reason: "source-state",
+        upToDate: false,
+    })
+
+    runSyncImpl = async () => ({
+        status: "check",
+        action: "skip",
+        targetVersion: "1.4.54",
+        currentVersion: "1.4.54",
+        reason: "up-to-date",
+    })
+    const pendingFresh = decode(await app.inject({ method: "GET", url: "/api/content-management/state" }))
+    assert.equal(pendingFresh.pending.upToDate, true)
+    assert.equal(pendingFresh.pending.diskVersion, "1.4.54")
+})
+
+test("/state 在磁盘检查不可用时 pending 为 null（不置灰，由 apply 兜底）", async () => {
+    runSyncImpl = async () => { throw new Error("disk exploded") }
+    const response = await app.inject({ method: "GET", url: "/api/content-management/state" })
+    assert.equal(response.statusCode, 200)
+    const payload = decode(response)
+    assert.equal(payload.pending, null)
 })
 
 test("apply 期间并发调用返回 409", async () => {

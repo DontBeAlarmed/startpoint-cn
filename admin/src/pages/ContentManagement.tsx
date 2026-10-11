@@ -5,11 +5,19 @@ import { Alert, Button, Card, Descriptions, Typography } from "antd"
 
 import { apiGet, apiPost } from "../api/client"
 
+interface PendingContentCheck {
+    diskVersion: string
+    reason: string
+    upToDate: boolean
+}
+
 interface ContentState {
     targetVersion: string
     contentDigest: string
     appliedAt: string | null
     busy: boolean
+    /** 磁盘待应用状态（check 不可用时为 null，按钮不置灰）。 */
+    pending: PendingContentCheck | null
 }
 
 interface ApplyOutcome {
@@ -19,6 +27,8 @@ interface ApplyOutcome {
     currentVersion: string
     releaseDigest?: string
     note?: string
+    /** applied=false 且因磁盘无新内容跳过（前置 check 判定 up-to-date）。 */
+    upToDate?: boolean
 }
 
 /** 内容管理：线上内容热更新（补丁包应用 → 运行时快照热重载，服务端不重启）。 */
@@ -34,7 +44,7 @@ export default function ContentManagement() {
         mutationFn: () => apiPost<{ data: ApplyOutcome }>("/api/content-management/apply"),
         onSuccess: result => {
             setLastError(null)
-            if (!result.data.applied) {
+            if (!result.data.applied && !result.data.upToDate) {
                 setLastError(result.data.note ?? "应用失败")
             }
             state.refetch()
@@ -47,6 +57,7 @@ export default function ContentManagement() {
 
     const stateData = state.data
     const busy = stateData?.busy === true || apply.isPending
+    const upToDate = stateData?.pending?.upToDate === true
 
     return (
         <Card title="内容热更新" style={{ maxWidth: 720 }}>
@@ -54,6 +65,7 @@ export default function ContentManagement() {
                 把补丁包放入 .cdn/patches/&lt;目标版本&gt;/ 后，点击「应用内容更新」：
                 服务端同步并热重载内容快照（进程不重启）。应用期间线上服务会短暂卡顿，
                 请避免在高峰时段操作。客户端将在下一次战斗结束/重新登录时自动拉取新内容。
+                磁盘内容已是最新时按钮置灰，应用请求也会被前置检查直接跳过。
             </Typography.Paragraph>
 
             {stateData && (
@@ -63,6 +75,17 @@ export default function ContentManagement() {
                         <Typography.Text code style={{ fontSize: 12 }}>
                             {stateData.contentDigest}
                         </Typography.Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="待应用状态">
+                        {stateData.pending === null ? (
+                            <Typography.Text type="warning">状态未知（磁盘检查不可用）</Typography.Text>
+                        ) : stateData.pending.upToDate ? (
+                            <Typography.Text type="secondary">磁盘内容已是最新</Typography.Text>
+                        ) : (
+                            <Typography.Text type="success">
+                                {`有待应用更新（${stateData.targetVersion} → ${stateData.pending.diskVersion}，${stateData.pending.reason}）`}
+                            </Typography.Text>
+                        )}
                     </Descriptions.Item>
                     <Descriptions.Item label="上次应用">
                         {stateData.appliedAt ?? "本次进程内尚未应用（重启后清空）"}
@@ -82,6 +105,17 @@ export default function ContentManagement() {
                 />
             )}
 
+            {apply.data && apply.data.data.upToDate && (
+                <Alert
+                    type="info"
+                    showIcon
+                    message="磁盘内容已是最新"
+                    description={apply.data.data.note}
+                    style={{ marginBottom: 16 }}
+                    closable
+                />
+            )}
+
             {apply.data && apply.data.data.applied && (
                 <Alert
                     type="success"
@@ -97,7 +131,7 @@ export default function ContentManagement() {
                 type="primary"
                 loading={busy}
                 onClick={() => apply.mutate()}
-                disabled={busy}
+                disabled={busy || upToDate}
             >
                 应用内容更新
             </Button>
