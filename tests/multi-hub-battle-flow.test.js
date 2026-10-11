@@ -659,20 +659,8 @@ test("finishPlayer requires first success, rejects duplicate, and reuses one pay
     ))
 })
 
-test("finishPlayer rejects an unsuccessful first finish and successful duplicate", async t => {
-    const cases = [
-        [
-            { status: 200, body: { data_headers: { result_code: 4 } } },
-            { status: 400, body: { data_headers: { result_code: 4 } } },
-            "finish response failed",
-        ],
-        [
-            { status: 200, body: { data_headers: { result_code: 1 } } },
-            { status: 200, body: { data_headers: { result_code: 1 } } },
-            "duplicate finish response failed",
-        ],
-    ]
-    for (const [first, duplicate, expected] of cases) {
+test("finishPlayer rejects an unsuccessful first finish but accepts a replayed duplicate", async t => {
+    const rejected = async (first, duplicate, expected) => {
         const database = createSettlementDatabase()
         t.after(() => database.close())
         const harness = settlementHarness(database, { responses: [first, duplicate] })
@@ -686,6 +674,38 @@ test("finishPlayer rejects an unsuccessful first finish and successful duplicate
             error => error.message === expected,
         )
     }
+
+    // 首次 finish 失败仍然拒绝（终态回放只属于已成功的首次结算）
+    await rejected(
+        { status: 200, body: { data_headers: { result_code: 4 } } },
+        { status: 400, body: { data_headers: { result_code: 4 } } },
+        "finish response failed",
+    )
+    // 首次成功后，重复 finish 两种结果都合法（multi 终态幂等，2026-10-11）：
+    // 被拒（房间终态拒绝一侧）或回放 200 响应——不二次结算由 settle 与
+    // duplicate 的状态深度相等断言守护
+    const accepted = async (duplicate) => {
+        const database = createSettlementDatabase()
+        t.after(() => database.close())
+        const state = await finishPlayer(
+            settlementHarness(database, {
+                responses: [
+                    { status: 200, body: { data_headers: { result_code: 1 } } },
+                    duplicate,
+                ],
+            }),
+            {
+                dataKey: "identity",
+                playerId: 2,
+                url: "http://game.invalid",
+                viewerId: "viewer-1",
+            },
+            finishOptions(),
+        )
+        assert.notEqual(state, null)
+    }
+    await accepted({ status: 400, body: { data_headers: { result_code: 4 } } })
+    await accepted({ status: 200, body: { data_headers: { result_code: 1 } } })
 })
 
 test("finishPlayer caches schema metadata and only snapshots player-owned tables", async t => {

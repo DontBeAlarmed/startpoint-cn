@@ -292,8 +292,10 @@ test("scenario summaries run after SQL and compute metrics are frozen", async ()
 
 test("finish SQL metrics exclude post-settlement behavior reads", () => {
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
-    assert.equal(snapshot.scenarios["single-battle-finish"].sqlReads, 38)
-    assert.equal(snapshot.scenarios["multi-battle-finish"].sqlReads, 40)
+    // 2026-10-11 重认收（写入点结算语义）：任务认领随写入点前移，finish
+    // 边界的候选与计算量下降（与基线结构钉值同一成因）
+    assert.equal(snapshot.scenarios["single-battle-finish"].sqlReads, 33)
+    assert.equal(snapshot.scenarios["multi-battle-finish"].sqlReads, 39)
 })
 
 test("finish summaries cover only computed standard refs and enabled Awake refs", () => {
