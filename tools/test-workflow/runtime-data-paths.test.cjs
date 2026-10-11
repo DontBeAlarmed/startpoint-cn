@@ -123,13 +123,15 @@ test("prepares the data root and state directory repeatedly", t => {
 })
 
 for (const { fileName, targetKey } of STATE_CASES) {
-    test(`migrates ${fileName} through its fixed temporary file and rename`, t => {
+    test(`migrates ${fileName} through a unique temporary file and rename`, t => {
         const dataDir = createTemporaryDirectory()
         t.after(() => removeTemporaryDirectory(dataDir))
         const paths = resolveRuntimeDataPaths({ DATA_DIR: dataDir })
         const source = path.join(dataDir, fileName)
         const target = paths[targetKey]
-        const temporary = fixedTemporaryFile(paths, fileName)
+        // S6：迁移 tmp 使用唯一名（pid+随机段），固定 .migrate.tmp 成为
+        // 被清扫的遗留名
+        const uniqueTemporaryPattern = /^\..+\.migrate\.\d+\.[a-z0-9]+\.tmp$/
         const renames = []
         fs.writeFileSync(source, `legacy-${fileName}`)
         const tracingFileSystem = {
@@ -142,10 +144,13 @@ for (const { fileName, targetKey } of STATE_CASES) {
 
         prepareDataVolume(paths, tracingFileSystem)
 
-        assert.deepEqual(renames, [[temporary, target]])
+        assert.equal(renames.length, 1)
+        assert.match(path.basename(renames[0][0]), uniqueTemporaryPattern)
+        assert.equal(path.dirname(renames[0][0]), paths.stateDir)
+        assert.equal(renames[0][1], target)
         assert.equal(fs.readFileSync(target, "utf8"), `legacy-${fileName}`)
         assert.equal(fs.existsSync(source), false)
-        assert.equal(fs.existsSync(temporary), false)
+        assert.equal(fs.existsSync(renames[0][0]), false)
     })
 
     test(`keeps canonical ${fileName} and removes a stale legacy source`, t => {
@@ -216,7 +221,7 @@ test("retries legacy cleanup after canonical publication when deletion fails", t
     assert.equal(fs.readFileSync(paths.activeAccountFile, "utf8"), "canonical-state")
 })
 
-test("reports a fixed temporary file cleanup failure and retries later", t => {
+test("legacy fixed temporary cleanup failure degrades to WARN and migration still completes", t => {
     const dataDir = createTemporaryDirectory()
     t.after(() => removeTemporaryDirectory(dataDir))
     const paths = resolveRuntimeDataPaths({ DATA_DIR: dataDir })
@@ -226,6 +231,9 @@ test("reports a fixed temporary file cleanup failure and retries later", t => {
     fs.writeFileSync(source, "legacy-state")
     fs.writeFileSync(temporary, "partial")
     let rejectCleanup = true
+    const warnings = []
+    const originalWarn = console.warn
+    console.warn = message => warnings.push(String(message))
     const failingFileSystem = {
         ...fs,
         unlinkSync(target) {
@@ -238,18 +246,24 @@ test("reports a fixed temporary file cleanup failure and retries later", t => {
             fs.unlinkSync(target)
         },
     }
+    try {
+        // S6：遗留固定名 tmp 的清理失败 best-effort 降级 WARN，不阻断迁移
+        prepareDataVolume(paths, failingFileSystem)
+    } finally {
+        console.warn = originalWarn
+    }
+    assert.equal(warnings.some(message => (
+        /failed to clean up legacy state migration temporary file/i.test(message)
+        && /simulated temporary cleanup failure/i.test(message)
+    )), true, warnings.join("\n"))
+    assert.equal(fs.readFileSync(paths.activeAccountFile, "utf8"), "legacy-state")
+    assert.equal(fs.existsSync(source), false)
+    assert.equal(fs.existsSync(temporary), true, "无法清理的遗留 tmp 保留待下次")
 
-    assert.throws(
-        () => prepareDataVolume(paths, failingFileSystem),
-        /failed to clean up state migration temporary file.*simulated temporary cleanup failure/i,
-    )
-    assert.equal(fs.existsSync(temporary), true)
-    assert.equal(fs.existsSync(source), true)
-
+    // 下一次准备（正常文件系统）清扫遗留 tmp，状态保持权威
     prepareDataVolume(paths)
     assert.equal(fs.readFileSync(paths.activeAccountFile, "utf8"), "legacy-state")
     assert.equal(fs.existsSync(temporary), false)
-    assert.equal(fs.existsSync(source), false)
 })
 
 test("rejects a symbolic link at the fixed temporary path", t => {

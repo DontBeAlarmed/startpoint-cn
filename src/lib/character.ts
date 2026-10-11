@@ -5,7 +5,14 @@ import { getCharacterFacts } from "./character-content";
 import { getRealNow } from "../runtime/time/game-time";
 import { GivePlayerCharacterResult } from "./types";
 import { recordHundredCharactersMilestoneSync } from "./player-history-milestones";
-import { settleAcquisitionMissionsAtWritePoint } from "./gacha-acquisition-mission-settlement";
+// 惰性引入（调用点函数体内 require）：character.ts 处于
+// character → gacha-acquisition-mission-settlement → mission/settlement →
+// … → reward-grant → character 的真实依赖环上，顶层 import 会被架构守护
+// 记为运行时环（architecture_dependencies）；与锻块结算门同一断环手法。
+function settleAcquisitionMissionsAtWritePoint(playerId: number): void {
+    const { settleAcquisitionMissionsAtWritePoint: settle } = require("./gacha-acquisition-mission-settlement") as typeof import("./gacha-acquisition-mission-settlement")
+    settle(playerId)
+}
 import {
     grantCharacterExp,
     grantCharacterExpWithinTransactionSync,

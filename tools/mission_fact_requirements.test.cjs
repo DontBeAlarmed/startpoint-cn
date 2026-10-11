@@ -302,14 +302,17 @@ test("keeps exact bundled Category 5 classification counts and unsupported IDs",
         .filter(entry => entry.category === 5)
     const count = mode => entries.filter(entry => entry.requirement.mode === mode).length
 
-    assert.equal(count("computed"), 1182)
+    // 1182 → 1188、unsupported 6 → 0：任务目录演进（cond20/cond92 计数、
+    // MVP 25000 族与 70004 70004 族获得事实需求）——cat5 全量可分类，
+    // computed 计数随目录增长
+    assert.equal(count("computed"), 1188)
     assert.equal(count("persisted"), 100)
-    assert.equal(count("unsupported"), 6)
+    assert.equal(count("unsupported"), 0)
     assert.deepEqual(
         entries
             .filter(entry => entry.requirement.mode === "unsupported")
             .map(entry => entry.missionId),
-        [25000, 25010, 25020, 70004, 70005, 70006],
+        [],
     )
 })
 

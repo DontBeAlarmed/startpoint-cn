@@ -40,7 +40,13 @@ export function serializeFullEquipmentList(
     return list
 }
 
-import { settleAcquisitionMissionsAtWritePoint } from "./gacha-acquisition-mission-settlement"
+// 惰性引入（调用点函数体内 require）：equipment → gacha-acquisition-mission-
+// settlement → mission/settlement → … → reward-grant → equipment 的运行时环
+// 在此断开（与 character.ts 同一手法，锻块结算门同款）
+function settleAcquisitionMissionsAtWritePoint(playerId: number): void {
+    const { settleAcquisitionMissionsAtWritePoint: settle } = require("./gacha-acquisition-mission-settlement") as typeof import("./gacha-acquisition-mission-settlement")
+    settle(playerId)
+}
 
 /**
  * Gives a player an amount of equipment.

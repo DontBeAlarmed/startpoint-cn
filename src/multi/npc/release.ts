@@ -2,7 +2,16 @@ import { getRoom } from "../room/manager"
 import { describeError } from "../describe-error"
 import { sessionManager } from "../state/SessionManager"
 import { scheduleLobbyTask, type LobbyLifecycleGuard } from "../tcp/lobby-lifecycle"
-import { handleEnterComs } from "../tcp/lobby"
+
+// 惰性引入（调用点函数体内 require）：tcp/lobby → 本模块（applyNpcPostFill）
+// 与本模块 → tcp/lobby（handleEnterComs）构成 2 模块环；释放是定时器回调
+// 路径，运行时才需要 handleEnterComs，在此断环。
+function enterViaHandleEnterComs(hostClient: Parameters<typeof import("../tcp/lobby")["handleEnterComs"]>[0], lifecycle: Parameters<typeof import("../tcp/lobby")["handleEnterComs"]>[1]): void {
+    const { handleEnterComs } = require("../tcp/lobby") as typeof import("../tcp/lobby")
+    void handleEnterComs(hostClient, lifecycle).catch(error => {
+        console.error(`[MULTI] npc release inject failed: room=${hostClient.roomNumber}`, error)
+    })
+}
 import {
     closeRecruitmentForRoom,
     findOpenRecruitmentForRoom,
@@ -88,9 +97,7 @@ function fireOrReschedule(lifecycle: LobbyLifecycleGuard, roomNumber: string): v
         console.log(`[MULTI] npc release skipped (host offline): room=${roomNumber}`)
         return
     }
-    void handleEnterComs(hostClient, lifecycle).catch(error => {
-        console.error(`[MULTI] npc release inject failed: room=${roomNumber}`, error)
-    })
+    enterViaHandleEnterComs(hostClient, lifecycle)
 }
 
 /**
