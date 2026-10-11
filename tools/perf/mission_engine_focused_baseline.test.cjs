@@ -97,8 +97,10 @@ test("snapshot pins the completed mission engine structural performance values",
         getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 1, missionComputes: 110 },
         // Battle finish: cat9 奖励仍由页拥有;持有数窄域结算 + 奖励连锁轮
         // + main_quest 数据修复(score ×4)构成现值(2026-10-03 批准语义)
-        singleBattleFinish: { sqlReads: 38, sqlWrites: 27, missionComputes: 471 },
-        multiBattleFinish: { sqlReads: 40, sqlWrites: 32, missionComputes: 475 },
+        // 2026-10-11 重认收（写入点结算语义）：任务 33/66/40 族的认领随
+        // 写入点结算前移，finish 边界的候选与计算量相应下降
+        singleBattleFinish: { sqlReads: 33, sqlWrites: 26, missionComputes: 452 },
+        multiBattleFinish: { sqlReads: 39, sqlWrites: 32, missionComputes: 460 },
     })
 })
 

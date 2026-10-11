@@ -247,7 +247,11 @@ async function executeEntry(runtime, app, identity, fixedTime) {
             fixedTime,
             identity.entry === "multi-finish",
         )
-        return summarizeBattleFinish(runtime, outcome, identity.playerId)
+        const summarized = summarizeBattleFinish(runtime, outcome, identity.playerId)
+        if (process.env.LAYERED_DUMP_BEHAVIOR === "1" && identity.entry === "multi-finish") {
+            process.stderr.write(`LAYERED_MULTI_BEHAVIOR ${JSON.stringify(summarized)}\n`)
+        }
+        return summarized
     }
     const response = await app.inject({
         method: "POST",

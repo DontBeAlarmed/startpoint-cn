@@ -242,7 +242,10 @@ async function runFinishScenario() {
         registerBattleRoutes(app, context)
         await app.ready()
 
-        const playId = "multi-settlement-baseline"
+        // 每局随机 play_id：终态回放缓存（键含 viewer+quest+playId）以进程
+        // 内存跨 run 存续，固定 playId 会让同进程第二次 run 在全新数据库上
+        // 命中上一局的缓存回放、跳过结算（生产语义正确——playId 每局唯一）
+        const playId = `multi-settlement-baseline-${randomUUID()}`
         const started = await app.inject({ method: "POST", url: "/start", payload: startPayload(playId) })
         if (started.statusCode !== 200) throw new Error(`baseline start failed: ${started.body}`)
 

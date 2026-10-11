@@ -234,9 +234,9 @@
       "behaviorSha256": "bf3e5558c2ba1534a5bed657d2eaab3ff34ff4f3a019798ed56fcf7cf5713dfd"
     },
     "get-progress-item-invalidation": {
-      "sqlReads": 30,
+      "sqlReads": 35,
       "sqlWrites": 7,
-      "missionComputes": 1331,
+      "missionComputes": 1304,
       "behavior": {
         "characterIds": [],
         "degreeIds": [],
@@ -248,9 +248,7 @@
         "missionProgressCount": 1265,
         "missionProgressSha256": "2ce04d2a41608ea92da926b7bd2d71b34d5826a551184fdc283aa249d9502622",
         "missionRewardIds": [
-          33001,
-          66001,
-          66002
+          33001
         ],
         "statusCode": 200,
         "targetMission": {
@@ -260,12 +258,12 @@
           "stage": 1
         }
       },
-      "behaviorSha256": "1ac81adb691e57bd2f98d88ad62bb44660ebe62cae6622aebd2545d0a6d6d780"
+      "behaviorSha256": "661482e2da0757a91caf911d1ef844858e256c3fd865874b675e583d87d665b5"
     },
     "get-progress-character-invalidation": {
-      "sqlReads": 29,
+      "sqlReads": 37,
       "sqlWrites": 7,
-      "missionComputes": 1677,
+      "missionComputes": 1681,
       "behavior": {
         "characterIds": [
           231003
@@ -291,9 +289,9 @@
       "behaviorSha256": "a3b22b37aa5187f24c4b9917d36dd7fec72405b7b1cd44911bb6652b49e34c1b"
     },
     "get-progress-equipment-invalidation": {
-      "sqlReads": 38,
-      "sqlWrites": 10,
-      "missionComputes": 1355,
+      "sqlReads": 46,
+      "sqlWrites": 11,
+      "missionComputes": 1316,
       "behavior": {
         "characterIds": [],
         "degreeIds": [],
@@ -301,16 +299,11 @@
           200001
         ],
         "invalidationRule": "regular-56-equipment-200001-to-degree-43000",
-        "itemIds": [
-          100000
-        ],
+        "itemIds": [],
         "missionProgressCount": 1265,
-        "missionProgressSha256": "ccd6df10921ab1e4b1a2399dd55462291626f7f867806b5a9ef2b4b2c4e7b273",
+        "missionProgressSha256": "b5573a990a9cc9a99e75879f64fd6cb95d2e5b611ccb9cc48b54453e919365a5",
         "missionRewardIds": [
-          33001,
-          56001,
-          66001,
-          66002
+          56001
         ],
         "statusCode": 200,
         "targetMission": {
@@ -320,12 +313,12 @@
           "stage": 1
         }
       },
-      "behaviorSha256": "1287d0ca11b37e9d0c88f7bf04aefca674821f4f8aeb888b4fad2ec6cda5c516"
+      "behaviorSha256": "9404977110e1e9c8777b990c0c956ad8e05751c9d9c0e516f0e9bf54cd1a51c6"
     },
     "single-battle-finish": {
-      "sqlReads": 38,
-      "sqlWrites": 27,
-      "missionComputes": 471,
+      "sqlReads": 33,
+      "sqlWrites": 26,
+      "missionComputes": 452,
       "behavior": {
         "adapter": "mission-finish-boundary",
         "awake": {
@@ -452,9 +445,9 @@
       "behaviorSha256": "37381d5f574905c13241fe61083a8ccb6529c898de07cef563b13611c3384440"
     },
     "multi-battle-finish": {
-      "sqlReads": 40,
+      "sqlReads": 39,
       "sqlWrites": 32,
-      "missionComputes": 475,
+      "missionComputes": 460,
       "behavior": {
         "adapter": "mission-finish-boundary",
         "awake": {

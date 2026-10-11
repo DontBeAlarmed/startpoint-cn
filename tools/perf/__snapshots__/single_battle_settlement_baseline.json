@@ -1224,14 +1224,14 @@
       },
       "behaviorSha256": "1c188bda34b2b23bdd269dd10c99e16d8b66348cc2d82e893073f880d70cc1b4",
       "sql": {
-        "statements": 115,
-        "selectStatements": 68,
+        "statements": 110,
+        "selectStatements": 63,
         "writeStatements": 39,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 15,
-            "reads": 9,
+            "statements": 14,
+            "reads": 8,
             "writes": 6
           },
           "players_active_mission_counters": {
@@ -1320,9 +1320,14 @@
             "writes": 0
           },
           "players_mission_battle_counters": {
-            "statements": 3,
-            "reads": 2,
+            "statements": 2,
+            "reads": 1,
             "writes": 1
+          },
+          "players_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
           },
           "players_party_race_clears": {
             "statements": 1,
@@ -1330,19 +1335,19 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 6,
-            "reads": 2,
-            "writes": 4
+            "statements": 4,
+            "reads": 1,
+            "writes": 3
           },
           "players_periodic_snapshots": {
-            "statements": 8,
-            "reads": 8,
+            "statements": 4,
+            "reads": 4,
             "writes": 0
           },
           "players_quest_progress": {
-            "statements": 6,
+            "statements": 7,
             "reads": 5,
-            "writes": 1
+            "writes": 2
           },
           "server_gameplay_settings": {
             "statements": 2,
@@ -1500,14 +1505,14 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 103,
-        "selectStatements": 57,
+        "statements": 98,
+        "selectStatements": 52,
         "writeStatements": 38,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 14,
-            "reads": 8,
+            "statements": 13,
+            "reads": 7,
             "writes": 6
           },
           "players_active_mission_counters": {
@@ -1586,9 +1591,14 @@
             "writes": 2
           },
           "players_mission_battle_counters": {
-            "statements": 3,
-            "reads": 2,
+            "statements": 2,
+            "reads": 1,
             "writes": 1
+          },
+          "players_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
           },
           "players_party_race_clears": {
             "statements": 1,
@@ -1596,19 +1606,19 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 6,
-            "reads": 2,
-            "writes": 4
+            "statements": 4,
+            "reads": 1,
+            "writes": 3
           },
           "players_periodic_snapshots": {
-            "statements": 8,
-            "reads": 8,
+            "statements": 4,
+            "reads": 4,
             "writes": 0
           },
           "players_quest_progress": {
-            "statements": 5,
+            "statements": 6,
             "reads": 4,
-            "writes": 1
+            "writes": 2
           },
           "server_gameplay_settings": {
             "statements": 2,
@@ -2232,14 +2242,14 @@
       },
       "behaviorSha256": "3a0abc02ac26bfde3340ab9f5afb2078d5ac6e1d321f89932e4bb0f6983153f7",
       "sql": {
-        "statements": 107,
-        "selectStatements": 67,
+        "statements": 102,
+        "selectStatements": 62,
         "writeStatements": 30,
         "transactionStatements": 10,
         "byTable": {
           "players": {
-            "statements": 14,
-            "reads": 9,
+            "statements": 13,
+            "reads": 8,
             "writes": 5
           },
           "players_active_mission_battle_facts": {
@@ -2333,9 +2343,14 @@
             "writes": 0
           },
           "players_mission_battle_counters": {
-            "statements": 3,
-            "reads": 2,
+            "statements": 2,
+            "reads": 1,
             "writes": 1
+          },
+          "players_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
           },
           "players_party_race_clears": {
             "statements": 1,
@@ -2343,19 +2358,19 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 6,
-            "reads": 2,
-            "writes": 4
+            "statements": 4,
+            "reads": 1,
+            "writes": 3
           },
           "players_periodic_snapshots": {
-            "statements": 8,
-            "reads": 8,
+            "statements": 4,
+            "reads": 4,
             "writes": 0
           },
           "players_quest_progress": {
-            "statements": 7,
+            "statements": 8,
             "reads": 6,
-            "writes": 1
+            "writes": 2
           },
           "server_gameplay_settings": {
             "statements": 2,
@@ -4304,9 +4319,9 @@
       "behaviorSha256": "ecf4b90004f9f97572364c403ef24817a30dc70a90093633435ec70d197aac3e",
       "sql": {
         "statements": 102,
-        "selectStatements": 67,
+        "selectStatements": 65,
         "writeStatements": 27,
-        "transactionStatements": 8,
+        "transactionStatements": 10,
         "byTable": {
           "players": {
             "statements": 13,
@@ -4334,13 +4349,13 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 5,
-            "reads": 4,
+            "statements": 6,
+            "reads": 5,
             "writes": 1
           },
           "players_category_missions": {
-            "statements": 10,
-            "reads": 4,
+            "statements": 11,
+            "reads": 5,
             "writes": 6
           },
           "players_character_awake_unlocks": {
@@ -4394,9 +4409,14 @@
             "writes": 0
           },
           "players_mission_battle_counters": {
-            "statements": 3,
-            "reads": 2,
+            "statements": 2,
+            "reads": 1,
             "writes": 1
+          },
+          "players_mission_counters": {
+            "statements": 2,
+            "reads": 2,
+            "writes": 0
           },
           "players_party_race_clears": {
             "statements": 1,
@@ -4404,19 +4424,19 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 5,
-            "reads": 2,
-            "writes": 3
+            "statements": 3,
+            "reads": 1,
+            "writes": 2
           },
           "players_periodic_snapshots": {
-            "statements": 8,
-            "reads": 8,
+            "statements": 4,
+            "reads": 4,
             "writes": 0
           },
           "players_quest_progress": {
-            "statements": 6,
+            "statements": 7,
             "reads": 5,
-            "writes": 1
+            "writes": 2
           },
           "server_gameplay_settings": {
             "statements": 2,

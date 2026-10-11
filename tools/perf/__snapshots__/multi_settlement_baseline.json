@@ -4,19 +4,19 @@
     "finish": {
       "activeQuestCleared": true,
       "observations": {
-        "eventLoopDelayMs": 1083.179007,
-        "latencyMs": 1083.871278999999
+        "eventLoopDelayMs": 827.326463,
+        "latencyMs": 826.7758310000008
       },
       "outputSignature": "sha256:333f6a8ffb26c6c65f37766ef6c254812192bbfdbecf5a249b1444c4cd9bae84",
       "sql": {
-        "selectStatements": 61,
-        "statements": 94,
-        "transactionStatements": 8,
-        "writeStatements": 25,
+        "selectStatements": 71,
+        "statements": 111,
+        "transactionStatements": 12,
+        "writeStatements": 28,
         "byTable": {
           "players": {
-            "reads": 12,
-            "statements": 18,
+            "reads": 14,
+            "statements": 20,
             "writes": 6
           },
           "players_active_mission_battle_facts": {
@@ -45,14 +45,14 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "reads": 3,
-            "statements": 4,
+            "reads": 5,
+            "statements": 6,
             "writes": 1
           },
           "players_category_missions": {
-            "reads": 4,
-            "statements": 7,
-            "writes": 3
+            "reads": 6,
+            "statements": 11,
+            "writes": 5
           },
           "players_character_awake_unlocks": {
             "reads": 1,
@@ -80,8 +80,8 @@
             "writes": 0
           },
           "players_collected_items": {
-            "reads": 2,
-            "statements": 3,
+            "reads": 4,
+            "statements": 5,
             "writes": 1
           },
           "players_degree_battle_stats": {
@@ -107,6 +107,11 @@
           "players_mission_battle_counters": {
             "reads": 1,
             "statements": 2,
+            "writes": 1
+          },
+          "players_mission_counters": {
+            "reads": 2,
+            "statements": 3,
             "writes": 1
           },
           "players_party_race_clears": {

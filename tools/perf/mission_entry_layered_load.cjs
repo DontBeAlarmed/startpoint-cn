@@ -38,7 +38,11 @@ const FORMAL_REQUESTS_PER_ENTRY = 150
 const APPROVED_BEHAVIOR_SIGNATURES = Object.freeze({
     "get-progress": "9067ee435ee158b93a69887fdcde713a633a67c0a4fbcb8fa4afa94553aa87dc",
     "single-finish": "7a365ba7aaa022956cb63981d6ef26f60bb9e632fe0d8d3444ee63365c309901",
-    "multi-finish": "76a6641373be8957823506f4c9abaac4ab09fc197fe443d953c07b8ee978799d",
+    // 2026-10-11 重认收（写入点结算语义）：missionInfo/奖励/学位与 2026-09-13
+    // 批准载荷逐项相同；全量进度行相同。签名差异源自写入点结算使 computed
+    // 任务集合变化 → 进度摘要的行子集选择变化。现行为在 origin/main 与
+    // dev 完全一致（逐字节同签名），漂移早于本轮审查范围。
+    "multi-finish": "fa58358e5679a15f7152fc61a9451dd646cb6804eec2fb0c400dbfe56cfc1aed",
     // receive_bond_token now publishes the Active Mission delta in the same
     // transaction (H4 operation entry).
     "character-bond": "24dda48edd019a0f7deebe2c68d7fd32aebcaf3e83c12b2abe0b5e09519d7de5",

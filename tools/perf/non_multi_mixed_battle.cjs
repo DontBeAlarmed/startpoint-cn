@@ -172,6 +172,14 @@ function requireRejected(response, label) {
     return true
 }
 
+// 迟到 finish（play_id 与当前局不一致）为幂等零奖励终态（HTTP 200，
+// 与多人路径同型的既有设计）——不结算、不消费活跃任务
+function requireIdempotentTerminal(response, label) {
+    const terminal = response.statusCode === 200
+    assert.equal(terminal, true, `${label} must return an idempotent HTTP 200 terminal state`)
+    return true
+}
+
 async function executeSingleBattleScenario(app, identity, context = {}) {
     if (!context.skipPrepare && typeof context.prepareSingleBattleIdentity === "function") {
         context.prepareSingleBattleIdentity(identity)
@@ -213,7 +221,7 @@ async function executeSingleBattleScenario(app, identity, context = {}) {
     assertSingleBattleStateUnchanged(context, identity.playerId, peerFinishBefore, "cross-owner finish")
 
     const wrongPlayBefore = snapshotSingleBattleState(context, identity.playerId)
-    const wrongPlayIdFinishRejected = requireRejected(
+    const wrongPlayIdFinishTerminal = requireIdempotentTerminal(
         await postCnRequest(
             app,
             "/api/index.php/single_battle_quest/finish",
@@ -295,7 +303,7 @@ async function executeSingleBattleScenario(app, identity, context = {}) {
         repeatedFinishRejected,
         negativeLifecycle: {
             crossOwnerFinishRejected,
-            wrongPlayIdFinishRejected,
+            wrongPlayIdFinishTerminal,
             duplicateStartRejected,
         },
         multiRecoveryInspections: typeof context.getMultiRecoveryInspections === "function"

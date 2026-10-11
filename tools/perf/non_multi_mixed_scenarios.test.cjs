@@ -305,7 +305,7 @@ test("all non-multi entries use isolated real CN HTTP journeys", async () => {
         repeatedFinishRejected: true,
         negativeLifecycle: {
             crossOwnerFinishRejected: true,
-            wrongPlayIdFinishRejected: true,
+            wrongPlayIdFinishTerminal: true,
             duplicateStartRejected: true,
         },
         multiRecoveryInspections: 0,

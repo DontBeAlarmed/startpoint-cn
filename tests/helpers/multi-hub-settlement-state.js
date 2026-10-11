@@ -239,7 +239,8 @@ async function finishPlayer(harness, node, {
     if (!isDeepStrictEqual(duplicateState, settledState)) {
         throw stageError("duplicate finish state")
     }
-    if (isSuccessfulFinish(duplicate)) throw stageError("duplicate finish response")
+    // 终态幂等（multi 终态回放缓存）：重复 finish 要么被拒、要么回放原
+    // 200 响应——两种都合法；不二次结算由上方状态深度相等断言守护
     return settledState
 }
 
