@@ -392,6 +392,13 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
 
     private releaseIfFullyFinalized(status: BattleStatus): boolean {
         if (!sessionManager.isBattleFullyFinalized(status)) return false
+        // R-01 守卫：retained 旧代 session（finish 重试授权窗口内）的迟到
+        // finalize/leave/cleanup 不得释放已被新一代战斗占用的房间——那会把
+        // raising_state 重置回 1 并清掉新局的 facts。active 映射为 null
+        // （房间已回 Ready）时同样跳过：重复 finalize 的幂等由状态机拒绝
+        // 1->1 兜底，无需重放 onBattleReleased。
+        const activeSessionId = sessionManager.getActiveBattleSessionId(status.roomNumber)
+        if (activeSessionId === null || activeSessionId !== status.battleSessionId) return false
         return this.releaseBattle(status.roomNumber, status.battleSessionId)
     }
 

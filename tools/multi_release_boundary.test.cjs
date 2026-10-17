@@ -157,3 +157,53 @@ test("a node-session cleanup shares the deferred-release semantics", t => {
     coordinator.cleanupNodeSession(GUEST.nodeSessionId)
     assertReleaseRuntimeRetained(room, battleSessionId)
 })
+
+test("a stale previous-generation finalize must not release the room running a newer battle", async t => {
+    // R-01 回归：retained 旧代 session（30min finish 重试窗口）的迟到 finalize
+    // 曾把新一代战斗的房间重置回 Ready 并清掉新局 facts（全员无法结算）。
+    const first = createFinalizedBattle(t)
+    const sessionA = first.battleSessionId
+
+    // 局 A 正常 finalize 释放（保留 retained 事实记录供 finish 重试）
+    const releasedA = await first.coordinator.finalizeBattle({
+        participant: HOST,
+        roomNumber: first.room.room_number,
+        battleSessionId: sessionA,
+    })
+    assert.equal(releasedA.ok, true)
+    assert.equal(first.room.raising_state, 1)
+
+    // 同房开新一代战斗 B
+    sessionManager.setBattleParticipants(first.room.room_number, [
+        { connectionId: "release-host-cid", participant: HOST },
+        { connectionId: "release-guest-cid", participant: GUEST },
+    ], HOST)
+    assert.equal(updateRoomState(first.room.room_number, 4), true)
+    const sessionB = sessionManager.getActiveBattleSessionId(first.room.room_number)
+    assert.notEqual(sessionB, null)
+    assert.notEqual(sessionB, sessionA, "新一代战斗必须持有新的 battleSessionId")
+
+    // 迟到的 A finalize：事实本身仍可读（finish 重试授权），但不得触碰房间
+    const stale = await first.coordinator.finalizeBattle({
+        participant: HOST,
+        roomNumber: first.room.room_number,
+        battleSessionId: sessionA,
+    })
+    assert.equal(stale.ok, true, "retained 事实仍然可读（重试授权语义不变）")
+    assert.equal(first.room.raising_state, 4, "迟到 finalize 不得把新一代战斗的房间重置回 Ready")
+    assert.equal(sessionManager.getActiveBattleSessionId(first.room.room_number), sessionB)
+    assert.equal(sessionManager.battleExpectedCount.has(first.room.room_number), true, "新局 SceneReady 运行时必须完好")
+    assert.equal(sessionManager.battleParticipants.has(first.room.room_number), true, "新局成员快照必须完好")
+
+    // B 自己的 finalize 仍然正常释放
+    sessionManager.markParticipantFinalizedBattle(first.room.room_number, HOST)
+    sessionManager.markParticipantFinalizedBattle(first.room.room_number, GUEST)
+    const releasedB = await first.coordinator.finalizeBattle({
+        participant: HOST,
+        roomNumber: first.room.room_number,
+        battleSessionId: sessionB,
+    })
+    assert.equal(releasedB.ok, true)
+    assert.equal(first.room.raising_state, 1)
+    assert.equal(sessionManager.getActiveBattleSessionId(first.room.room_number), null)
+})
