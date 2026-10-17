@@ -17,6 +17,7 @@ process.env.DATA_DIR = databaseDirectory
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()
 const data = require("../src/data")
+const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
     getPlayerEquipmentSync,
@@ -619,4 +620,29 @@ test("item sale crossing mana addition stage settles mission 40 at once", async 
         missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 40),
         "卖出响应的 mission_info 必须包含任务 40",
     )
+})
+
+test("cross-batch delta composition: inner write-point settlement survives the outer flush (R-02)", async () => {
+    const { playerId } = await createPlayer("inventory-r02")
+    const ITEM_M = 19001 // 任意可持有道具；数量走 setInventoryFixtureItemExactSync 精确锚定
+    setInventoryFixtureItemExactSync(playerId, ITEM_M, 0)
+    const { withInventoryBatchContextWithinTransactionSync } = require("../src/lib/inventory")
+
+    getDb().transaction(() => {
+            withInventoryBatchContextWithinTransactionSync({ playerId }, inventory => {
+            // 外层计划：M +5（此时尚未落库，绝对值视角 afterAmount=5）
+            inventory.grant(ITEM_M, 5)
+            // 写入点结算：内层批次（独立 context）先落库 M +2
+            withInventoryBatchContextWithinTransactionSync({ playerId }, innerInventory => {
+                innerInventory.grant(ITEM_M, 2)
+                innerInventory.flush()
+            })
+            assert.equal(getPlayerItemSync(playerId, ITEM_M), 2, "内层 flush 后必须已独立落库")
+            // 外层 flush（delta 写）——R-02 修复前绝对写会把内层增量覆盖回 5
+            inventory.flush()
+        })
+    })()
+
+    // R-02 修复前：外层绝对写覆盖内层增量 → M=5；修复后 delta 叠合 → M=7
+    assert.equal(getPlayerItemSync(playerId, ITEM_M), 7, "内层批次增量必须在外层 flush 后存活")
 })

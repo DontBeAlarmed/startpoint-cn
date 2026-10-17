@@ -1286,12 +1286,15 @@ test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () =>
     assert.equal(payload.data.draw.length, 10)
     assert.equal(getPlayerGachaInfoSync(playerId, 1613).gachaExchangePoint, 10)
     assert.equal(getPlayerCollectedItemTotalSync(playerId, 70030), collectedBefore)
+    // R-02 delta 写契约：券扣减是负 delta UPDATE（amount = amount + -1），
+    // 不再是绝对值 upsert
     const ticketWrites = routeSql.statements.filter(sql => (
-        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
-        && /(?:VALUES\s*|,\s*)\(70030(?:\.0+)?,\s*0(?:\.0+)?,/i.test(sql)
+        /^\s*UPDATE\s+players_items\b/i.test(sql)
+        && /id\s*=\s*70030(?:\.0+)?\b/i.test(sql)
+        && /amount\s*=\s*amount\s*\+\s*-1(?:\.0+)?\b/i.test(sql)
     ))
     assert.equal(ticketWrites.length, 1, routeSql.statements.filter(sql => (
-        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+        /players_items\b/i.test(sql)
     )).join("\n---\n"))
     const ticketCollectedWrites = routeSql.statements.filter(sql => (
         /^\s*INSERT\s+INTO\s+players_collected_items\b/i.test(sql)
@@ -1336,17 +1339,16 @@ test("ticket gacha rolls its ticket and rewards back on a late mission failure",
     assert.match(response.body, /forced ticket gacha mission counter failure/)
     assert.deepEqual(drawState(playerId, 1613), before)
     assert.equal(getPlayerCollectedItemTotalSync(playerId, 70030), collectedBefore)
-    // The in-transaction H4 owner keeps the deferred inventory context open,
-    // so the ticket deduction flushes merged with the compensation write as
-    // one multi-row upsert; match the ticket row anywhere in the VALUES list.
+    // R-02 delta 写契约：券扣减是负 delta UPDATE；事务回滚保证最终不落任何
+    // 净变化——回滚前的扣减语句仍会出现在 trace 中，形状必须匹配。
     assert.equal(
         routeSql.statements.filter(sql => (
-            /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
-            && /\(\s*70030(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,/i.test(sql)
+            /^\s*UPDATE\s+players_items\b/i.test(sql)
+            && /id\s*=\s*70030(?:\.0+)?\b/i.test(sql)
         )).length,
         1,
         routeSql.statements.filter(sql => (
-            /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+            /players_items\b/i.test(sql)
         )).join("\n---\n"),
     )
     assert.equal(

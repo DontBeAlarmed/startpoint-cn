@@ -212,33 +212,60 @@ export class InventorySqliteRepository {
         return maybeSettleCraftPointMissions(ownerId, id)
     }
 
-    /** Batch absolute write; per-row semantics identical to writeAbsoluteItemSync. */
-    writeAbsoluteItemsBatchSync(
+    /**
+     * Batch delta write（R-02）：同事务内先期落库的内层批次（写入点结算）
+     * 增量不得被外层批次的过期绝对值覆盖。delta 叠合即正确语义；负 delta
+     * 受 amount + delta >= 0 守卫（守卫失守 = 状态机被破坏，响亮失败）。
+     */
+    writeInventoryItemDeltasBatchSync(
         playerId: number,
-        rows: readonly { readonly itemId: number; readonly amount: number }[],
+        rows: readonly { readonly itemId: number; readonly delta: number }[],
     ): void {
         requireActiveTransaction()
         const ownerId = positiveId(playerId, "INVALID_PLAYER_ID", "playerId")
+        for (const row of rows) {
+            positiveId(row.itemId, "INVALID_ITEM_ID", "itemId")
+            if (!Number.isSafeInteger(row.delta)) {
+                throw new InventoryValidationError(
+                    "INVALID_STORED_STATE",
+                    `inventory delta for item ${row.itemId} must be a safe integer`,
+                )
+            }
+        }
+        const negativeRows = rows.filter(row => row.delta < 0)
+        for (const row of negativeRows) {
+            // 负 delta 只允许命中已存在行（INSERT 会造出负库存行）
+            const result = getDb().prepare(`
+                UPDATE players_items
+                SET amount = amount + ?
+                WHERE player_id = ? AND id = ? AND amount + ? >= 0
+            `).run(row.delta, ownerId, row.itemId, row.delta)
+            if (result.changes !== 1) {
+                throw new InventoryValidationError(
+                    "INVALID_STORED_STATE",
+                    `inventory delta write for item ${row.itemId} would drive the amount negative`,
+                )
+            }
+        }
+        const nonNegativeRows = rows.filter(row => row.delta >= 0)
         const CHUNK_ROWS = 1000
-        for (let start = 0; start < rows.length; start += CHUNK_ROWS) {
-            const chunk = rows.slice(start, start + CHUNK_ROWS)
+        for (let start = 0; start < nonNegativeRows.length; start += CHUNK_ROWS) {
+            const chunk = nonNegativeRows.slice(start, start + CHUNK_ROWS)
             const values: unknown[] = []
             const placeholders: string[] = []
             for (const row of chunk) {
-                const id = positiveId(row.itemId, "INVALID_ITEM_ID", "itemId")
-                const afterAmount = nonNegativeAmount(row.amount, `item ${id} afterAmount`)
                 placeholders.push("(?, ?, ?)")
-                values.push(id, afterAmount, ownerId)
+                values.push(row.itemId, row.delta, ownerId)
             }
             const result = getDb().prepare(`
                 INSERT INTO players_items (id, amount, player_id)
                 VALUES ${placeholders.join(", ")}
                 ON CONFLICT(id, player_id) DO UPDATE SET
-                    amount = excluded.amount
+                    amount = amount + excluded.amount
             `).run(...values)
             if (result.changes !== chunk.length) {
                 throw new Error(
-                    `inventory absolute write affected ${result.changes} of ${chunk.length} rows`,
+                    `inventory delta write affected ${result.changes} of ${chunk.length} rows`,
                 )
             }
         }

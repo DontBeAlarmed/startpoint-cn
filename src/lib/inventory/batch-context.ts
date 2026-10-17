@@ -349,15 +349,20 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
             .sort((left, right) => left.stored.itemId - right.stored.itemId)
             .map(item => ({ item, result: this.toResult(item) }))
         this.closed = true
-        const absoluteRows: { itemId: number; amount: number }[] = []
+        const deltaRows: { itemId: number; delta: number }[] = []
         const obtainedRows: { itemId: number; obtainedAmount: number }[] = []
-        for (const { result } of rows) {
-            absoluteRows.push({ itemId: result.itemId, amount: result.afterAmount })
+        for (const { item, result } of rows) {
+            // delta = 相对 load 时 stored 的净变化；绝对写会在同事务内层批次
+            // 已先落库时覆盖其增量（R-02），叠合式 delta 写是正确语义。
+            deltaRows.push({
+                itemId: result.itemId,
+                delta: result.afterAmount - item.stored.amount,
+            })
             if (result.obtainedAmount > 0) {
                 obtainedRows.push({ itemId: result.itemId, obtainedAmount: result.obtainedAmount })
             }
         }
-        this.repository.writeAbsoluteItemsBatchSync(this.playerId, absoluteRows)
+        this.repository.writeInventoryItemDeltasBatchSync(this.playerId, deltaRows)
         this.repository.recordPositiveObtainedBatchSync(this.playerId, obtainedRows)
         // 锻块入账是「累计获得锻造石」事实的产生时点：flush 内当场窄域结算并
         // 保留结果供响应投影复用（结算与发放同事务）。
