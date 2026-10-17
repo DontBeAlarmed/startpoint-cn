@@ -85,14 +85,18 @@ async function main() {
     await drawApp.close()
 
     const selectApp = await createApp()
+    // 新契约：first_draw 遇 pending 不阻塞——隐式放弃旧结果 + 重新扣费 + 自动生效
+    setInventoryFixtureItemExactSync(playerId, 10002, 1)
     const firstDrawWhilePending = await selectApp.inject({
         method: "POST",
         url: "/ex/first_draw",
         payload: { viewer_id: viewerId, character_id: 1, cost_item_id: 10002 },
     })
-    assert.equal(firstDrawWhilePending.statusCode, 400)
-    assert.deepEqual(getPendingExBoostDrawSync(playerId), pendingAfterFirstDraw)
-    assert.equal(getPlayerItemSync(playerId, 10002), itemAfterFirstDraw)
+    assert.equal(firstDrawWhilePending.statusCode, 200, firstDrawWhilePending.body)
+    assert.equal(getPendingExBoostDrawSync(playerId), null, "auto 生效事务内必须清 pending（隐式放弃）")
+    assert.equal(getPlayerItemSync(playerId, 10002), 0, "隐式放弃不退旧抽费用，新抽取正常扣费")
+    const appliedExBoost = getPlayerCharacterSync(playerId, 1).exBoost
+    assert.notEqual(appliedExBoost, undefined)
 
     const invalidSelectResponse = await selectApp.inject({
         method: "POST",
@@ -100,16 +104,14 @@ async function main() {
         payload: { viewer_id: viewerId, is_confirm: 1 },
     })
     assert.equal(invalidSelectResponse.statusCode, 400)
-    assert.deepEqual(getPendingExBoostDrawSync(playerId), pendingAfterFirstDraw)
 
-    const selectResponse = await selectApp.inject({
+    // 空 pending 的 select：协议守卫
+    const selectWithoutPending = await selectApp.inject({
         method: "POST",
         url: "/ex/select",
         payload: { viewer_id: viewerId, is_confirm: true },
     })
-    assert.equal(selectResponse.statusCode, 200, selectResponse.body)
-    const selectedExBoost = getPlayerCharacterSync(playerId, 1).exBoost
-    assert.notEqual(selectedExBoost, undefined)
+    assert.equal(selectWithoutPending.statusCode, 400)
 
     setInventoryFixtureItemExactSync(playerId, 10002, 1)
     const firstDrawReplay = await selectApp.inject({
@@ -119,7 +121,7 @@ async function main() {
     })
     assert.equal(firstDrawReplay.statusCode, 200, firstDrawReplay.body)
     assert.equal(getPlayerItemSync(playerId, 10002), 1)
-    assert.deepEqual(getPlayerCharacterSync(playerId, 1).exBoost, selectedExBoost)
+    assert.deepEqual(getPlayerCharacterSync(playerId, 1).exBoost, appliedExBoost)
 
     const repeatedFirstDrawReplay = await selectApp.inject({
         method: "POST",
@@ -128,8 +130,9 @@ async function main() {
     })
     assert.equal(repeatedFirstDrawReplay.statusCode, 200, repeatedFirstDrawReplay.body)
     assert.equal(getPlayerItemSync(playerId, 10002), 1)
-    assert.deepEqual(getPlayerCharacterSync(playerId, 1).exBoost, selectedExBoost)
+    assert.deepEqual(getPlayerCharacterSync(playerId, 1).exBoost, appliedExBoost)
 
+    setInventoryFixtureItemExactSync(playerId, 10002, 1)
     database.exec(`
         CREATE TRIGGER reject_ex_boost_pending_draw
         BEFORE INSERT ON players_ex_boost_pending_draws

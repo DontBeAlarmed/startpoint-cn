@@ -196,10 +196,8 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
     })
 
     const pendingDraw = getPendingExBoostDrawSync(playerId)
-    if (pendingDraw !== null) {
-        if (autoAccept || pendingDraw.characterId !== characterId) return reply.status(400).send({
-            "error": "Bad Request", "message": "An EX boost draw is already pending."
-        })
+    if (pendingDraw !== null && !autoAccept && pendingDraw.characterId === characterId) {
+        // 同角色重入：免费回放已付费未决的结果（客户端崩溃后的唯一恢复路径，不二次扣费）
         const currentCostItemAmount = getPlayerItemSync(playerId, costItemId) ?? 0
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -217,6 +215,9 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
             },
         })
     }
+    // 其余场景（无 pending / 异角色 / autoAccept）直接走新抽取，链路不阻塞：
+    // 异角色 pending 视为隐式放弃——下方事务内新 pending 覆盖旧行（非自动档 upsert）
+    // 或 autoAccept 生效事务内显式删除；不退费，与显式「放弃」同语义。
 
     if (autoAccept && characterData.exBoost !== undefined) {
         const currentCostItemAmount = getPlayerItemSync(playerId, costItemId) ?? 0
@@ -286,6 +287,8 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                     statusId: drawResult.statusId,
                     abilityIdList: drawResult.abilityIdList,
                 })
+                // 隐式放弃：异角色/旧档位的未决结果随本次生效一并清除
+                deletePendingExBoostDrawSync(playerId)
                 return { afterAmount: itemResult.afterAmount, updateTime: exBoostWrite.updateTime }
             })
         ))()

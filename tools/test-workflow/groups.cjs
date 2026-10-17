@@ -164,6 +164,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_mana_mutation_http.test.cjs",
             "tools/character_mana_mutation_plan.test.cjs",
             "tools/ex_boost_pending_draw.test.cjs",
+            "tools/ex_boost_pending_lifecycle.test.cjs",
             "tools/small_write_route_boundaries.test.cjs",
             "tools/mana_board_availability.test.cjs",
             "tools/player_awake_save_roundtrip.test.cjs",
