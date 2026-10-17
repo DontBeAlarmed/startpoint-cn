@@ -299,10 +299,13 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             player = refreshedPlayer;
             // 自动补货游戏内提醒：无附件信息邮件（1 天限时），不再使用公告/force_news
             try {
+                // 邮件时间戳必须用虚拟时间：过期清扫与客户端倒计时都跑在
+                // 虚拟时钟上（getVirtualNow），真实时间会让 1 天限时永不过期
+                // 且客户端显示 365+ 天（时间基准混用缺陷）
                 insertScheduledResourceNoticeMailSync(
                     playerId,
                     scheduledResourceSettlement.grantedRuleIds,
-                    gameTime.realNow,
+                    now,
                     options.dailyResetHour ?? 5,
                 );
             } catch (noticeError) {

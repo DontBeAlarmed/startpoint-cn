@@ -30,6 +30,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertScheduledResourceRuleSync } = require("../src/data/domains/scheduled-resource")
 const { insertScheduledResourceNoticeMailSync } = require("../src/lib/scheduled-resource-notice-mail")
+const { clientSerializeDate } = require("../src/data/utils/date")
 const cnLoadRoutes = require("../src/routes/cn/load").default
 
 initializeDatabase()
@@ -81,6 +82,11 @@ test("insertScheduledResourceNoticeMailSync 构建无附件限时信息邮件", 
     assert.equal(mail.reward_period_limited, 1)
     const limit = new Date(mail.reward_limit_time.replace(" ", "T") + "Z")
     assert.equal(limit.getTime() - now.getTime(), 24 * 60 * 60 * 1000, "限时必须为 1 天")
+    // 字符串时序必须与真实时序一致（清扫用字符串比较）：limit > now 的字面量
+    assert.ok(
+        mail.reward_limit_time > clientSerializeDate(now),
+        "限时时戳必须大于发放时戳（字符串比较语义，清扫判据）",
+    )
     assert.equal(mail.type, 8, "FREE_MANA（玛纳）附件类型")
     assert.equal(mail.number, 1, "附件 = 1 玛纳")
     assert.match(mail.description, /::item::/, "正文必须带附件渲染令牌（与官方 reason 模板一致）")
