@@ -4,10 +4,10 @@
     "finish": {
       "activeQuestCleared": true,
       "observations": {
-        "eventLoopDelayMs": 827.326463,
-        "latencyMs": 826.7758310000008
+        "eventLoopDelayMs": 2271.215615,
+        "latencyMs": 2269.4965389999998
       },
-      "outputSignature": "sha256:333f6a8ffb26c6c65f37766ef6c254812192bbfdbecf5a249b1444c4cd9bae84",
+      "outputSignature": "sha256:b9ae40c5d330d1e889c920e28ccd838d6f55f5d08a332217be41add2a8815686",
       "sql": {
         "selectStatements": 71,
         "statements": 111,

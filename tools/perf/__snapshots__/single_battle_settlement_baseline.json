@@ -17,6 +17,7 @@
           },
           "data_headers": {
             "asset_update": false,
+            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -93,6 +94,7 @@
           },
           "data_headers": {
             "asset_update": false,
+            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -123,6 +125,7 @@
           },
           "data_headers": {
             "asset_update": false,
+            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -132,7 +135,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "261e0b5baca8233743ced169fb138290e66542e525e524ace70f7c3f1150257a",
+      "behaviorSha256": "ae5b937034bc460b1274c8668ef6a8de456bb7df22b8eda0d09d6ad1cf3d63b3",
       "sql": {
         "statements": 42,
         "selectStatements": 27,
@@ -1213,6 +1216,7 @@
           },
           "data_headers": {
             "asset_update": false,
+            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -1222,7 +1226,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "1c188bda34b2b23bdd269dd10c99e16d8b66348cc2d82e893073f880d70cc1b4",
+      "behaviorSha256": "5bfce83985303ef86392f71203581b4447d2bc9b8514337a547c35be0b259f64",
       "sql": {
         "statements": 110,
         "selectStatements": 63,
@@ -2231,6 +2235,7 @@
           },
           "data_headers": {
             "asset_update": false,
+            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -2240,7 +2245,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "3a0abc02ac26bfde3340ab9f5afb2078d5ac6e1d321f89932e4bb0f6983153f7",
+      "behaviorSha256": "07bf4f4c3e3a13847885ace2b2e33d7e08bb3a548d88890f1ac5e49bb4b3101c",
       "sql": {
         "statements": 102,
         "selectStatements": 62,
@@ -4306,6 +4311,7 @@
             },
             "data_headers": {
               "asset_update": false,
+              "force_news": 0,
               "force_update": false,
               "result_code": 1,
               "servertime": "fixed-server-time",
@@ -4316,7 +4322,7 @@
           }
         }
       },
-      "behaviorSha256": "ecf4b90004f9f97572364c403ef24817a30dc70a90093633435ec70d197aac3e",
+      "behaviorSha256": "5cc82d7fa274400e2955a15a67c18a0796f76eec08395c99f967fd7094ed7272",
       "sql": {
         "statements": 102,
         "selectStatements": 65,
@@ -4479,6 +4485,7 @@
           },
           "data_headers": {
             "asset_update": false,
+            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -4488,7 +4495,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "5b5670ec3feaba0fb3919e0db1cad9efa33ee8cf6efa2def989400bba923868d",
+      "behaviorSha256": "e358308084491906c14820b1937e56b1ce72767b631ffd82111bd1c415559da5",
       "sql": {
         "statements": 9,
         "selectStatements": 5,
@@ -4645,6 +4652,7 @@
           },
           "data_headers": {
             "asset_update": false,
+            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -4654,7 +4662,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "10188d2d75a9fc197cfc7ec7debe7951308d3f6ef091f00c5e5db2bd78011677",
+      "behaviorSha256": "b41fcab216c3f7a0acf366c2b04b1c006dbe0b441508d63f4a27dece8ccf44fa",
       "sql": {
         "statements": 25,
         "selectStatements": 18,
