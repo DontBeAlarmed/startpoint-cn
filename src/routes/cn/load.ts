@@ -58,6 +58,7 @@ import { getGameTimeContext } from "../../runtime/time/game-time";
 import { getGameCalendar } from "../../time/game-calendar-provider";
 import { getDailyChallengeCatalog } from "../../lib/quest/daily-challenge";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
+import { ensureScheduledResourceNoticeSync } from "../../data/domains/news";
 import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
 import { getCurrencyCapacityPolicySync } from "../../lib/config-content";
@@ -296,6 +297,13 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
             }
             player = refreshedPlayer;
+            // 自动补货游戏内提醒：维护常驻公告行（列表恒一行），并置 force_news=2
+            // 让客户端在主页到达时弹一次公告列表（客户端自清 flag，每日至多一次）
+            try {
+                ensureScheduledResourceNoticeSync();
+            } catch (noticeError) {
+                console.error("[LOAD] scheduled-resource notice upsert failed:", noticeError);
+            }
         }
 
         const eventTradeExpirySettlement = settleEventTradeExpiryOnLoadSync({
@@ -465,6 +473,8 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             const payload = {
                 data_headers: generateDataHeaders({
                     asset_update: assetState.assetUpdate,
+                    // 今日自动发放到账 → 主页公告提醒（客户端自清，每日至多一次）
+                    force_news: scheduledResourceSettlement.status === "granted" ? 2 : 0,
                     viewer_id: accountId,
                     servertime: getServerTime(),
                 }),

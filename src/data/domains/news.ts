@@ -354,3 +354,31 @@ export function deleteNewsSync(id: number, revision: number): void {
         throw new NewsRevisionConflictError()
     }
 }
+
+const SCHEDULED_RESOURCE_NOTICE_TITLE = "【系统】每日资源自动发放"
+
+/**
+ * 自动补货提醒的常驻公告行：固定标题 find-or-create，原地更新发布时间，
+ * 列表中恒为一行（不随发放日增）——force_news=2 主页公告弹窗的内容载体。
+ * 同一 UTC 日内重复调用为幂等读，不递增 revision。
+ */
+export function ensureScheduledResourceNoticeSync(now = getRealNow()): ServerNewsRow {
+    const existing = getDb()
+        .prepare("SELECT * FROM server_news WHERE title = ? ORDER BY id LIMIT 1")
+        .get(SCHEDULED_RESOURCE_NOTICE_TITLE) as Record<string, unknown> | undefined
+    const draft = {
+        category: 1 as NewsCategory,
+        title: SCHEDULED_RESOURCE_NOTICE_TITLE,
+        publishedAtReal: now.toISOString(),
+        bodyRichText: "<p>今日的自动发放已完成，可在「菜单 → 所持品」确认到账资源。</p>",
+        label: 1,
+        thumbnail: 1,
+        enabled: true,
+    }
+    if (existing === undefined) return createNewsSync(draft)
+    const row = rowToNews(existing)
+    // 当日判定基准用 publishedAtReal（随 draft 注入）而非 updated_at（内部真实时钟），
+    // 保证模拟时钟/测试注入下同样成立
+    if (row.publishedAtReal.slice(0, 10) === now.toISOString().slice(0, 10)) return row
+    return updateNewsSync(row.id, row.revision, draft)
+}
