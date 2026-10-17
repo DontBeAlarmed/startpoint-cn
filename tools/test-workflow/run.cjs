@@ -10,6 +10,8 @@ const projectRoot = path.resolve(__dirname, "../..")
 const signalExitCodes = { SIGINT: 130, SIGTERM: 143 }
 const MAX_PARALLEL_TESTS = 8
 const FULL_MAX_PARALLEL_TESTS = 4
+// TEST_TIMEOUT_SCALE：慢环境（CI 双核）等比放大组超时预算，本地默认 1
+const timeoutScale = Math.max(1, Number(process.env.TEST_TIMEOUT_SCALE ?? "1") || 1)
 
 function parseArguments(argv) {
     let mode = null
@@ -364,9 +366,10 @@ async function executeTestGroups(groupNames, options = {}) {
         }
 
         const destination = definition.execution === "parallel" ? parallelItems : serialItems
-        const timeoutMs = definition.timeoutMs
-            ?? (definition.execution === "parallel" ? 30000 : 120000)
-        const forceKillAfterMs = definition.forceKillAfterMs ?? 2000
+        // TEST_TIMEOUT_SCALE：慢环境（CI 双核）等比放大组超时预算，本地默认 1
+        const timeoutMs = Math.ceil((definition.timeoutMs
+            ?? (definition.execution === "parallel" ? 30000 : 120000)) * timeoutScale)
+        const forceKillAfterMs = Math.ceil((definition.forceKillAfterMs ?? 2000) * timeoutScale)
         for (const file of definition.tests) {
             destination.push({ file, forceKillAfterMs, group, timeoutMs })
         }

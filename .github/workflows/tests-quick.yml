@@ -23,4 +23,7 @@ jobs:
       # multi 生命周期、content 同步等 quick 组）此前只有本地 workflow 入口，
       # CI 从不运行。quick 组为 ts-node 直驱，无需先行 build。
       - name: Quick test groups
+        env:
+          # CI 双核跑不动本地校准的 30/60s 组预算——等比放大 3 倍
+          TEST_TIMEOUT_SCALE: "3"
         run: npm run test:quick
