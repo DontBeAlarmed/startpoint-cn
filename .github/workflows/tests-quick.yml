@@ -24,6 +24,6 @@ jobs:
       # CI 从不运行。quick 组为 ts-node 直驱，无需先行 build。
       - name: Quick test groups
         env:
-          # CI 双核跑不动本地校准的 30/60s 组预算——等比放大 3 倍
-          TEST_TIMEOUT_SCALE: "3"
+          # CI 双核跑不动本地校准的 30/60s 组预算——等比放大 5 倍
+          TEST_TIMEOUT_SCALE: "5"
         run: npm run test:quick
