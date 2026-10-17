@@ -28,4 +28,6 @@ jobs:
           # 并行度压到 2，降低 ts-node 编译与内容安装的 CPU 争用
           TEST_TIMEOUT_SCALE: "5"
           TEST_MAX_PARALLEL: "2"
+          # 子进程 stdout 走管道时块缓冲——挂起时 TAP 输出全丢，强制实时刷新以便诊断
+          NODE_OPTIONS: "--force-flushing"
         run: npm run test:quick
