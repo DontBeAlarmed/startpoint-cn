@@ -236,3 +236,66 @@ test("领取提醒邮件（1 玛纳附件）必须正常到账", async t => {
     assert.equal(remaining, 0, "领取后邮件物理删除（官方语义）")
     // 零附件领取不写领取履历（履历只记附件事实）——通知文本阅后即焚，符合设计
 })
+
+test("旧版 0 附件通知邮件（兼容形状）领取 = 已读+删除，不再 400", async t => {
+    const db = getDb()
+    const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
+    const previousOffset = getTimeOffset()
+    setServerTimeOffset(-184581169420) // 与线上当前虚拟时钟一致
+    t.after(() => setServerTimeOffset(previousOffset))
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `scheduled-notice-legacy-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const viewerId = 800000413
+    db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+        .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+    // 旧代码形状：FREE_VMONEY + number 0 + create/limit 在虚拟时钟的未来
+    db.prepare(`INSERT INTO players_mails (player_id, reason_id, subject, description, type, type_id, number, receive_time, create_time, reward_period_limited, reward_limit_time)
+        VALUES (?, 0, '每日资源自动发放', '正文', 4, NULL, 0, '0000-00-00 00:00:00', '2026-10-17 19:20:44', 1, '2026-10-18 19:20:44')`)
+        .run(playerId)
+    const mailId = db.prepare(
+        "SELECT id FROM players_mails WHERE player_id = ? AND subject = ?",
+    ).get(playerId, NOTICE_SUBJECT).id
+    const manaBefore = (getDb().prepare("SELECT free_mana AS v FROM players WHERE id = ?").get(playerId) ?? {}).v
+
+    const mailRoutes = require("../src/routes/api/mail").default
+    const fastify = Fastify({ logger: false })
+    fastify.addContentTypeParser(
+        "application/x-www-form-urlencoded",
+        { parseAs: "string" },
+        (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
+    )
+    fastify.addHook("onSend", (_request, reply, payload, done) => {
+        if (String(reply.getHeader("content-type")).includes("application/x-msgpack")) {
+            done(null, pack(payload).toString("base64"))
+            return
+        }
+        done(null, payload)
+    })
+    await fastify.register(mailRoutes, { prefix: "/api/index.php/mail" })
+    await fastify.ready()
+    t.after(() => fastify.close())
+
+    const received = await fastify.inject({
+        method: "POST",
+        url: "/api/index.php/mail/receive",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: encodeRequest({ viewer_id: viewerId, mail_id: mailId }),
+    })
+    assert.equal(received.statusCode, 200, received.body)
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS n FROM players_mails WHERE id = ?").get(mailId).n,
+        0,
+        "兼容领取后邮件删除",
+    )
+    assert.equal(
+        (getDb().prepare("SELECT free_mana AS v FROM players WHERE id = ?").get(playerId) ?? {}).v,
+        manaBefore,
+        "无附件通知领取不得发放任何奖励",
+    )
+})

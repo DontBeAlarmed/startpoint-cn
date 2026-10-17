@@ -96,7 +96,9 @@ function validateMailReward(mail: RawPlayerMail): void {
             `Mail ${mail.id} has unsupported attachment type ${mail.type}.`,
         )
     }
-    if (!Number.isSafeInteger(mail.number) || mail.number <= 0) {
+    // number = 0：无附件通知邮件（如每日自动发放提醒的旧版/现行形态），
+    // 领取 = 已读 + 删除，合法；负数才是真正的非法状态。
+    if (!Number.isSafeInteger(mail.number) || mail.number < 0) {
         throw new UnsupportedMailAttachmentError(`Mail ${mail.id} has an invalid attachment amount.`)
     }
     if (mail.type === MailType.ITEM
@@ -107,6 +109,8 @@ function validateMailReward(mail: RawPlayerMail): void {
 }
 
 function standardReward(mail: RawPlayerMail): RewardGrantCommand | null {
+    // number = 0：无附件通知邮件——不产生任何奖励计划条目（领取即已读）
+    if (mail.number === 0) return null
     switch (mail.type) {
         case MailType.ITEM:
             return { type: RewardType.ITEM, id: requireMailTypeId(mail), count: mail.number }
@@ -382,6 +386,8 @@ export function settleMailRewardsInTransactionOwnerSync(
         updatePlayerSync({ id: playerId, ...dedicated.update })
     }
     for (const mail of mails) {
+        // number = 0 的纯通知邮件不写领取履历（履历只记附件事实）
+        if (mail.number === 0) continue
         insertReceiveHistorySync(playerId, {
             type: mail.type,
             type_id: mail.type_id,
