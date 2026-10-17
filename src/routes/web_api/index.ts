@@ -22,6 +22,8 @@ export interface WebApiRoutesOptions extends ServerRoutesOptions {
     readonly getAvatarCdnRoot?: ContentRoutesOptions["getCdnRoot"]
     /** 服务端启动锁定的日历偏移（惰性 getter）；热更新 apply 用（不端点内 parse env）。 */
     readonly getGameCalendarUtcOffsetMinutes?: () => number
+    /** apply 成功且资产版本推进后的回调（cn-server 接线 TCP AssetUpdate 广播）。 */
+    readonly onContentApplied?: import("./content-management").ContentManagementRoutesOptions["onContentApplied"]
 }
 
 const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) => {
@@ -66,6 +68,7 @@ const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) =>
         fastify.register(async instance => {
             registerContentManagementRoutes(instance, {
                 getGameCalendarUtcOffsetMinutes,
+                onContentApplied: options.onContentApplied,
             })
         }, { prefix: "/content-management" })
     }

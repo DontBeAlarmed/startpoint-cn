@@ -52,7 +52,7 @@ import expodApiPlugin from "./routes/api/expod";
 import storyQuestApiPlugin from "./routes/api/storyQuest";
 import optionApiPlugin from "./routes/api/option";
 import singleBattleQuestApiPlugin from "./routes/api/singleBattleQuest";
-import { multiBattleRoutes } from "./multi";
+import { multiBattleRoutes, sessionManager } from "./multi";
 import { createMultiRuntimeService } from "./multi/runtime/service";
 import { MultiManagementService } from "./multi/management/service";
 import { createMultiManagementCredentialProvider } from "./multi/management/credentials";
@@ -304,6 +304,12 @@ fastify.register(indexWebApiPlugin, {
             throw new Error("runtime config not loaded");
         }
         return startupRuntimeConfig.gameCalendarUtcOffsetMinutes;
+    },
+    // 内容 apply 且资产版本推进 → 对所有在线会话广播 AssetUpdate(9)，
+    // 客户端弹窗确认后回标题重走资产检查（仅房间内玩家即时触达，其余等结算兜底/重登）
+    onContentApplied: (previousVersion, currentVersion) => {
+        const notified = sessionManager.broadcastAssetUpdateToAll();
+        console.log(`[CONTENT] AssetUpdate broadcast: ${previousVersion} -> ${currentVersion} sessions=${notified}`);
     },
     // Lazy: CDN_DIR may resolve to a directory that only exists under the
     // local asset mode; avatar requests degrade to 404 when it is absent.

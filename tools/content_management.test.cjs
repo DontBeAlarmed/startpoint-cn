@@ -34,6 +34,8 @@ let runSyncImpl
 let reloadCalls
 let lastReloadError
 let restoreReloadedSnapshot = null
+let reloadedTargetVersion = "1.4.55"
+let notifiedApplies = []
 
 function decode(response) {
     return JSON.parse(response.body)
@@ -65,10 +67,13 @@ test.before(async () => {
             const previous = getContentSnapshot()
             const installed = installFrozenTestContentSnapshot({
                 tables: {},
-                targetVersion: "1.4.55",
+                targetVersion: reloadedTargetVersion,
             })
             restoreReloadedSnapshot = installed.restore
             return { previous, current: installed.snapshot }
+        },
+        onContentApplied: (previousVersion, currentVersion) => {
+            notifiedApplies.push([previousVersion, currentVersion])
         },
         })
     }, { prefix: "/api/content-management" })
@@ -84,6 +89,8 @@ test.before(async () => {
     })
     reloadCalls = []
     lastReloadError = null
+    reloadedTargetVersion = "1.4.55"
+    notifiedApplies = []
 })
 
 test.after(async () => {
@@ -234,4 +241,74 @@ test("reload 失败返回结构化结果（applied:false, stage:reload）并附�
     assert.equal(payload.data.stage, "reload")
     assert.ok(payload.data.note.includes("重启将生效新版本"), "必须警示跳版/重启行为")
     lastReloadError = null
+})
+
+test("apply 资产版本推进时触发 onContentApplied（TCP AssetUpdate 广播钩子）", async () => {
+    notifiedApplies.length = 0
+    reloadedTargetVersion = "1.4.56"
+    const response = await app.inject({ method: "POST", url: "/api/content-management/apply", payload: {} })
+    assert.equal(response.statusCode, 200)
+    const payload = decode(response)
+    assert.equal(payload.data.applied, true)
+    assert.equal(payload.data.currentVersion, "1.4.56")
+    assert.deepEqual(
+        notifiedApplies,
+        [[payload.data.previousVersion, payload.data.currentVersion]],
+        "版本推进必须以（旧版本, 新版本）回调一次",
+    )
+})
+
+test("apply 同版本重载不触发 onContentApplied", async () => {
+    notifiedApplies.length = 0
+    reloadedTargetVersion = getContentSnapshot().cdn.targetVersion
+    const response = await app.inject({ method: "POST", url: "/api/content-management/apply", payload: {} })
+    assert.equal(response.statusCode, 200)
+    const payload = decode(response)
+    assert.equal(payload.data.applied, true)
+    assert.equal(payload.data.previousVersion, payload.data.currentVersion)
+    assert.equal(notifiedApplies.length, 0, "版本未变不得广播 AssetUpdate（客户端无内容可下）")
+})
+
+test("onContentApplied 抛错不影响 apply 结果（通知失败只降级）", async () => {
+    notifiedApplies.length = 0
+    reloadedTargetVersion = "1.4.57"
+    // 用一个抛错的钩子重新注册最小实例验证降级路径
+    const probeApp = Fastify({ logger: false })
+    probeApp.addContentTypeParser(
+        "application/x-www-form-urlencoded",
+        { parseAs: "string" },
+        (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
+    )
+    let probeInstalledRestore = null
+    probeApp.register(async instance => {
+        registerContentManagementRoutes(instance, {
+            prefix: "/api/content-management",
+            getGameCalendarUtcOffsetMinutes: () => 480,
+            runSync: async () => ({
+                status: "synchronized",
+                action: "synchronize",
+                targetVersion: "1.4.57",
+                currentVersion: "1.4.54",
+                reason: "source-state",
+                releaseDigest: `sha256:${"b".repeat(64)}`,
+            }),
+            reload: async () => {
+                const previous = getContentSnapshot()
+                const installed = installFrozenTestContentSnapshot({ tables: {}, targetVersion: "1.4.57" })
+                probeInstalledRestore = installed.restore
+                return { previous, current: installed.snapshot }
+            },
+            onContentApplied: () => { throw new Error("broadcast socket exploded") },
+        })
+    }, { prefix: "/api/content-management" })
+    await probeApp.ready()
+    const response = await probeApp.inject({ method: "POST", url: "/api/content-management/apply", payload: {} })
+    assert.equal(response.statusCode, 200)
+    const payload = decode(response)
+    assert.equal(payload.data.applied, true, "广播抛错不得把 apply 打成失败")
+    assert.equal(payload.data.currentVersion, "1.4.57")
+    await probeApp.close()
+    probeInstalledRestore?.()
+    notifiedApplies.length = 0
+    reloadedTargetVersion = "1.4.55"
 })

@@ -1189,6 +1189,19 @@ export class SessionManager {
     getRoomClientCount(roomNumber: string): number {
         return this.roomClients.get(roomNumber)?.size ?? 0
     }
+
+    /**
+     * 内容 apply 后向全部在线会话广播 MeetingServerMessage.AssetUpdate(9)。
+     * 客户端（MultiBattleRoomScene.serverMessage_AssetUpdate）断开房间 socket、
+     * 房主解散房间，弹窗确认后回标题重走全局资产检查。返回送达的会话数。
+     */
+    broadcastAssetUpdateToAll(): number {
+        let notified = 0
+        for (const client of this.clients.values()) {
+            if (this.sendJson(client.socket, [1, [9]])) notified += 1
+        }
+        return notified
+    }
 }
 
 export const sessionManager = new SessionManager()

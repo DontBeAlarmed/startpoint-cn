@@ -35,6 +35,8 @@ export interface ContentManagementRoutesOptions {
     /** 测试注入点。 */
     readonly runSync?: (options: Parameters<typeof runContentSync>[0]) => Promise<ContentSyncResult>
     readonly reload?: typeof reloadContentSnapshot
+    /** apply 成功且资产版本推进后的回调（cn-server 接线 TCP AssetUpdate 广播）；抛错不得影响 apply 结果。 */
+    readonly onContentApplied?: (previousVersion: string, currentVersion: string) => void
 }
 
 interface ApplyOutcome {
@@ -209,6 +211,19 @@ export function registerContentManagementRoutes(
             const outcome = await applyInFlight
             if (outcome.applied) {
                 lastAppliedAt = new Date().toISOString()
+                // 资产版本确实推进才通知客户端（版本未变的 apply 对客户端不可见）；
+                // 通知失败只降级为日志，不回滚 apply 结果
+                if (
+                    options.onContentApplied
+                    && outcome.previousVersion !== undefined
+                    && outcome.previousVersion !== outcome.currentVersion
+                ) {
+                    try {
+                        options.onContentApplied(outcome.previousVersion, outcome.currentVersion)
+                    } catch (error) {
+                        _request.log.warn({ err: error }, "content apply notification failed")
+                    }
+                }
             }
             return reply.status(200).send({ data: outcome })
         } catch (error) {
