@@ -88,6 +88,22 @@ export function resolveAssetLoadState(
         })
 }
 
+/**
+ * 结算兜底：仅当客户端明确带着与当前目标不一致的资源版本时才置 asset_update。
+ * 与 load 的无条件 true 不同——结算页会弹资源版本错误并踢回标题，误报会造成
+ * 「结算→标题→无差量可下→再打→再弹」的打断循环，宁可漏报不可误报。
+ * 目标版本缺失（精简测试夹具等）时同样不置位。
+ */
+export function shouldFlagSettlementAssetUpdate(
+    config: AssetProviderConfig,
+    clientVersion: string | undefined,
+    snapshotTargetVersion: string | undefined,
+): boolean {
+    if (config.mode === "client-owned") return false
+    if (!snapshotTargetVersion) return false
+    return isValidAssetVersion(clientVersion) && clientVersion !== snapshotTargetVersion
+}
+
 function isUnspecifiedIpHost(hostname: string): boolean {
     const unwrapped = hostname.startsWith("[") && hostname.endsWith("]")
         ? hostname.slice(1, -1)

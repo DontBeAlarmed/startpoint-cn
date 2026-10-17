@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
+import path from "node:path"
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
@@ -26,6 +27,8 @@ import { createModeHost } from "../../modes/loader"
 import {
     validateSessionIdentity,
 } from "../../lib/quest/finish/session-validator"
+import { parseAssetProviderConfig, shouldFlagSettlementAssetUpdate, type AssetProviderConfig } from "../../content/cdn/asset-mode"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
 import { buildSingleFinishResponse, buildStaleSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
@@ -76,6 +79,10 @@ import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/ent
 export interface SingleBattleQuestRouteOptions {
     readonly dailyResetHour?: number
     readonly getContinueVmoneyCost?: () => number
+    /** 测试注入点：结算兜底 asset_update 的资产模式判定（默认按 env 解析）。 */
+    readonly assetProvider?: AssetProviderConfig
+    /** 测试注入点：内容快照目标版本（默认读生产快照）。 */
+    readonly getSnapshotTargetVersion?: () => string
 }
 
 const singleBattleModeHost = createModeHost(message => console.log(message))
@@ -125,6 +132,18 @@ interface PlayContinueBody {
 const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteOptions = {}) => {
     const dailyResetHour = options.dailyResetHour ?? 5
     const challengePointMap = getEventChallengePointMap()
+    const assetProvider = options.assetProvider ?? parseAssetProviderConfig({
+        projectRoot: path.resolve(__dirname, "../../.."),
+    })
+    // 结算兜底 asset_update：客户端 res_ver 与内容目标版本不一致时置位，
+    // 结算页弹资源版本错误踢回标题重走资产检查（官方行为，见文档 C2）
+    const settlementAssetUpdate = (req: FastifyRequest): boolean => {
+        const resVer = req.headers["res_ver"] as string | undefined
+        const snapshotTargetVersion = assetProvider.mode === "client-owned"
+            ? ""
+            : options.getSnapshotTargetVersion?.() ?? getContentSnapshot().cdn?.targetVersion
+        return shouldFlagSettlementAssetUpdate(assetProvider, resVer, snapshotTargetVersion)
+    }
 
     fastify.post("/finish", async (request: FastifyRequest, reply: FastifyReply) => {
         const validationResult = validateSingleFinishRequest(request.body)
@@ -149,7 +168,10 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             if (stalePlayer === null) return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id.",
             })
-            const staleGenerated = generateDataHeaders({ viewer_id: viewerId })
+            const staleGenerated = generateDataHeaders({
+                viewer_id: viewerId,
+                asset_update: settlementAssetUpdate(request),
+            })
             const staleServerTime = staleGenerated.servertime
             if (typeof staleServerTime !== "number") {
                 throw new Error("Stale finish response headers are missing servertime.")
@@ -187,7 +209,10 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
         if (!finishResult.ok) {
             return reply.status(finishResult.statusCode).send(finishResult.payload)
         }
-        const generatedDataHeaders: Record<string, unknown> = generateDataHeaders({ viewer_id: viewerId })
+        const generatedDataHeaders: Record<string, unknown> = generateDataHeaders({
+            viewer_id: viewerId,
+            asset_update: settlementAssetUpdate(request),
+        })
         const serverTime = generatedDataHeaders.servertime
         if (typeof serverTime !== "number") {
             throw new Error("Single finish response headers are missing servertime.")
