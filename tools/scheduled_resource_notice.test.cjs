@@ -1,10 +1,10 @@
 "use strict"
 
-// 自动补货提醒三件套：
-// 1) generateDataHeaders 默认携带 force_news=0（全响应统一头）；
-// 2) news 常驻公告行 find-or-create + 同日幂等 + 跨日原地更新（列表恒一行）；
-// 3) /load 在 scheduled-resource 发放日置 force_news=2，同日第二次 load 不再置位
-//    （客户端主页到达弹公告列表后自清 flag，每日至多一次）。
+// 自动补货提醒（邮件通道）：
+// 1) 发放日首次 load 插入一封无附件信息邮件（subject/description/1 天限时）；
+// 2) 同日第二次 load 不再插信（business day 去重）；
+// 3) 邮件不再携带 force_news 头、不再写公告行（公告方案已撤）；
+// 4) 领取该邮件（number=0 的 FREE_VMONEY）必须无副作用成功——实证零值附件语义。
 
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
@@ -26,47 +26,62 @@ const restoreContentSnapshot = installBundledGameplaySnapshot()
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { generateDataHeaders } = require("../src/utils")
-const { ensureScheduledResourceNoticeSync } = require("../src/data/domains/news")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertScheduledResourceRuleSync } = require("../src/data/domains/scheduled-resource")
+const { insertScheduledResourceNoticeMailSync } = require("../src/lib/scheduled-resource-notice-mail")
 const cnLoadRoutes = require("../src/routes/cn/load").default
 
 initializeDatabase()
 
-const NOTICE_TITLE = "【系统】每日资源自动发放"
+const NOTICE_SUBJECT = "每日资源自动发放"
 
-test("generateDataHeaders 默认带 force_news=0 且可覆盖", () => {
+test("generateDataHeaders 不再默认携带 force_news（公告通道已撤）", () => {
     const headers = generateDataHeaders({ viewer_id: 1 })
-    assert.equal(headers.force_news, 0, "全响应统一头必须包含 force_news（0 为惰性值）")
-    assert.equal(generateDataHeaders({ force_news: 2 }).force_news, 2)
-    assert.equal(generateDataHeaders({ force_news: 1 }).force_news, 1)
+    assert.equal(Object.hasOwn(headers, "force_news"), false)
 })
 
-test("ensureScheduledResourceNoticeSync 幂等创建、同日不递增、跨日原地更新", () => {
+test("insertScheduledResourceNoticeMailSync 构建无附件限时信息邮件", () => {
+    const playerIdRow = (() => {
+        const account = insertAccountSync({
+            appId: "wf_cn",
+            idpAlias: "",
+            idpCode: "test",
+            idpId: `notice-builder-${randomUUID()}`,
+            status: "normal",
+        })
+        return insertDefaultPlayerSync(account.id).id
+    })()
+    insertScheduledResourceRuleSync({
+        scope: "player",
+        playerId: playerIdRow,
+        rewardType: "free_vmoney",
+        rewardId: null,
+        grantAmount: 1,
+        triggerThreshold: 5,
+        inventoryCap: 10,
+        enabled: true,
+        startsAtReal: null,
+        endsAtReal: null,
+        description: "体力药水×3+玛纳200",
+    })
+    const rule = getDb()
+        .prepare("SELECT id FROM scheduled_resource_rules WHERE player_id = ?")
+        .get(playerIdRow)
     const now = new Date("2024-08-14T08:00:00.000Z")
-    const first = ensureScheduledResourceNoticeSync(now)
-    assert.equal(first.title, NOTICE_TITLE)
-    assert.equal(first.revision, 1)
-    const sameDay = ensureScheduledResourceNoticeSync(now)
-    assert.equal(sameDay.id, first.id)
-    assert.equal(sameDay.revision, 1, "同日重复调用必须幂等（不递增 revision）")
-    const rowsAfterSameDay = getDb()
-        .prepare("SELECT COUNT(*) AS n FROM server_news WHERE title = ?")
-        .get(NOTICE_TITLE).n
-    assert.equal(rowsAfterSameDay, 1, "列表恒一行，不得随发放日增")
 
-    const nextDay = ensureScheduledResourceNoticeSync(new Date("2024-08-16T08:00:00.000Z"))
-    assert.equal(nextDay.id, first.id, "跨日必须原地更新同一行")
-    assert.equal(nextDay.revision, 2)
-    assert.equal(nextDay.publishedAtReal, "2024-08-16T08:00:00.000Z")
-
-    const dayThree = ensureScheduledResourceNoticeSync(new Date("2024-08-17T08:00:00.000Z"))
-    assert.equal(dayThree.revision, 3)
-    const rowsAfterThreeDays = getDb()
-        .prepare("SELECT COUNT(*) AS n FROM server_news WHERE title = ?")
-        .get(NOTICE_TITLE).n
-    assert.equal(rowsAfterThreeDays, 1)
+    const mailId = insertScheduledResourceNoticeMailSync(playerIdRow, [rule.id], now, 5)
+    const mail = getDb().prepare("SELECT * FROM players_mails WHERE id = ?").get(mailId)
+    assert.equal(mail.subject, NOTICE_SUBJECT)
+    assert.equal(mail.reason_id, 0, "reason_id=0 必须命中客户端 Reason 回退路径（渲染服务端原文）")
+    assert.match(mail.description, /体力药水×3\+玛纳200/, "正文必须携带规则描述")
+    assert.match(mail.description, /发放时间/, "正文必须携带发放时间")
+    assert.match(mail.description, /每日 5:00/, "正文必须携带下次补充时间")
+    assert.equal(mail.receive_time, "0000-00-00 00:00:00", "初始未领取（红点可见）")
+    assert.equal(mail.reward_period_limited, 1)
+    const limit = new Date(mail.reward_limit_time.replace(" ", "T") + "Z")
+    assert.equal(limit.getTime() - now.getTime(), 24 * 60 * 60 * 1000, "限时必须为 1 天")
+    assert.equal(mail.number, 0, "无附件：FREE_VMONEY 附件数量必须为 0")
 })
 
 function encodeRequest(body) {
@@ -79,7 +94,7 @@ function decodeResponse(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
 
-test("load 在发放日置 force_news=2，同日第二次 load 回落为 0", async t => {
+test("load 发放日插邮件且不再携带 force_news 头，同日第二次 load 不重复", async t => {
     const db = getDb()
     const account = insertAccountSync({
         appId: "wf_cn",
@@ -144,17 +159,73 @@ test("load 在发放日置 force_news=2，同日第二次 load 回落为 0", asy
     const firstLoad = await loadOnce()
     assert.equal(firstLoad.response.statusCode, 200, JSON.stringify(firstLoad.body).slice(0, 200))
     assert.equal(
-        firstLoad.body.data_headers.force_news, 2,
-        "发放日的首次 load 必须置 force_news=2（主页公告提醒）",
+        Object.hasOwn(firstLoad.body.data_headers, "force_news"),
+        false,
+        "公告通道已撤：load 不得再携带 force_news",
     )
-    assert.ok(getDb()
-        .prepare("SELECT id FROM server_news WHERE title = ?")
-        .get(NOTICE_TITLE), "发放必须同步维护常驻公告行")
+    const mailsAfterFirst = db.prepare(
+        "SELECT COUNT(*) AS n FROM players_mails WHERE player_id = ? AND subject = ?",
+    ).get(playerId, NOTICE_SUBJECT).n
+    assert.equal(mailsAfterFirst, 1, "发放日必须恰好插入一封提醒邮件")
 
     const secondLoad = await loadOnce()
     assert.equal(secondLoad.response.statusCode, 200)
-    assert.equal(
-        secondLoad.body.data_headers.force_news, 0,
-        "同日已发放（无新发放）不得再置位——提醒每日至多一次",
+    const mailsAfterSecond = db.prepare(
+        "SELECT COUNT(*) AS n FROM players_mails WHERE player_id = ? AND subject = ?",
+    ).get(playerId, NOTICE_SUBJECT).n
+    assert.equal(mailsAfterSecond, 1, "同日第二次 load 不得重复插信")
+})
+
+test("领取提醒邮件（number=0 附件）必须无副作用成功", async t => {
+    const db = getDb()
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `scheduled-notice-claim-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const viewerId = 800000412
+    db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+        .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+    const now = new Date("2024-08-14T08:00:00.000Z")
+    insertScheduledResourceNoticeMailSync(playerId, [], now, 5)
+    const vmoneyBefore = (getDb().prepare("SELECT free_vmoney AS v FROM players WHERE id = ?").get(playerId) ?? {}).v
+    const mailId = db.prepare(
+        "SELECT id FROM players_mails WHERE player_id = ? AND subject = ?",
+    ).get(playerId, NOTICE_SUBJECT).id
+
+    const mailRoutes = require("../src/routes/api/mail").default
+    const fastify = Fastify({ logger: false })
+    fastify.addContentTypeParser(
+        "application/x-www-form-urlencoded",
+        { parseAs: "string" },
+        (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
     )
+    fastify.addHook("onSend", (_request, reply, payload, done) => {
+        if (String(reply.getHeader("content-type")).includes("application/x-msgpack")) {
+            done(null, pack(payload).toString("base64"))
+            return
+        }
+        done(null, payload)
+    })
+    await fastify.register(mailRoutes, { prefix: "/api/index.php/mail" })
+    await fastify.ready()
+    t.after(() => fastify.close())
+
+    const received = await fastify.inject({
+        method: "POST",
+        url: "/api/index.php/mail/receive",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: encodeRequest({ viewer_id: viewerId, mail_id: mailId }),
+    })
+    assert.equal(received.statusCode, 200, received.body)
+    const vmoneyAfter = (getDb().prepare("SELECT free_vmoney AS v FROM players WHERE id = ?").get(playerId) ?? {}).v
+    assert.equal(vmoneyAfter, vmoneyBefore, "零值附件领取不得改变货币")
+    const remaining = db.prepare(
+        "SELECT COUNT(*) AS n FROM players_mails WHERE id = ?",
+    ).get(mailId).n
+    assert.equal(remaining, 0, "领取后邮件物理删除（官方语义）")
+    // 零附件领取不写领取履历（履历只记附件事实）——通知文本阅后即焚，符合设计
 })

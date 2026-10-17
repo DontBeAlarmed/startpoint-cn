@@ -119,12 +119,10 @@ export interface DataHeaders {
  */
 export function generateDataHeaders(
     customValues: Partial<DataHeaders> = {},
-    fields: (keyof DataHeaders)[] = ['force_update', 'force_news', 'asset_update', 'short_udid', 'viewer_id', 'servertime', 'result_code'],
+    fields: (keyof DataHeaders)[] = ['force_update', 'asset_update', 'short_udid', 'viewer_id', 'servertime', 'result_code'],
 ): Record<string, any> {
     const defaultHeaders: DataHeaders = {
         force_update: false,
-        // 0 = 不强插；1 = 场景切换强插单条（latest_forced）；2 = 主页每日公告列表（客户端自清）
-        force_news: 0,
         asset_update: false,
         short_udid: 0,
         viewer_id: 0,

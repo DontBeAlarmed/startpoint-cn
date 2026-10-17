@@ -291,7 +291,7 @@ test("system and forced news endpoints retain empty response shapes", async t =>
     assert.deepEqual(forcedSystem.data, {})
 })
 
-test("load 在无自动发放时 force_news 为惰性值 0（发放日才置 2，见 scheduled_resource_notice）", async t => {
+test("load does not set the forced-news header", async t => {
     const account = insertAccountSync({
         appId: "wf_cn",
         idpAlias: "",
@@ -324,7 +324,7 @@ test("load 在无自动发放时 force_news 为惰性值 0（发放日才置 2�
     })
 
     assert.equal(response.statusCode, 200, response.body)
-    assert.equal(decode(response).data_headers.force_news, 0)
+    assert.equal(Object.hasOwn(decode(response).data_headers, "force_news"), false)
 })
 
 test("client news date projection follows an explicit +540 calendar", () => {
