@@ -13,7 +13,8 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # 22.x 才支持 NODE_OPTIONS=--force-flushing（挂起诊断需要实时 TAP）
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
