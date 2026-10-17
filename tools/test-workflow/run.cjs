@@ -72,6 +72,10 @@ function parseArguments(argv) {
 }
 
 function resolveMaxParallelTests(parsed) {
+    // TEST_MAX_PARALLEL：慢环境（CI 双核）压缩并行度，降低 ts-node 编译与
+    // 内容安装的 CPU 争用；本地默认不变。
+    const envMax = Number(process.env.TEST_MAX_PARALLEL ?? "")
+    if (Number.isSafeInteger(envMax) && envMax > 0) return envMax
     return parsed.mode === "group" && parsed.group === "full"
         ? FULL_MAX_PARALLEL_TESTS
         : MAX_PARALLEL_TESTS
