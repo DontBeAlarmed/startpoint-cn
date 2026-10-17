@@ -9,8 +9,10 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+console.error("[SF-DEBUG] module: before snapshot install")
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()
+console.error("[SF-DEBUG] module: snapshot installed")
 test.after(() => restoreContentSnapshot())
 
 // 共享形态：MULTI_SOCIAL_DB_PATH 指向独立共享文件，用两个独立连接模拟
@@ -31,7 +33,9 @@ const { getSharedFollowRelationSync } = require("../src/data/domains/social-foll
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 
+console.error("[SF-DEBUG] module: before initializeDatabase")
 data.initializeDatabase()
+console.error("[SF-DEBUG] module: database initialized")
 
 test.after(async () => {
     data.closeDatabase()

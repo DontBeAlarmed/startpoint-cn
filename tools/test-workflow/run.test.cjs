@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict")
 
 process.env.TEST_TIMEOUT_SCALE = "1" // 元测试断言精确超时值：钉死 scale，不受 workflow 注入影响
+delete process.env.TEST_MAX_PARALLEL // 同理：并行度断言不受 workflow 注入影响
 const { spawn } = require("node:child_process")
 const { once } = require("node:events")
 const fs = require("node:fs")
