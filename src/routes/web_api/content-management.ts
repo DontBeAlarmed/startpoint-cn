@@ -8,7 +8,9 @@ import { resetMediumArchiveIndexes } from "../../content/cdn/medium-archive-inde
 import {
     getContentSnapshot,
     reloadContentSnapshot,
+
 } from "../../content/runtime/content-snapshot"
+import { ContentSmokeValidationError, runContentSmokeValidators } from "../../lib/content-smoke"
 
 /**
  * 内容管理（管理后台）：线上内容热更新。
@@ -146,8 +148,17 @@ async function performApply(
     }
 
     try {
-        await reload()
+        // R-04 目录级预检：候选快照在替换运行时前先过冒烟校验，坏内容不上线
+        await reload({ validate: snapshot => runContentSmokeValidators(snapshot.repository) })
     } catch (error) {
+        if (error instanceof ContentSmokeValidationError) {
+            return {
+                applied: false,
+                stage: "reload",
+                currentVersion: before.targetVersion,
+                note: `目录级预检未通过，坏内容未上线（旧快照继续服务：${sanitizeErrorMessage(error.message, projectRoot)}）；磁盘已更新，重启将生效新版本——请修正或撤除补丁包后重试`,
+            }
+        }
         return {
             applied: false,
             stage: "reload",

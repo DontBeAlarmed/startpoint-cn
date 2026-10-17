@@ -168,7 +168,8 @@ export class ContentSnapshotProvider {
      * 与 initialize 共用 initialization 槽位串行，杜绝"initialize 后完成
      * 用旧快照反向覆盖 reload 结果"。
      */
-    async reload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+    async reload(options: { validate?: (snapshot: ContentSnapshot) => void } = {}):
+        Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
         const previous = this.snapshot
         // 绕过 initialize 的实例记忆化：reload 的语义就是"重新读盘"。
         const loaded = this.snapshotSource
@@ -184,6 +185,9 @@ export class ContentSnapshotProvider {
                 "content reload produced the same snapshot instance; the load path returned the memoized snapshot",
             )
         }
+        // R-04 目录级预检：候选快照在对外生效前必须通过冒烟校验（如 gacha
+        // 目录构建）。校验抛错则保持旧快照继续服务，坏内容不上线。
+        options.validate?.(current)
         this.snapshot = current
         return { previous: previous as ContentSnapshot, current }
     }
@@ -329,9 +333,10 @@ export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
      * provider（fresh 读盘），加载成功后原子替换外层快照。失败保留旧快照
      * （fail-safe）。reload 之间/与 initialize 之间经 in-flight 槽位串行。
      */
-    override async reload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+    override async reload(options: { validate?: (snapshot: ContentSnapshot) => void } = {}):
+        Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
         if (this.reloadInFlight) return this.reloadInFlight
-        this.reloadInFlight = this.doReload()
+        this.reloadInFlight = this.doReload(options)
         try {
             return await this.reloadInFlight
         } finally {
@@ -339,7 +344,8 @@ export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
         }
     }
 
-    private async doReload(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+    private async doReload(options: { validate?: (snapshot: ContentSnapshot) => void } = {}):
+        Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
         const previous = this.snapshot
         // 无条件等待在飞的 initialize 落地：否则首次初始化在飞时 reload 抢先
         // 替换，随后 initialize 完成链会把旧值反向覆盖（双审 P2 窗口）。
@@ -360,6 +366,8 @@ export class ConfiguredContentSnapshotProvider extends ContentSnapshotProvider {
                 "content reload produced the same snapshot instance; the load path is memoized",
             )
         }
+        // R-04 目录级预检：与基类同语义——校验抛错则保持旧快照继续服务。
+        options.validate?.(current)
         this.snapshot = current
         return {
             previous: (previous ?? current) as ContentSnapshot,
@@ -563,6 +571,7 @@ export function getContentSnapshot(): ContentSnapshot {
  * 内容热重载：重新从磁盘加载 release 并原子替换运行时快照。
  * 失败保留旧快照（fail-safe）；成功后新请求即服务新内容。
  */
-export function reloadContentSnapshot(): Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
-    return productionContentSnapshotProvider.reload()
+export function reloadContentSnapshot(options: { validate?: (snapshot: ContentSnapshot) => void } = {}):
+    Promise<{ previous: ContentSnapshot; current: ContentSnapshot }> {
+    return productionContentSnapshotProvider.reload(options)
 }

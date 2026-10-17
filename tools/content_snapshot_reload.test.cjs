@@ -98,3 +98,47 @@ test("并发语义：reload×reload 共享同一 in-flight；initialize 在飞�
     assert.equal(secondResult.current, snapshots[1])
     assert.equal(created, 2, "并发 reload 不得重复构造 inner provider")
 })
+
+test("validate 钩子：候选快照校验抛错时保持旧快照继续服务（R-04 预检）", async () => {
+    const snapshots = [makeSnapshot("5.0.0"), makeSnapshot("5.0.1")]
+    let calls = 0
+    const provider = new ContentSnapshotProvider({
+        snapshotSource: { load: async () => snapshots[Math.min(calls++, snapshots.length - 1)] },
+    })
+    await provider.initialize()
+    await assert.rejects(
+        () => provider.reload({
+            validate: candidate => {
+                throw new Error(`Gacha 142 period is reversed. (candidate=${candidate.cdn.targetVersion})`)
+            },
+        }),
+        /period is reversed/,
+    )
+    assert.equal(provider.get(), snapshots[0], "校验失败必须保持旧快照对外服务")
+
+    const swapped = await provider.reload({ validate: () => {} })
+    assert.equal(swapped.current, snapshots[1], "校验通过必须正常换快照")
+    assert.equal(provider.get(), snapshots[1])
+})
+
+test("validate 钩子：Configured 层同样在替换前校验（双审 P0 路径不被绕过）", async () => {
+    const snapshots = [makeSnapshot("6.0.0"), makeSnapshot("6.0.1")]
+    let created = 0
+    const provider = new ConfiguredContentSnapshotProvider({
+        createProvider: () => {
+            const snapshot = snapshots[Math.min(created++, snapshots.length - 1)]
+            return new ContentSnapshotProvider({
+                snapshotSource: { load: async () => snapshot },
+            })
+        },
+    })
+    await provider.initialize({})
+    await assert.rejects(
+        () => provider.reload({ validate: () => { throw new Error("smoke failed") } }),
+        /smoke failed/,
+    )
+    assert.equal(provider.get(), snapshots[0], "Configured 层校验失败同样保持旧快照")
+
+    const swapped = await provider.reload({ validate: () => {} })
+    assert.equal(swapped.current, snapshots[1])
+})

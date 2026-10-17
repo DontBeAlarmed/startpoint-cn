@@ -312,3 +312,53 @@ test("onContentApplied 抛错不影响 apply 结果（通知失败只降级）",
     notifiedApplies.length = 0
     reloadedTargetVersion = "1.4.55"
 })
+
+test("apply 向 reload 注入 validate：冒烟失败时 apply 被拒且 note 可操作（R-04）", async () => {
+    const probeApp = Fastify({ logger: false })
+    probeApp.addContentTypeParser(
+        "application/x-www-form-urlencoded",
+        { parseAs: "string" },
+        (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
+    )
+    let validateReceived = false
+    probeApp.register(async instance => {
+        registerContentManagementRoutes(instance, {
+            prefix: "/api/content-management",
+            getGameCalendarUtcOffsetMinutes: () => 480,
+            runSync: async () => ({
+                status: "synchronized",
+                action: "synchronize",
+                targetVersion: "1.4.57",
+                currentVersion: "1.4.54",
+                reason: "source-state",
+                releaseDigest: `sha256:${"c".repeat(64)}`,
+            }),
+            reload: async options => {
+                assert.ok(typeof options?.validate === "function", "apply 必须向 reload 注入目录级预检回调")
+                validateReceived = true
+                const previous = getContentSnapshot()
+                const installed = installFrozenTestContentSnapshot({ tables: {}, targetVersion: "1.4.57" })
+                const restore = installed.restore
+                try {
+                    options.validate(installed.snapshot)
+                } finally {
+                    restore()
+                }
+                return { previous, current: installed.snapshot }
+            },
+        })
+    }, { prefix: "/api/content-management" })
+    await probeApp.ready()
+    const response = await probeApp.inject({ method: "POST", url: "/api/content-management/apply", payload: {} })
+    assert.equal(response.statusCode, 200)
+    const payload = decode(response)
+    assert.equal(validateReceived, true, "validate 钩子必须被注入")
+    assert.equal(payload.data.applied, false, "冒烟失败必须拒绝 apply")
+    assert.ok(
+        payload.data.note.includes("目录级预检未通过"),
+        `note 必须可操作，实际: ${payload.data.note}`,
+    )
+    await probeApp.close()
+    notifiedApplies.length = 0
+    reloadedTargetVersion = "1.4.55"
+})
