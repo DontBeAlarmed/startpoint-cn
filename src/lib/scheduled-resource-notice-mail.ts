@@ -14,7 +14,8 @@ const NOTICE_TTL_MS = 24 * 60 * 60 * 1000
  *   （服务端内容快照无 item 文本表）。
  * - 1 天限时：纯通知零价值，过期清扫即消失；红点（mail_arrived 动态计数）
  *   在限期内持续可见。
- * - number = 0 的 FREE_VMONEY 附件：领取路径的零值语义由套件实证兜底。
+ * - 附件 = 1 玛纳（FREE_MANA，无 typeId）：象征性的到账凭证，领取路径走
+   标准正数奖励流；正文以 ::item:: 令牌渲染附件区（与官方 reason 模板一致）。
  */
 export function insertScheduledResourceNoticeMailSync(
     playerId: number,
@@ -34,15 +35,16 @@ export function insertScheduledResourceNoticeMailSync(
         "",
         `发放时间：${clientSerializeDate(now)}`,
         `每日 ${dailyResetHour}:00 后登录即可再次补充`,
+        "::item::",
     ].join("\n")
 
     return insertMailSync(playerId, {
         reason_id: 0,
         subject: NOTICE_SUBJECT,
         description,
-        type: MailType.FREE_VMONEY,
+        type: MailType.FREE_MANA,
         type_id: null,
-        number: 0,
+        number: 1,
         receive_time: "0000-00-00 00:00:00",
         create_time: clientSerializeDate(now),
         reward_period_limited: 1,

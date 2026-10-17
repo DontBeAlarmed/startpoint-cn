@@ -88,9 +88,12 @@ function validateMissionRewardPair(
 
 function validateAwakeGroups(awakeTable: JsonRecord): number {
     const missionIds = Object.keys(awakeTable).map(Number)
-    if (missionIds.length !== 144
-        || missionIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
-        contractError("mission_char_awake.json", "official CN awake table must contain 144 missions")
+    // 行数/内容不在此钉死：runner 的 source-pair 深对比
+    // （mission_char_awake.json ↔ character_awake_mission 源）已完整覆盖
+    // 转换漂移检测，且随官方内容增长天然成立。此处只做 id 形状与分组
+    // 结构不变式。
+    if (missionIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+        contractError("mission_char_awake.json", "awake mission ids must be positive safe integers")
     }
     const groups = new Map<number, number[]>()
     for (const missionId of missionIds) {
