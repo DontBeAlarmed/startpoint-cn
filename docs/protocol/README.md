@@ -13,6 +13,7 @@
 ## 多人联机
 
 - [多人联机协议](./multi-battle.md)
+- [服务端→客户端通知通道档案](./client-notification-channels.md)：主动推送/轮询/响应内嵌信号与被动校验时点全量盘点。
 - [可信多人 Hub 设置教程](./multi-hub-setup.md)
 - [可信局域网多人 Hub 架构](./trusted-multi-hub.md)
 - [超级猫头鹰多场景分析](./super-owl-multiscene.md)
