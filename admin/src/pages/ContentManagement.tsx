@@ -64,9 +64,12 @@ export default function ContentManagement() {
     })
 
     const stateData = state.data
-    // 初始拉取期间同样视为 busy：状态未知时不给点应用（apply 的前置 check
-    // 虽会兜底，但页面不应呈现"看似加载中、按钮却可点"的矛盾态）
-    const busy = state.isPending || stateData?.busy === true || apply.isPending
+    // 初始拉取与后台重拉期间都视为 busy：apply 成功后的 state.refetch() 是
+    // 后台刷新（isPending 保持 false），页面此刻渲染的还是 apply 前的旧缓存
+    // （upToDate=false），不加 isFetching 会出现"应用成功弹窗已出、按钮却
+    // 短暂可点"的窗口——/state 要跑一次磁盘 check 扫描，窗口长达数秒。
+    // 手动刷新同理（与页头刷新图标的 refreshing 判据一致）。
+    const busy = state.isPending || state.isFetching || stateData?.busy === true || apply.isPending
     const upToDate = stateData?.pending?.upToDate === true
 
     return (
