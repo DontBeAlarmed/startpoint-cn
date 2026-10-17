@@ -64,13 +64,14 @@ export default function ContentManagement() {
     })
 
     const stateData = state.data
-    // 初始拉取与后台重拉期间都视为 busy：apply 成功后的 state.refetch() 是
-    // 后台刷新（isPending 保持 false），页面此刻渲染的还是 apply 前的旧缓存
-    // （upToDate=false），不加 isFetching 会出现"应用成功弹窗已出、按钮却
-    // 短暂可点"的窗口——/state 要跑一次磁盘 check 扫描，窗口长达数秒。
-    // 手动刷新同理（与页头刷新图标的 refreshing 判据一致）。
+    // busy 只驱动 loading 动效（按钮转圈/页头刷新图标）
     const busy = state.isPending || state.isFetching || stateData?.busy === true || apply.isPending
-    const upToDate = stateData?.pending?.upToDate === true
+    // 点击资格是 fail-closed（默认置灰）：只有"已完成的状态拉取明确报告
+    // 磁盘有待应用内容"才放开。初始加载、apply 后重拉、手动刷新、check
+    // 不可用（pending=null，如同步锁竞争）、缓存陈旧——一律置灰。灰态下
+    // 误漏新补丁的代价是"点一下刷新按钮"，远小于灰态缺口的误应用风险。
+    const updateAvailable = !state.isPending && !state.isFetching
+        && stateData?.pending?.upToDate === false
 
     return (
         <AdminPage
@@ -151,7 +152,7 @@ export default function ContentManagement() {
                 type="primary"
                 loading={busy}
                 onClick={() => apply.mutate()}
-                disabled={busy || upToDate}
+                disabled={busy || !updateAvailable}
             >
                 应用内容更新
             </Button>
