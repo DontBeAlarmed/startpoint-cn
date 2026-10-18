@@ -904,6 +904,28 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
         (player_id, campaign_id, gacha_id, period_start_time, period_end_time,
          free_one_times, free_ten_times)
         VALUES (?, 1, 80000, 1693526400, 1694304000, 1, 2)`).run(playerId)
+    // R-12：服务操作/服务器配置域在 v1 恢复后必须保留
+    const { addLocalFollowSync } = require("../src/data/domains/follow")
+    const followTargetId = insertDefaultPlayerSync(createAccount("legacy-target").id).id
+    addLocalFollowSync({ sourcePlayerId: playerId, targetPlayerId: followTargetId, followedAtMs: 1700000000000 })
+    const { insertScheduledResourceRuleSync, recordScheduledResourceGrantsWithinTransactionSync } = require("../src/data/domains/scheduled-resource")
+    const restockRule = insertScheduledResourceRuleSync({
+        scope: "player",
+        playerId,
+        rewardType: "free_vmoney",
+        rewardId: null,
+        grantAmount: 1,
+        triggerThreshold: 5,
+        inventoryCap: 10,
+        enabled: true,
+        startsAtReal: null,
+        endsAtReal: null,
+        description: "r12-preserve",
+    })
+    getDb().transaction(() => {
+        recordScheduledResourceGrantsWithinTransactionSync(playerId, [restockRule.id], "2026-08-24", new Date())
+    })()
+
     const result = restorePlayerSaveSnapshotSync({
         schema: "starpoint-cn-save",
         version: 1,
@@ -923,6 +945,17 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
     assert.equal(
         db.prepare("SELECT total_obtained FROM players_collected_items WHERE player_id = ? AND item_id = 30005").get(playerId).total_obtained,
         41,
+    )
+    // R-12：follows 与定时资源状态必须在 v1 恢复后保留（与 v2 对齐）
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS n FROM players_follows WHERE follower_player_id = ?").get(playerId).n,
+        1,
+        "players_follows 必须在 v1 恢复后保留",
+    )
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS n FROM players_scheduled_resource_state WHERE player_id = ?").get(playerId).n,
+        1,
+        "定时资源状态必须在 v1 恢复后保留",
     )
     assert.deepEqual(
         db.prepare(`SELECT gacha_id FROM players_gacha_info
@@ -1135,6 +1168,7 @@ test("legacy v1 restore preserves rush, carnival, bond exchange, and campaign st
 
     const dataV1 = cloneJson(getMergedPlayerDataSync(playerId))
     dataV1.player.name = "legacy-newer-domains-restored"
+
     const result = restorePlayerSaveSnapshotSync({
         schema: "starpoint-cn-save",
         version: 1,

@@ -73,6 +73,10 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     "players_receive_history",
     "players_mails",
     "players_bond_token_exchanges",
+    // R-12：与 v2 restore 对齐——服务操作/服务器配置域不被 v1 恢复级联抹除
+    // （replacePlayerDataSync 的 DELETE FROM players 会经 FK CASCADE 波及它们）
+    "players_follows",
+    "players_scheduled_resource_state",
 ])
 
 export {
@@ -551,6 +555,24 @@ function restoreLegacyV1SaveSync(
         definition.name,
         selectPlayerRows(database, definition, targetPlayerId),
     ]))
+    // R-12：follows / 定时资源状态不在 PLAYER_SAVE_TABLES 管理域内
+    // （PLAYER_SAVE_EXCLUDED_TABLES 的 serverOperation/serverConfig），
+    // 直接查库保留——DELETE FROM players 的 FK CASCADE 会波及它们
+    // R-12：三张服务域表在 replacePlayerDataSync 的 DELETE FROM players
+    // 级联中被抹除，需捕获并在 restore 事务内按父先子后回填：
+    // scheduled_resource_rules（规则，被 state 的 FK 引用）→
+    // players_scheduled_resource_state（发放状态）→ players_follows
+    //（无 player_id 列，双向谓词）。
+    const preservedExternal = new Map<string, PlayerSaveRow[]>(
+        [["scheduled_resource_rules", "player_id = ?"],
+         ["players_scheduled_resource_state", "player_id = ?"],
+         ["players_follows", `follower_player_id = ? OR followed_player_id = ?`]].map(([tableName, predicate]) => [
+            tableName,
+            predicate === "player_id = ?"
+                ? database.prepare(`SELECT * FROM ${tableName} WHERE player_id = ?`).all(targetPlayerId) as PlayerSaveRow[]
+                : database.prepare(`SELECT * FROM ${tableName} WHERE ${predicate}`).all(targetPlayerId, targetPlayerId) as PlayerSaveRow[],
+        ]),
+    )
     const preservedGachaIds = new Set([
         ...(preserved.get("players_gacha_details") ?? []),
         ...(preserved.get("players_stars_gacha_campaigns") ?? []),
@@ -585,6 +607,18 @@ function restoreLegacyV1SaveSync(
             ) VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(gacha_id, player_id) DO NOTHING
         `)
+        // R-12：回填服务操作/服务器配置域（follows + 定时资源状态）
+        for (const [tableName, rows] of preservedExternal) {
+            if (rows.length === 0) continue
+            const columns = Object.keys(rows[0])
+            const insert = database.prepare(`
+                INSERT INTO ${tableName} (${columns.join(", ")})
+                VALUES (${columns.map(() => "?").join(", ")})
+            `)
+            for (const row of rows) {
+                insert.run(...columns.map(column => (row as Record<string, unknown>)[column]))
+            }
+        }
         for (const row of preservedGachaParents) {
             insertMissingGachaParent.run(
                 row.gacha_id,
