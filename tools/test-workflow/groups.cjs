@@ -344,7 +344,9 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:multi-hub": {
         execution: "serial",
-        timeoutMs: 120_000,
+        // R-16：E2E 用例自身声明 timeout 210s（multi-hub-process.test.js:59），
+        // 组预算必须 ≥ 210s，否则结构性 flaky（进程级测试被组闸先杀）
+        timeoutMs: 240_000,
         tests: [
             "tests/multi-hub-battle-flow.test.js",
             "tests/multi-hub-process-harness.test.js",
@@ -811,6 +813,9 @@ const AGGREGATE_GROUPS = Object.freeze({
         ...quickGroups,
         ...integrationGroups,
         "admin",
+        // R-19：generator 组纳入 full 聚合——9 个内容生成器测试此前不被任何
+        // npm 脚本运行（事实孤儿），verify:full/test:full 现在覆盖它们
+        "generator",
         "generator:mission-event",
     ]),
 })
