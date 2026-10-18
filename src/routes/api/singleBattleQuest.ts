@@ -29,6 +29,7 @@ import {
 } from "../../lib/quest/finish/session-validator"
 import { parseAssetProviderConfig, shouldFlagSettlementAssetUpdate, type AssetProviderConfig } from "../../content/cdn/asset-mode"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
+import { rememberSingleFinishResponse, getSettledSingleFinishResponse } from "../../lib/quest/finish/single-finish-replay-cache"
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
 import { buildSingleFinishResponse, buildStaleSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
@@ -163,6 +164,8 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
         // 不结算、不删除活跃任务 —— 既避免把 400 渲染成 H400，也避免用旧 body
         // 提前结算新一局（多人路径已有同型校验，单人路径此前缺失）。
         const activeQuest = activeQuests[playerId]
+        // 新一代任务活跃但收到旧 playId → 迟到局：零奖励终态（既有语义，
+        // 不得被回放劫持——回放会带出旧局奖励）
         if (activeQuest !== undefined && activeQuest.playId !== body.play_id) {
             const stalePlayer = getPlayerSync(playerId)
             if (stalePlayer === null) return reply.status(400).send({
@@ -200,6 +203,18 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             return reply.header("content-type", "application/x-msgpack").status(200).send(staleResponse)
         }
 
+        // R-26：无活跃任务（上一局已结算删除）的同 playId 重试 → 回放
+        // 缓存的同一响应（幂等）；缓存未命中保持 400
+        if (activeQuest === undefined) {
+            const settledReplay = getSettledSingleFinishResponse(playerId, body.play_id)
+            if (settledReplay !== null) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send(settledReplay)
+            }
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Invalid play id.",
+            })
+        }
         const finishResult = settleSingleBattleQuest({
             playerId,
             memoryActiveQuest: activeQuests[playerId],
@@ -238,6 +253,8 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             },
             mailArrived: getPlayerMailCountSync(playerId, true) > 0,
         })
+        // R-26：记录已结算响应，TTL 内同 playId 重试回放同一响应（幂等）
+        rememberSingleFinishResponse(playerId, body.play_id, response)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send(response)
 
