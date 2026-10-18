@@ -307,6 +307,38 @@ test("player history milestones roll back with their caller transaction", () => 
     assert.deepEqual(getPlayerHistoryMilestonesSync(otherPlayer.id), [])
 })
 
+test("tryLoadPlayerHistoryCatalog returns null outside all windows; routes degrade without 500 (R-14)", () => {
+    const restoreOutOfWindow = installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "player_history.json",
+            "player_history_card_background.json",
+            "player_history_topic.json",
+        ],
+    })
+    try {
+        const { tryLoadPlayerHistoryCatalog, loadPlayerHistoryCatalog } = require("../src/lib/player-history-catalog")
+        assert.throws(
+            () => loadPlayerHistoryCatalog(Date.parse("2020-01-01T00:00:00.000Z")),
+            /no history period/,
+            "bundled 目录在 2020 年无窗口（既有语义）",
+        )
+        assert.equal(
+            tryLoadPlayerHistoryCatalog(Date.parse("2020-01-01T00:00:00.000Z")),
+            null,
+            "try 变体必须返回 null 而非抛错",
+        )
+        // bundled 行的第二列（2025-06-19）是预热区间，第三列（2025-07-17 12:00 JST =
+        // 04:00Z）才开窗；既有边界测试已实证。取窗口内时刻验证 try 变体。
+        assert.notEqual(
+            tryLoadPlayerHistoryCatalog(Date.parse("2025-07-17T04:00:00.000Z")),
+            null,
+            "窗口开启后仍正常返回目录",
+        )
+    } finally {
+        restoreOutOfWindow()
+    }
+})
+
 test("player history windows open at the CN calendar boundary under offset 480", () => {
     const restoreBoundarySnapshot = installBundledGameplaySnapshot({
         additionalTableNames: [

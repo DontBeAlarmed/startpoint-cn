@@ -18,6 +18,7 @@ import { parseGlobalPartyId } from "../../lib/special-event-parties"
 import {
     createEmptyPlayerHistoryTopicValues,
     loadPlayerHistoryCatalog,
+    tryLoadPlayerHistoryCatalog,
     PlayerHistoryCatalog,
 } from "../../lib/player-history-catalog"
 import { loadPlayerHistoryTopicValuesSync } from "../../lib/player-history-stats"
@@ -138,7 +139,25 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/index", async (request, reply) => {
         const resolved = await resolvePlayer(request, reply)
         if (!resolved) return
-        const catalog = loadPlayerHistoryCatalog(getServerTime() * 1000)
+        // R-14：虚拟时间调出全部历史时间窗时目录不可构建——返回空档案
+        // 而非 500（目录每次请求惰性重建，抛错即全端点打挂）
+        const catalog = tryLoadPlayerHistoryCatalog(getServerTime() * 1000)
+        if (catalog === null) {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                data_headers: generateDataHeaders({ viewer_id: resolved.viewerId }),
+                data: {
+                    player_history_id: 0,
+                    background_card_id: 0,
+                    degree_id: resolved.player.degreeId,
+                    favorite_character: {
+                        character_ids: [null, null],
+                        unison_character_ids: [null, null],
+                    },
+                    player_history_topic_list: {},
+                },
+            })
+        }
         const defaults = getDefaults(resolved.playerId, resolved.player, catalog)
         const settings = getPlayerHistorySettingsSync(
             resolved.playerId,
@@ -175,7 +194,10 @@ const routes = async (fastify: FastifyInstance) => {
     fastify.post("/edit", async (request, reply) => {
         const resolved = await resolvePlayer(request, reply)
         if (!resolved) return
-        const catalog = loadPlayerHistoryCatalog(getServerTime() * 1000)
+        const catalog = tryLoadPlayerHistoryCatalog(getServerTime() * 1000)
+        if (catalog === null) {
+            return reply.status(400).send({ error: "Bad Request", message: "Player history is not available at the current server time." })
+        }
         const body = request.body as RequestBody
         const fields = [
             body.party_info,

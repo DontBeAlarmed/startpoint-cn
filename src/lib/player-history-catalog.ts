@@ -144,6 +144,22 @@ function parseTopics(table: RawNestedTable, historyId: number): readonly PlayerH
         }))
 }
 
+// R-14：时间窗全空（管理员把虚拟时间调出所有 period）时返回 null 而非抛错——
+// 目录是请求时惰性构建且无缓存，抛错即让 profile/player_history 全端点 500
+export function tryLoadPlayerHistoryCatalog(
+    nowMs: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): PlayerHistoryCatalog | null {
+    try {
+        return loadPlayerHistoryCatalog(nowMs, calendar)
+    } catch (error) {
+        if (error instanceof Error && error.message.includes("no history period is available")) {
+            return null
+        }
+        throw error
+    }
+}
+
 export function loadPlayerHistoryCatalog(
     nowMs: number,
     calendar: GameCalendarPolicy = getGameCalendar(),
