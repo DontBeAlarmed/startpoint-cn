@@ -58,7 +58,11 @@ function notifyRoomDisbanded(roomNumber: string, hostPlayerId: number): void {
 
 function cleanExpiredRooms(timing: RoomCleanupTiming) {
     const now = getRealNowMs();
-    const timeOffset = now - getServerTime() * 1000;
+    // R-15=B：房间老化锚真实时间。host_entry_time 写入点（createRoom/
+    // updateHostEntryTime）同步改为 getRealNowMs()，偏移换算删除——
+    // timeOffset 调整不得使存量房间瞬时全灭或永不过期。
+    // 旧值（虚拟秒）与新值（真实毫秒）混存窗口内可能出现一次瞬态误判，可接受。
+    const timeOffset = 0;
     let cleaned = 0;
     for (const [roomNumber, room] of rooms) {
         if (room.raising_state === 4) {
@@ -195,7 +199,8 @@ export function createRoom(
         created_at: getRealNowMs(),
         raising_state: 2,
         room_sequence: roomSequence++,
-        host_entry_time: getServerTime(),
+        // R-15=B：入场时刻锚真实时间（见 cleanExpiredRooms 注释）
+        host_entry_time: Math.floor(getRealNowMs() / 1000),
         member_participants: [{ ...hostParticipant }],
         mates: [],
         share_room_options: 0,
@@ -354,6 +359,7 @@ export function disbandRoom(roomNumber: string): boolean {
 export function updateHostEntryTime(roomNumber: string): boolean {
     const room = rooms.get(roomNumber);
     if (!room) return false;
-    room.host_entry_time = getServerTime();
+    // R-15=B：与清理逻辑同一时钟域
+    room.host_entry_time = Math.floor(getRealNowMs() / 1000);
     return true;
 }

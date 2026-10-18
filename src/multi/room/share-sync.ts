@@ -73,8 +73,10 @@ export function deleteRoomShareRowForDisband(roomNumber: string): void {
 }
 
 function getShareNowMs(): number {
-    // 与 attention/social_room_shares 写入侧同一时钟（getServerTime，受全局
-    // timeOffset）——expires_at 比较两侧必须同源
-    const { getServerTime } = require("../../utils") as typeof import("../../utils")
-    return getServerTime() * 1000
+    // R-15=B：基础设施 TTL（房间招募行寿命）锚定真实时间——虚拟时间轴属于
+    // 内容排期，timeOffset 调整不得使招募行瞬时全灭或永不过期。
+    // 写入侧（attention/social_room_shares）与读取侧（本函数、lobby 列表）
+    // 同步改锚，两侧同源。
+    const { getRealNowMs } = require("../../runtime/time/game-time") as typeof import("../../runtime/time/game-time")
+    return getRealNowMs()
 }

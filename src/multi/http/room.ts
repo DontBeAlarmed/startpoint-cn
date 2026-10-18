@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { describeError } from "../describe-error";
 import { PrepareBody, SummonBody, RestoreRoomBody, ShareRoomBody } from "../types";
 import { generateDataHeaders, getServerTime } from "../../utils";
+import { getRealNowMs } from "../../runtime/time/game-time";
 import { serializeRoomStatusConnection } from "../room/serializer";
 import { buildNpcMates } from "../npc/builder";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
@@ -198,7 +199,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         //   客户端 Faild 重开铃），NPC 由服务端注入在 W 到点时进场（批次三）
         // 双审修订：判定路径（settings 读 + 招募行读）整体 fail-open——共享库
         // 抖动等 DB 异常时回退为直接发候选（提交前行为），恒 200 不变式优先。
-        const nowMs = getServerTime() * 1000;
+        const nowMs = getRealNowMs(); // R-15=B 招募行 TTL 锚真实时间
         let serveCandidates = true;
         try {
             const settings = getServerGameplaySettingsSync();
@@ -396,10 +397,10 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                         rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
                         hostEntryTime: room.value.hostEntryTime,
                     }),
-                    nowMs: getServerTime() * 1000,
+                    nowMs: getRealNowMs(), // R-15=B
                 });
                 console.log(`[MULTI] share_room ${recruitment.created ? "created" : "refreshed"} key=${recruitment.attentionKey}`);
-                pruneExpiredRecruitments(getServerTime() * 1000);
+                pruneExpiredRecruitments(getRealNowMs()); // R-15=B
                 // 私服混合：发布后挂服务端 NPC 释放点（W>0 时启用；回调内惰性重读配置）
                 scheduleNpcRelease(body.room_number);
             } catch (error) {

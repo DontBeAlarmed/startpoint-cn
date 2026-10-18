@@ -31,7 +31,8 @@ export function getCachedFinishResponse(
     if (key === null) return null
     const entry = cacheByKey.get(key)
     if (entry === undefined) return null
-    if (getServerTime() * 1000 > entry.expiresAtMs) {
+    // R-15=B：缓存 TTL 锚真实时间（基础设施瞬态，与内容时间轴无关）
+    if (Date.now() > entry.expiresAtMs) {
         cacheByKey.delete(key)
         return null
     }
@@ -57,6 +58,6 @@ export function cacheFinishResponse(
     cacheByKey.set(key, {
         key,
         response,
-        expiresAtMs: getServerTime() * 1000 + DEFAULT_TTL_MS,
+        expiresAtMs: Date.now() + DEFAULT_TTL_MS,
     })
 }

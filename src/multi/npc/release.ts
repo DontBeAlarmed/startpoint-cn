@@ -19,7 +19,7 @@ import {
     refreshRecruitmentForRoom,
 } from "../../data/domains/attention"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
-import { getServerTime } from "../../utils"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 /**
  * 私服混合的窗口释放点（设计 v2 §3「服务端注入」）：客户端每场景只发一次 summon
@@ -67,7 +67,7 @@ function fireOrReschedule(lifecycle: LobbyLifecycleGuard, roomNumber: string): v
     if (!settings.multiRandomRecruitmentPublishEnabled || settings.multiNpcReleaseSeconds <= 0) return
     const room = getRoom(roomNumber)
     if (!room) return
-    const nowMs = getServerTime() * 1000
+    const nowMs = getRealNowMs() // R-15=B 招募/交付 TTL 锚真实时间
     // 活性重锚：优先取未过期 open 行；仅 status='open' 但已过期（客户端重发停摆，
     // 而非招募关闭）时服务端接管——视为到点继续注入（双审 B-3 退化分支）
     let recruitment = findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs)
@@ -111,7 +111,7 @@ export function applyNpcPostFill(roomNumber: string): void {
         const settings = getServerGameplaySettingsSync()
         const room = getRoom(roomNumber)
         if (!room) return
-        const nowMs = getServerTime() * 1000
+        const nowMs = getRealNowMs() // R-15=B 招募/交付 TTL 锚真实时间
         if (settings.multiNpcCloseRecruitmentAfterFill) {
             closeRecruitmentForRoom(room.host_viewer_id, roomNumber)
         } else if (settings.multiRandomRecruitmentPublishEnabled) {
