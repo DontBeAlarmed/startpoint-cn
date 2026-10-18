@@ -99,7 +99,11 @@ test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本
     const { resetSharedSocialDbForTest } = require("../src/data/social/shared-db")
     resetSharedSocialDbForTest()
     const previousPath = process.env.MULTI_SOCIAL_DB_PATH
-    process.env.MULTI_SOCIAL_DB_PATH = "/proc/definitely-not-writable/social.sqlite"
+    // 跨平台的"不可写"形态：只读目录下的路径（/proc 上的 recursive mkdir
+    // 在 Linux 会挂起，不能用）
+    const readOnlyDir = fs.mkdtempSync(path.join(os.tmpdir(), "social-readonly-"))
+    fs.chmodSync(readOnlyDir, 0o555)
+    process.env.MULTI_SOCIAL_DB_PATH = path.join(readOnlyDir, "social.sqlite")
     console.error("[SF-DEBUG] t3.a reset done, bad path set")
     try {
         console.error("[SF-DEBUG] t3.b try entered")
@@ -158,7 +162,11 @@ test("共享库不可用时 relation fail-closed 为 none", () => {
     const { resetSharedSocialDbForTest } = require("../src/data/social/shared-db")
     resetSharedSocialDbForTest()
     const previousPath = process.env.MULTI_SOCIAL_DB_PATH
-    process.env.MULTI_SOCIAL_DB_PATH = "/proc/definitely-not-writable/social.sqlite"
+    // 跨平台的"不可写"形态：只读目录下的路径（/proc 上的 recursive mkdir
+    // 在 Linux 会挂起，不能用）
+    const readOnlyDir = fs.mkdtempSync(path.join(os.tmpdir(), "social-readonly-"))
+    fs.chmodSync(readOnlyDir, 0o555)
+    process.env.MULTI_SOCIAL_DB_PATH = path.join(readOnlyDir, "social.sqlite")
     try {
         const a = 740000901
         const b = 740000902
