@@ -57,6 +57,7 @@ function makeViewerPair(tag) {
 }
 
 test("共享形态：本模块写共享文件，第二连接（模拟节点 B）读到同一行", () => {
+    console.error("[SF-DEBUG] enter: 共享形态：本模块写共享文件，第二连接（模拟节点 B）读到同一行")
     const a = makeViewerPair("a")
     const b = makeViewerPair("b")
     const { upsertSharedFollowEdgeSync } = require("../src/data/domains/social-follow")
@@ -78,6 +79,7 @@ test("共享形态：本模块写共享文件，第二连接（模拟节点 B）
 })
 
 test("共享形态：双行 mutual / 单行 single / 零行 none", () => {
+    console.error("[SF-DEBUG] enter: 共享形态：双行 mutual / 单行 single / 零行 none")
     const a = makeViewerPair("m")
     const b = makeViewerPair("n")
     const { upsertSharedFollowEdgeSync, deleteSharedFollowEdgeSync } = require("../src/data/domains/social-follow")
@@ -89,7 +91,8 @@ test("共享形态：双行 mutual / 单行 single / 零行 none", () => {
     deleteSharedFollowEdgeSync(b.viewerId, a.viewerId)
     assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "single")
     deleteSharedFollowEdgeSync(a.viewerId, b.viewerId)
-    assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "none")
+      console.error("[SF-DEBUG] enter: 共享库不可用时 follow add 端点仍成功（双写降级 WARN，本地权威不受影响）")
+  assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "none")
 })
 
 test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本地权威不受影响）", async () => {
@@ -144,6 +147,7 @@ test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本
 })
 
 test("共享库不可用时 relation fail-closed 为 none", () => {
+    console.error("[SF-DEBUG] enter: 共享库不可用时 relation fail-closed 为 none")
     // 重置共享库单例并指向不可写路径，使连接打开失败
     const { resetSharedSocialDbForTest } = require("../src/data/social/shared-db")
     resetSharedSocialDbForTest()
