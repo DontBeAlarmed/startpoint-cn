@@ -91,11 +91,11 @@ test("共享形态：双行 mutual / 单行 single / 零行 none", () => {
     deleteSharedFollowEdgeSync(b.viewerId, a.viewerId)
     assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "single")
     deleteSharedFollowEdgeSync(a.viewerId, b.viewerId)
-      console.error("[SF-DEBUG] enter: 共享库不可用时 follow add 端点仍成功（双写降级 WARN，本地权威不受影响）")
-  assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "none")
+    assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "none")
 })
 
 test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本地权威不受影响）", async () => {
+    console.error("[SF-DEBUG] enter: 共享库不可用时 follow add 端点仍成功（双写降级 WARN，本地权威不受影响）")
     const { resetSharedSocialDbForTest } = require("../src/data/social/shared-db")
     resetSharedSocialDbForTest()
     const previousPath = process.env.MULTI_SOCIAL_DB_PATH
