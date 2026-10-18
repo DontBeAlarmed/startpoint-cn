@@ -47,7 +47,7 @@ export interface PreparedRewardGrantExecution {
     readonly plan: RewardGrantExecutionPlan
     readonly result: RewardGrantExecutionResult
     readonly inventoryCheckpoint: InventoryBatchCheckpoint
-    persistPlayerResources(): void
+    persistPlayerResources(): import("../mission/settlement").MissionSettlementResult | null
     writeItemOverflows(): void
 }
 
@@ -264,8 +264,10 @@ export function prepareRewardGrantExecution(
             if (persisted) {
                 throw new RewardGrantAssetExecutionError(-1, "Player resources already persisted")
             }
-            persistPlayerResourceGrantsWithinTransactionSync(resourceBefore, resourceAfter)
+            // R-07：玛纳入账任务结算结果随 persist 透出（调用方可投影）
+            const manaAdditionMissionSettlement = persistPlayerResourceGrantsWithinTransactionSync(resourceBefore, resourceAfter)
             persisted = true
+            return manaAdditionMissionSettlement
         },
         writeItemOverflows() {
             for (const overflow of pendingItemOverflows) {

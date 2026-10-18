@@ -156,6 +156,8 @@ export interface RewardGrantExecutionResult {
     readonly entries: readonly RewardGrantExecutionEntryResult[]
     readonly assets: RewardGrantAssetResult
     readonly playerAfter: RewardGrantKnownPlayerState
+    /** R-07：玛纳入账任务（40 族）的窄域结算结果，persist 时产生；响应投影可消费 */
+    readonly manaAdditionMissionSettlement?: import("../mission/settlement").MissionSettlementResult
 }
 
 export type RewardGrantContractField =

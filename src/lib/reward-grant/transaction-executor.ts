@@ -86,9 +86,15 @@ function finalizeOwnedExecution(
         throw new RewardGrantExecutionTransactionError("INVENTORY_CHANGED_AFTER_GRANT")
     }
     inventory.flush()
-    prepared.persistPlayerResources()
+    // R-07：玛纳入账任务结算结果并入执行结果（调用方可投影）
+    const manaAdditionMissionSettlement = prepared.persistPlayerResources()
     prepared.writeItemOverflows()
-    return prepared.result
+    return manaAdditionMissionSettlement === null
+        ? prepared.result
+        : {
+            ...prepared.result,
+            manaAdditionMissionSettlement,
+        }
 }
 
 function validateExecutionOptions(

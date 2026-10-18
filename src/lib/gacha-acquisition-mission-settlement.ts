@@ -39,13 +39,15 @@ export function settleGachaAcquisitionMissions(
 // 角色/装备」的重入级联（角色侧原护栏语义并入此处）。
 let settlingAtWritePoint = false
 
-export function settleAcquisitionMissionsAtWritePoint(playerId: number): void {
-    if (settlingAtWritePoint) return
+// R-07：返回结算结果（调用方可投影 mission_info）；失败 WARN 时返回 null
+export function settleAcquisitionMissionsAtWritePoint(playerId: number): MissionSettlementResult | null {
+    if (settlingAtWritePoint) return null
     settlingAtWritePoint = true
     try {
-        settleGachaAcquisitionMissions(playerId, getServerDate())
+        return settleGachaAcquisitionMissions(playerId, getServerDate())
     } catch (error) {
         console.warn("[MISSION] acquisition mission settle at write point failed", error)
+        return null
     } finally {
         settlingAtWritePoint = false
     }

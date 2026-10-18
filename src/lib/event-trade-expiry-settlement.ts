@@ -12,6 +12,7 @@ import {
 } from "./inventory/event-trade-expiry-plan"
 import { planManaCapacity } from "./inventory/mana-capacity-plan"
 import { insertManaOverflowMailsWithinTransactionSync } from "./mail-overflow"
+import type { MissionSettlementResult } from "./mission/settlement"
 
 interface EventTradeExpirySettlementInput {
     readonly playerId: number
@@ -112,10 +113,12 @@ export function settleEventTradeExpiryOnLoadSync(
             totalManaObtained: nextTotalManaObtained,
         })
         // 玛纳入账（任务 40 族）当场窄域结算（活动兑换过期入口）
+        let manaAdditionSettlement: MissionSettlementResult | null = null
         if (capacity.acceptedMana > 0) {
             const { settleManaAdditionMissions } = require("./mana-addition-mission-settlement") as typeof import("./mana-addition-mission-settlement")
             const { getServerDate } = require("../utils") as typeof import("../utils")
-            settleManaAdditionMissions(input.playerId, getServerDate())
+            // R-07：结果接入返回值供调用方投影（原为丢弃）
+            manaAdditionSettlement = settleManaAdditionMissions(input.playerId, getServerDate())
         }
         if (capacity.overflowMana > 0) {
             const maxAttachmentNumber = Math.max(

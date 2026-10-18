@@ -1,4 +1,5 @@
 import { getDb } from "../data/db"
+import type { MissionSettlementResult } from "./mission/settlement"
 
 export type PlayerGrantResource = "freeMana" | "freeVmoney" | "expPool"
 
@@ -81,7 +82,7 @@ export function snapshotPlayerResourceGrantState(
 export function persistPlayerResourceGrantsWithinTransactionSync(
     before: PlayerResourceGrantState,
     after: PlayerResourceGrantState,
-): void {
+): MissionSettlementResult | null {
     if (!getDb().inTransaction) {
         throw new PlayerResourceGrantError("playerId", "Player resource grant requires a transaction")
     }
@@ -98,7 +99,7 @@ export function persistPlayerResourceGrantsWithinTransactionSync(
     }
     if (manaDelta === 0
         && normalizedAfter.freeVmoney === normalizedBefore.freeVmoney
-        && normalizedAfter.expPool === normalizedBefore.expPool) return
+        && normalizedAfter.expPool === normalizedBefore.expPool) return null
 
     const vmoneyDelta = normalizedAfter.freeVmoney - normalizedBefore.freeVmoney
     const expPoolDelta = normalizedAfter.expPool - normalizedBefore.expPool
@@ -152,6 +153,8 @@ export function persistPlayerResourceGrantsWithinTransactionSync(
     if (manaDelta > 0) {
         const { settleManaAdditionMissions } = require("./mana-addition-mission-settlement") as typeof import("./mana-addition-mission-settlement")
         const { getServerDate } = require("../utils") as typeof import("../utils")
-        settleManaAdditionMissions(normalizedAfter.playerId, getServerDate())
+        // R-07：返回结算结果供调用方投影（原为丢弃）
+        return settleManaAdditionMissions(normalizedAfter.playerId, getServerDate())
     }
+    return null
 }
