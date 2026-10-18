@@ -2329,6 +2329,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/equipment_dissolve.test.cjs",
         "tools/equipment_enhancement.test.cjs",
         "tools/economy_write_transaction.test.cjs",
+        "tools/economy_idempotency.test.cjs",
         "tools/event_currency.test.cjs",
         "tools/free_first_deduction.test.cjs",
         "tools/gacha_write_transaction.test.cjs",
@@ -2387,6 +2388,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
     assert.equal(TEST_GROUPS["quick:protocol"].timeoutMs, 120_000)
     assert.deepEqual(TEST_GROUPS["quick:protocol"].tests, [
         "tools/handshake_lifecycle.test.cjs",
+        "tools/multi_reconnect_admission.test.cjs",
         "tools/global_embedded_startup.test.cjs",
         "tools/lobby_lifecycle.test.cjs",
         "tools/msgpack_compat.test.cjs",

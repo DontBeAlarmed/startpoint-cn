@@ -57,6 +57,14 @@ function deny(socket: net.Socket): void {
     socket.end()
 }
 
+// R-09 拒绝分级：可恢复拒绝走优雅 Denied（客户端 case1 = 按连接被拒处理，
+// 可提示后回大厅/重试），仅协议级参数错误与内部错误保留 Fatal [3]。
+function denyGracefully(socket: net.Socket, reason: string): void {
+    console.log(`[TCP] handshake denied (graceful): ${reason}`)
+    sessionManager.sendJson(socket, [1, "DENIED"])
+    socket.end()
+}
+
 export async function handleHandshake(
     socket: net.Socket,
     data: any,
@@ -147,7 +155,13 @@ export async function handleHandshake(
             || !questMatches
             || (!existingMember && occupiedRealPlayerSlots >= 3)) {
             releaseAdmission()
-            deny(socket)
+            denyGracefully(socket, !room
+                ? "room_missing"
+                : room.raising_state !== 1 && room.raising_state !== 2
+                    ? `room_state_${room.raising_state}`
+                    : !categoryMatches || !questMatches
+                        ? "quest_mismatch"
+                        : "room_full")
             return
         }
 
@@ -156,12 +170,12 @@ export async function handleHandshake(
             normalizedViewerId,
         )
         if (!admission) {
-            deny(socket)
+            denyGracefully(socket, "admission_unavailable")
             return
         }
         if (admission.participant.viewerId !== normalizedViewerId) {
             releaseAdmission()
-            deny(socket)
+            denyGracefully(socket, "admission_viewer_mismatch")
             return
         }
 
@@ -175,7 +189,7 @@ export async function handleHandshake(
             admission.participant,
         ) || hasRoomMemberViewerConflict(room, admission.participant)) {
             releaseAdmission()
-            deny(socket)
+            denyGracefully(socket, "viewer_conflict")
             return
         }
 
@@ -200,19 +214,19 @@ export async function handleHandshake(
             admission.participant,
         )) {
             releaseAdmission()
-            deny(socket)
+            denyGracefully(socket, "host_seat_conflict")
             return
         }
         const added = sessionManager.addClientToRoom(client)
         if (!added.ok) {
             releaseAdmission()
-            deny(socket)
+            denyGracefully(socket, `room_join_${added.error}`)
             return
         }
         if (!addRoomMember(normalizedRoomNumber, admission.participant)) {
             releaseAdmission()
             sessionManager.removeClient(client)
-            deny(socket)
+            denyGracefully(socket, "room_member_write_failed")
             return
         }
         try {

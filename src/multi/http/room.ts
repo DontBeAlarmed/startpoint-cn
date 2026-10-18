@@ -289,6 +289,19 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             console.log(`[MULTI] restore_room: host offline, guest polls raising_state → 2`)
         }
 
+        // 恢复链路补票：原始入场的准入券在首次握手时已被 consume 删除，
+        // 切出切回的成员必须重新签发，否则随后的房间重连握手必然
+        // HANDSHAKE_DENIED [3] Fatal（客户端 U0000 崩溃的根因）。
+        const member = room.value.members.find(member => member.viewerId === viewerId)
+        const issued = member !== undefined
+            ? await issueRoomAdmission(context, room.value.roomNumber, viewerId, member)
+            : null
+        if (issued === null) {
+            console.log(`[MULTI] restore_room: unable to snapshot player ${viewerId}, reconnect admission not issued`)
+        } else if (!issued.ok) {
+            console.log(`[MULTI] restore_room: admission issue failed (${issued.error}) for ${viewerId}`)
+        }
+
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
