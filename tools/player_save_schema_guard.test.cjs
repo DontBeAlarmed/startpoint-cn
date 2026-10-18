@@ -73,6 +73,15 @@ const SERVER_INFRASTRUCTURE_TABLES = new Set([
 initializeDatabase()
 db = getDb()
 
+test("player-save registry introducedSchema never exceeds the release contract schema (R-11)", () => {
+    const contract = require("../assets/server_release_contract.json")
+    const maxIntroduced = Math.max(...PLAYER_SAVE_TABLES.map(definition => definition.introducedSchema ?? 0))
+    assert.ok(
+        maxIntroduced <= contract.currentDataSchema,
+        `registry introducedSchema (${maxIntroduced}) 超过 release contract currentDataSchema (${contract.currentDataSchema})——缺表校验闸门会静默失效（R-11），升 contract 或回退 registry`,
+    )
+})
+
 test("every database table is known to the player save registry, excluded list, or infrastructure allowlist", () => {
     const registered = new Set([
         ...PLAYER_SAVE_TABLES.map(definition => definition.name),
