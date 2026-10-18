@@ -773,6 +773,7 @@ const TEST_GROUPS = Object.freeze({
             "tests/admin-ux-consistency.test.js",
             "tests/admin-webview-save-export.test.js",
             "tools/admin_activity_timeline.test.cjs",
+            "tools/zero_test_routes_behavior.test.cjs",
             "tools/admin_gift_routes.test.cjs",
             "tools/admin_news_routes.test.cjs",
             "tools/admin_mail_type_policy.test.cjs",
