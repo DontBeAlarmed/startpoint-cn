@@ -13,8 +13,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          # 22.x 才支持 NODE_OPTIONS=--force-flushing（挂起诊断需要实时 TAP）
-          node-version: 22
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
@@ -29,6 +28,4 @@ jobs:
           # 并行度压到 2，降低 ts-node 编译与内容安装的 CPU 争用
           TEST_TIMEOUT_SCALE: "5"
           TEST_MAX_PARALLEL: "2"
-          # 子进程 stdout 走管道时块缓冲——挂起时 TAP 输出全丢，强制实时刷新以便诊断
-          NODE_OPTIONS: "--force-flushing"
         run: npm run test:quick
