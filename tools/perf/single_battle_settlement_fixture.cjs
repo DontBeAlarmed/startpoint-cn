@@ -164,6 +164,7 @@ function createActiveQuest({
     playId = "gate-task-18",
     entryItemId,
     entryItemCount,
+    staminaCost = null,
 } = {}) {
     return {
         questId,
@@ -175,6 +176,7 @@ function createActiveQuest({
         coordinatorOrigin: null,
         entryItemId,
         entryItemCount,
+        staminaCost,
         playId,
         continueCount: 0,
     }

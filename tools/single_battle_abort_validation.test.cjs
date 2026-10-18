@@ -7,6 +7,7 @@ const test = require("node:test")
 const { pack, unpack } = require("msgpackr")
 
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
+const { computeRealTimeStamina } = require("../src/lib/stamina")
 const {
     ENTRY_CATEGORY,
     ENTRY_QUEST_ID,
@@ -175,6 +176,42 @@ test("abort rejects an invalid viewer as MsgPack before writes", async () => {
     })
 })
 
+test("abort response projects the refunded stamina in user_info (R-07)", async () => {
+    await withSingleBattleHarness("abort-stamina-projection", async harness => {
+        const playId = "r07-abort-stamina"
+        const STAMINA_COST = 13
+        harness.insertActiveQuest(harness.createActiveQuest({
+            category: ENTRY_CATEGORY,
+            questId: ENTRY_QUEST_ID,
+            playId,
+            entryItemId: ENTRY_ITEM_ID,
+            entryItemCount: 1,
+            staminaCost: STAMINA_COST,
+        }))
+        const beforeLive = computeRealTimeStamina(harness.getPlayer())
+        const response = await postAbort(harness.app, {
+            viewer_id: VIEWER_ID,
+            api_count: 1,
+            play_id: playId,
+            quest_id: ENTRY_QUEST_ID,
+            category: ENTRY_CATEGORY,
+        })
+        assert.equal(response.statusCode, 200, response.body)
+        const payload = decodeMsgpack(response)
+        const projected = payload.data.user_info?.stamina
+        assert.ok(Number.isSafeInteger(projected), `user_info.stamina 必须投影: ${JSON.stringify(payload.data.user_info)}`)
+        // 投影是实时计算值（含自然恢复），事务退还在其上加 13；
+        // 秒级边界内自然恢复可能再 +1，允许 1 点容差
+        assert.ok(
+            projected === beforeLive + STAMINA_COST || projected === beforeLive + STAMINA_COST + 1,
+            `投影必须是退还后的实时值: ${projected} vs ${beforeLive + STAMINA_COST}`,
+        )
+        assert.ok(
+            payload.data.user_info.stamina_heal_time !== undefined,
+            "stamina_heal_time 必须随投影",
+        )
+    })
+})
 test("abort clears stale memory after a committed no-active observation", async () => {
     await withSingleBattleHarness("abort-stale-memory", async harness => {
         const playId = "task-26c-stale-memory"

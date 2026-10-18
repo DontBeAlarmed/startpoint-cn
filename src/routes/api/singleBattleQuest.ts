@@ -282,12 +282,24 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
         })
         const resolvedIdentity = abortResult.resolvedIdentity
 
+        // R-07（abort 投影）：读退还后的真实玩家状态
+        const abortPlayer = getPlayerSync(playerId)
+        if (abortPlayer === null) return sendBadRequest("Invalid viewer id.")
+        const abortStamina = computeRealTimeStamina(abortPlayer)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": headers,
             "data": {
                 ...mergeCommonResponseFragments([{
-                    "user_info": {},
+                    // R-07（abort 投影）：事务已退还体力/入场道具，响应必须
+                    // 携带退还后的真实状态——空 user_info 会让客户端显示停留
+                    // 旧值直到下一次同步
+                    "user_info": {
+                        "stamina": abortStamina,
+                        "stamina_heal_time": realToVirtual(abortPlayer.staminaHealTime),
+                        "free_mana": abortPlayer.freeMana,
+                        "free_vmoney": abortPlayer.freeVmoney,
+                    },
                     "item_list": abortResult.itemList,
                 }]),
                 "category_id": resolvedIdentity.category,
