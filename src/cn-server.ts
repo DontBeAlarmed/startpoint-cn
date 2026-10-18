@@ -53,6 +53,7 @@ import storyQuestApiPlugin from "./routes/api/storyQuest";
 import optionApiPlugin from "./routes/api/option";
 import singleBattleQuestApiPlugin from "./routes/api/singleBattleQuest";
 import { multiBattleRoutes, sessionManager } from "./multi";
+import { registerEconomyIdempotency } from "./routes/api/economy-idempotency";
 import { createMultiRuntimeService } from "./multi/runtime/service";
 import { MultiManagementService } from "./multi/management/service";
 import { createMultiManagementCredentialProvider } from "./multi/management/credentials";
@@ -167,6 +168,11 @@ fastify.register(leitingAuthPlugin, { prefix: "/api/index.php" });
 fastify.register(cnTakeOverPlugin, { prefix: "/api/index.php" });
 
 const apiPrefix = "/api/index.php";
+
+// R-03 经济请求级幂等：按 (会话解析 playerId, api_count) 缓存 200 响应字节，
+// 同计数重试原样回放（不重复执行经济逻辑）。覆盖 /api/index.php 下所有
+// 带 api_count 的 POST；未带该字段的请求（load/asset 等）天然跳过。
+registerEconomyIdempotency(fastify, { prefix: apiPrefix });
 
 function stubMsgpackReply(reply: any, data: any) {
     const servertime = getServerTime()
