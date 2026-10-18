@@ -100,7 +100,9 @@ test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本
     resetSharedSocialDbForTest()
     const previousPath = process.env.MULTI_SOCIAL_DB_PATH
     process.env.MULTI_SOCIAL_DB_PATH = "/proc/definitely-not-writable/social.sqlite"
+    console.error("[SF-DEBUG] t3.a reset done, bad path set")
     try {
+        console.error("[SF-DEBUG] t3.b try entered")
         const Fastify = require("fastify")
         const app = Fastify({ logger: false })
         app.addContentTypeParser(
@@ -115,9 +117,11 @@ test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本
             registerFollowWriteRoutes(instance)
         }, { prefix: "/api/index.php/follow" })
         await app.ready()
+        console.error("[SF-DEBUG] t3.c app ready")
 
         const self = makeViewerPair("degrade-self")
         const target = makeViewerPair("degrade-target")
+        console.error("[SF-DEBUG] t3.d pairs made")
         const viewerId = self.viewerId
         await insertSessionWithToken({
             token: String(viewerId), accountId: self.account.id,
@@ -128,6 +132,7 @@ test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本
             expires: new Date("2099-01-01"), type: SessionType.VIEWER,
         })
 
+        console.error("[SF-DEBUG] t3.e before inject")
         const response = await app.inject({
             method: "POST",
             url: "/api/index.php/follow/add",
@@ -137,6 +142,7 @@ test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本
                 follow_id: target.viewerId,
             }).toString("base64"),
         })
+        console.error("[SF-DEBUG] t3.f inject done:", response.statusCode)
         assert.equal(response.statusCode, 200, "共享写失败必须降级，不得 500")
         const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
         assert.equal(payload.data_headers.result_code, 1, "本地权威写成功")
