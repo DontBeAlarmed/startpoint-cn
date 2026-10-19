@@ -243,6 +243,14 @@ function getAvailableNpcSlotCount(room: MultiRoom, realMates: any[]): number {
     return Math.max(0, Math.min(room.npc_count, 3 - authoritativeViewerIds.size))
 }
 
+// 招募代存活判定：一场一换只在战斗 release 时清 NPC（one-shot clearRoomNpcRoster，
+// npc_count→0 + 过滤 com_id>0）。因此 npc_count>0 且 room.mates 残留 com_id>0 投影
+// ⇒ 自上次招募提交后未开战，此刻的 host Enter 是重连恢复而非 rematch。
+function hasLiveNpcRecruitment(room: MultiRoom): boolean {
+    return room.npc_count > 0
+        && room.mates.some(mate => (mate.com_id ?? 0) > 0)
+}
+
 function limitLobbyMates(mates: any[], hostViewerId: number): any[] {
     const realMates = selectRealMates(mates, hostViewerId)
     const npcSlots = 3 - realMates.length
@@ -340,6 +348,7 @@ export function notifyRoomDisbanded(roomNumber: string): void {
 export async function handleEnterComs(
     client: SessionClient,
     lifecycle: LobbyLifecycleGuard = getLobbyLifecycleGuard(),
+    options: { joinBroadcastDelayMs?: number } = {},
 ): Promise<void> {
     const room = getRoom(client.roomNumber)
     if (!room) return
@@ -424,12 +433,16 @@ export async function handleEnterComs(
 
     if (npcMates.length === 0) return
 
+    // joinDelay 是招募剧场的"NPC 陆续进场"节奏；重连恢复传 0 跳过剧场直接还原名单
+    const joinDelayMs = options.joinBroadcastDelayMs ?? npcRecruitmentTiming.joinDelayMs
+
     // postFill（设计 v2 §3）：NPC 进场提交后的招募行处置——close（官服）关招募 /
     // keep-open（私服）服务端接管行寿命。挂 commit 点（双审定案，非 summon 响应）。
     applyNpcPostFill(client.roomNumber)
 
-    scheduleLobbyTask(() => {
+    scheduleLobbyTask(lifecycle => {
         try {
+            if (!lifecycle.isActive()) return
             if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
             const currentHostClient = findHostClient(client.roomNumber)
             if (!currentHostClient) return
@@ -443,10 +456,11 @@ export async function handleEnterComs(
                 sessionManager.sendJson(enteredClient.socket, [1, [1, projectedMates]])
             }
         } catch { console.error("[LOBBY] EnterComs send-mates failed") }
-    }, npcRecruitmentTiming.joinDelayMs)
+    }, joinDelayMs)
 
-    scheduleLobbyTask(() => {
+    scheduleLobbyTask(lifecycle => {
         try {
+            if (!lifecycle.isActive()) return
             if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
             const currentHostClient = findHostClient(client.roomNumber)
             if (!currentHostClient) return
@@ -462,7 +476,7 @@ export async function handleEnterComs(
             }
             if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
         } catch { console.error("[LOBBY] EnterComs npc-ready failed") }
-    }, npcRecruitmentTiming.joinDelayMs + npcRecruitmentTiming.readyDelayMs)
+    }, joinDelayMs + npcRecruitmentTiming.readyDelayMs)
 }
 
 // An unreleased battle locks the lobby: while raising_state=4 the party,
@@ -513,7 +527,17 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     }
 
     if (isHost) {
-        if (room) reconcileRematchSlots(client, room)
+        if (room) {
+            if (hasLiveNpcRecruitment(room)) {
+                // 重连恢复（切出未开战 → 招募代仍存活）：立即重注入 NPC 并即时广播。
+                // rematch 的 500ms 调度 + joinDelay 广播会把切回后的空房窗拉长到约 2.5s，
+                // 用户感知为"NPC 被清空"——恢复路径不该重演招募剧场。
+                void handleEnterComs(client, getLobbyLifecycleGuard(), { joinBroadcastDelayMs: 0 })
+                    .catch(() => console.error("[LOBBY] EnterComs reconnect restore failed"))
+            } else {
+                reconcileRematchSlots(client, room)
+            }
+        }
         if (client.mates.length > 1) {
             sessionManager.broadcastMateListToRoom(client.roomNumber, client.mates, client)
         }

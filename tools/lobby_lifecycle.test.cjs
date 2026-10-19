@@ -511,10 +511,13 @@ test("all three lobby timeout paths are unrefed, cancelled, and inert after stop
     handleMessage(socket, [0, [10, [{ name: "NPC1" }, { name: "NPC2" }]]])
     await new Promise(resolve => setImmediate(resolve))
     handleMessage(socket, [0, [0, { party: {} }]])
+    // 重连恢复路径：带存活招募代的 Enter 立即重注入（async 提交），广播挂 0ms/500ms
+    await new Promise(resolve => setImmediate(resolve))
 
-    assert.equal(timers.length, 3)
-    assert.deepEqual(timers.map(timer => timer.unrefCalls), [1, 1, 1])
-    assert.deepEqual(getLobbyLifecycleStatus(), { running: true, activeTimers: 3 })
+    assert.equal(timers.length, 4)
+    assert.deepEqual(timers.map(timer => timer.unrefCalls), [1, 1, 1, 1])
+    assert.deepEqual(timers.slice(2).map(timer => timer.delayMs), [0, 500])
+    assert.deepEqual(getLobbyLifecycleStatus(), { running: true, activeTimers: 4 })
 
     const originalSendJson = sessionManager.sendJson
     const originalBroadcast = sessionManager.broadcastToRoom
@@ -644,6 +647,47 @@ test("NPC recruitment uses configured delays and explicit reset restores default
     await flushPromises()
 
     assert.deepEqual(defaultTimers.map(timer => timer.delayMs), [2_000, 2_500])
+})
+
+test("a reconnecting host with a live NPC recruitment restores mates immediately, skipping the rematch clearing window", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host } = createLobbyRoom(t, 531)
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "重连甲" },
+        { com_id: 2, name: "重连乙" },
+    ]
+    stubRecruitment(t, [
+        { viewer_id: 950000001, com_id: 1 },
+        { viewer_id: 950000002, com_id: 2 },
+    ])
+
+    handleMessage(host.socket, [0, [10, []]])
+    await flushPromises()
+    assert.equal(host.client.mates.length, 3)
+
+    // 主机切出（网络断连）：房间与招募代保留，room.mates 残留 NPC 投影
+    handleSocketDisconnect(host.socket)
+    assert.equal(room.mates.filter(mate => (mate.com_id ?? 0) > 0).length, 2)
+
+    // 宽限期内重连（新 socket / 新 connectionId，同 nodeSession 身份）：Enter 即恢复
+    const reconnected = createLobbyClient(room, 531, "host-531-reconnected")
+    t.after(() => sessionManager.removeClientBySocket(reconnected.socket))
+    handleParticipantReconnect(reconnected.client)
+    const restoreTimersStart = timers.length
+    handleMessage(reconnected.socket, [0, [0, { party: {} }]])
+    await flushPromises()
+
+    assert.equal(reconnected.client.mates.length, 3)
+    assert.deepEqual(
+        reconnected.client.mates.filter(mate => mate.comId).map(mate => [mate.comId, mate.name]),
+        [[1, "重连甲"], [2, "重连乙"]],
+    )
+    // 恢复路径跳过招募剧场：名单广播 0ms、NPC 就绪 500ms（rematch 路径是 2000/2500）
+    assert.deepEqual(
+        timers.slice(restoreTimersStart).map(timer => timer.delayMs),
+        [0, 500],
+    )
 })
 
 test("repeated EnterComs preserves the room com_id to contributor-name binding", async t => {
