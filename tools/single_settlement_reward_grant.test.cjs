@@ -407,13 +407,19 @@ test("response state projects write-point mission settlement rewards (N-06)", ()
     const state = createSingleSettlementResponseState(playerId, player)
     // playerAfter 是结算前快照；写入点结算在 persist 阶段给出更新的 free_mana/itemList
     state.observeGrant(Object.freeze({
+        entries: Object.freeze([]),
         playerAfter: {
             playerId,
             freeMana: player.freeMana,
             freeVmoney: player.freeVmoney,
             expPool: player.expPool,
         },
-        assets: Object.freeze({ items: Object.freeze([]), currencies: Object.freeze([]) }),
+        assets: Object.freeze({
+            items: Object.freeze([]),
+            currencies: Object.freeze([]),
+            characters: Object.freeze([]),
+            equipment: Object.freeze([]),
+        }),
         manaAdditionMissionSettlement: {
             missionInfo: [],
             itemList: { 30005: 41 },
