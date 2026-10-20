@@ -16,7 +16,7 @@
   "playerId": 1,
   "producer": {
     "serverVersion": "1.0.1",
-    "dbSchemaVersion": 24,
+    "dbSchemaVersion": 30,
     "contentVersion": "1.4.54"
   },
   "domains": {
@@ -34,14 +34,14 @@
 
 ## 覆盖范围
 
-当前数据库 schema 是 24。快照范围不是按固定表数硬编码，而是继续以 `players` 外键图发现结果和显式注册表对账：
+当前数据库 schema 是 30（契约 `assets/server_release_contract.json` 的 `currentDataSchema`；守卫测试断言注册表 max(introducedSchema) ≤ 契约值）。快照范围不是按固定表数硬编码，而是继续以 `players` 外键图发现结果和显式注册表对账：
 
 - 已登记表进入 `core`、`missions`、`events`、`economy`、`mailbox`；
 - `players_active_quests`、`players_gift_redemptions`、`scheduled_resource_rules` 和
   `players_scheduled_resource_state` 明确排除；
 - 邮件、领取历史、活动扭蛋箱明细、Pass、Raid、登录奖励游标、商店购买计数、campaign lineup、EX 待选结果、玩家履历设置、练习战和无限演武战斗履历均可往返。
 
-schema 23 新增服务器级 `server_news`，schema 24 新增礼包定义和 `players_gift_redemptions`。两者都不进入 V2 快照；礼包领取记录由下文的专用恢复和克隆边界处理。
+schema 23 新增服务器级 `server_news`，schema 24 新增礼包定义和 `players_gift_redemptions`（均不进 V2 快照，礼包领取走专用恢复边界）；schema 25-30 陆续纳入 follow 有向边、定时资源状态、排名奖励台账、任务计数事实表等（v1 恢复保留白名单见 `LEGACY_V1_UNMANAGED_TABLES`）。
 
 注册表位于 `src/data/player-save/registry.ts`。测试会动态遍历当前 SQLite 外键图，并要求发现结果与“已登记 + 明确排除”完全相等。以后新增玩家表但未登记时，CI 会失败，不再静默漏出快照。
 

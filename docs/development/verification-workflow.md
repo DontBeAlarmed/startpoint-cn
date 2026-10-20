@@ -14,10 +14,12 @@
 | 修改 TypeScript | `npm run typecheck` | 执行严格类型检查，不生成构建产物 |
 | 模块提交前 | `npm run verify:full` | 类型、文档、全量测试、卫生检查和 CN build 总门禁 |
 
-需要稳定复测单个测试文件时，使用：
+需要稳定复测单个测试文件时，直接用 node 单文件运行（F-27：`run.cjs --files` 会把文件
+映射到所属分组后执行整组，不是单文件复跑）：
 
 ```bash
-node tools/test-workflow/run.cjs --files tools/example.test.cjs
+node --test tools/example.test.cjs
+node tools/example.test.cjs   # 纯断言式（无 node:test）文件用直跑
 ```
 
 需要验证某个源码路径会选择哪些测试时，优先查看 `tools/test-workflow/select-tests.cjs` 及其单测，不手工复制一份映射表到文档。
