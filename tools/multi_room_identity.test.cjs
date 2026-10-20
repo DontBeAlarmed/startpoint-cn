@@ -42,6 +42,12 @@ stubModule("../src/utils", {
         result_code: result_code ?? 1,
     }),
 })
+// R-15 后 host_entry_time 锚 runtime/time 真实钟（src/utils.getServerTime 已死），
+// stub 必须打在真实消费模块上（与 multi_coordinator_embedded 同型修复）
+stubModule("../src/runtime/time/game-time", {
+    ...require("../src/runtime/time/game-time"),
+    getRealNowMs: () => 1_725_000_000 * 1000,
+})
 
 const players = new Map([
     [101, { playerId: 201, player: { id: 201, name: "Host", rankPoint: 0, leaderCharacterId: 401 } }],

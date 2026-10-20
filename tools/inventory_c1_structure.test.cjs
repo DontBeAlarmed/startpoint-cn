@@ -34,6 +34,8 @@ test("activated Inventory plans are imported only by reviewed production adapter
     assert.deepEqual(violations, [
         "src/lib/event-trade-expiry-settlement.ts",
         "src/lib/item-overflow/disposition.ts",
+        // F-07：出售玛纳上限改用总额口径（planManaCapacity 只读检查，无库存写）
+        "src/lib/item-sell.ts",
         "src/lib/mail-reward-grant.ts",
     ])
 })
