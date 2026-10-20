@@ -65,4 +65,20 @@ assert.equal(
     "client timestamps must round-trip through the virtual clock",
 )
 
+// F-18（池上限对齐客户端）：亿级存量池登录不再被砍到旧 10 万上限
+const hugePoolResult = calculatePooledExpAtRealTime(995_501_598, dateAt(-10 * MINUTE), dateAt(0))
+assert.equal(
+    hugePoolResult.expPool,
+    995_501_598 + 10,
+    "亿级存量池必须在累积后原样增长（不再被 100000 上限砍掉）",
+)
+
+// 上限封顶在 20 亿（客户端真值），不再回卷
+const cappedResult = calculatePooledExpAtRealTime(1_999_999_999, dateAt(-10 * MINUTE), dateAt(0))
+assert.equal(
+    cappedResult.expPool,
+    2_000_000_000,
+    "累积封顶必须是客户端上限 20 亿",
+)
+
 console.log("exp pool time tests passed")

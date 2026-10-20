@@ -1,10 +1,18 @@
 import { getTimeOffset, realDateFromServerTime, realToVirtual } from "../utils"
 
 export const EXP_POOL_GAIN_INTERVAL_MS = 60 * 1000
-export const EXP_POOL_MAX = 100000
+// 客户端真值（config_iosbundled 解码）：上限 2,000,000,000、显示上限 999,999,999。
+// 旧值 100000 会让管理面板设置的亿级池在一次 ≥60s 间隔的登录后被砍到 10 万
+//（2026-10-21 维护者裁决对齐客户端）。
+export const EXP_POOL_MAX = 2_000_000_000
 
 const LEGACY_ANCHOR_TOLERANCE_MS = 5 * EXP_POOL_GAIN_INTERVAL_MS
-const MAX_CATCH_UP_MS = EXP_POOL_MAX * EXP_POOL_GAIN_INTERVAL_MS
+// 追平窗口与余额上限解耦：原 MAX_CATCH_UP_MS = EXP_POOL_MAX × 60s 随上限
+// 放大后≈3800 年，会让 normalizeImportedExpPoolAnchor 的 legacy 锚点迁移
+// 启发式全部失效（2 年前的虚拟锚点落入"可追平"窗口→登录一次性追平海量经验）。
+// 窗口保持原量级（6e9 ms ≈ 69 天真实跨度），只约束"锚点回拨可安全重建"的
+// 判定，不约束余额。
+const MAX_CATCH_UP_MS = 100_000 * EXP_POOL_GAIN_INTERVAL_MS
 
 export interface PooledExpCalculation {
     readonly expPool: number
