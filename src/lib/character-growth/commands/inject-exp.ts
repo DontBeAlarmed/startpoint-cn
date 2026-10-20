@@ -1,5 +1,5 @@
 import { getDb } from "../../../data/db"
-import { getPlayerSync } from "../../../data/domains/player"
+import { collectPlayerDataPooledExpSync, getPlayerSync } from "../../../data/domains/player"
 import { updatePlayerCharacterSync } from "../../../data/domains/character"
 import { incrementActiveMissionInjectedExpCountSync } from "../../../data/domains/active_mission_counters"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
@@ -58,6 +58,12 @@ export function executeInjectCharacterExp(command: InjectCharacterExpCommand): I
         const before = context.character()
         const player = getPlayerSync(command.playerId)
         if (player === null) throw growthError("INVALID_GROWTH_STATE", "player is unavailable.")
+        // expod 主因修复：先在同事务内累积被动经验（推进锚点）再比对库存。
+        // 客户端可花数额是"存库值＋按时间外推"，若服务端用裸库值比对，
+        // 距上次池子写入满 10 分钟后"花光显示值"必被 INSUFFICIENT_EXP 拒绝
+        //（端点按既有设计回 200+未变更事实，客户端表现为等级回滚/池子刷回）。
+        // 两侧产率同源（1/分钟、同一锚点），累积后服务端余量恒 ≥ 客户端显示。
+        collectPlayerDataPooledExpSync(player)
         if (command.addExp > player.expPool) {
             throw growthError("INSUFFICIENT_EXP", "player does not have enough exp pool.")
         }

@@ -151,6 +151,38 @@ test("reward EXP keeps character and bond-token reads before its single batch wr
     assert.doesNotMatch(source.slice(batchWrite), /getPlayerSync\(/)
 })
 
+test("inject_exp accrues pooled exp before comparing, so spending the displayed total always succeeds (expod root cause)", () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    try {
+        const playerId = fixture.createPlayer()
+        // 库里 90 点 + 锚点 10 分钟前（客户端按时间外推显示 100）：
+        // 修复前裸库值比对会把"花光显示值 100"拒成 INSUFFICIENT_EXP
+        fixture.setPlayer(playerId, {
+            expPool: 90,
+            expPooledTime: new Date(Date.now() - 10 * 60 * 1000),
+        })
+        fixture.addCharacter(playerId, 1, { exp: 50 })
+
+        const result = exp.executeInjectCharacterExp({
+            playerId,
+            characterId: 1,
+            addExp: 100,
+            evaluationTime: new Date("2026-08-31T00:00:00.000Z"),
+        })
+
+        const after = fixture.setPlayer(playerId, {})
+        assert.equal(after.expPool, result.expPool)
+        assert.ok(after.expPool <= 1, `累积后花光必须成功（余量仅锚点取整误差，实际 ${after.expPool}）`)
+        // 锚点必须被推进（否则下一轮注入会重复累积同一段）
+        assert.ok(
+            Date.now() - after.expPooledTime.getTime() < 5_000,
+            "注入成功后池子锚点必须推进到当前",
+        )
+    } finally {
+        fixture.cleanup()
+    }
+})
+
 test("inject_exp leaves the save untouched when the pool is insufficient", () => {
     const fixture = createCharacterGrowthC4Fixture()
     try {
