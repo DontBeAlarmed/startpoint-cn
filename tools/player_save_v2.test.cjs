@@ -545,6 +545,29 @@ test("restore preserves target identity, replaces all domains, and clears active
         },
     )
     assert.notEqual(db.prepare("SELECT id FROM players_mails WHERE player_id = ?").get(targetId).id, sourceMailId)
+
+    // F-09：真实业务日标记是服务端内部态——导出不携带、恢复不落档
+    db.prepare(`
+        UPDATE players SET
+            last_daily_reset_real_business_day = '2030-01-01',
+            last_daily_challenge_real_business_day = '2030-01-01'
+        WHERE id = ?
+    `).run(sourceId)
+    const markerSnapshot = exportPlayerSaveV2Sync(sourceId)
+    const markerRow = markerSnapshot.domains.core.tables.players[0]
+    assert.equal("last_daily_reset_real_business_day" in markerRow, false,
+        "导出不得携带 last_daily_reset_real_business_day")
+    assert.equal("last_daily_challenge_real_business_day" in markerRow, false,
+        "导出不得携带 last_daily_challenge_real_business_day")
+    restorePlayerSaveV2Sync(markerSnapshot, targetId)
+    const targetMarkers = db.prepare(`
+        SELECT last_daily_reset_real_business_day, last_daily_challenge_real_business_day
+        FROM players WHERE id = ?
+    `).get(targetId)
+    assert.equal(targetMarkers.last_daily_reset_real_business_day, null,
+        "恢复不得写入日切业务日标记（目标侧保持服务端自身状态）")
+    assert.equal(targetMarkers.last_daily_challenge_real_business_day, null,
+        "恢复不得写入挑战业务日标记")
 })
 
 test("v2 validation rejects future schemas and missing tables that existed in the producer schema", () => {

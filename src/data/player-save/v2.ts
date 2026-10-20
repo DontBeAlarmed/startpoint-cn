@@ -188,6 +188,13 @@ function assertRegistryMatchesDatabase(database: Database): ReadonlyMap<string, 
     return inspection.metadata
 }
 
+// F-09：真实业务日标记是服务端内部态（player.ts 注释明言"刻意不进存档格式"），
+// 导出与恢复均不得携带——随档迁移的未来/空标记会冻结或放大日切
+const SERVER_INTERNAL_PLAYER_COLUMNS = new Set([
+    "last_daily_reset_real_business_day",
+    "last_daily_challenge_real_business_day",
+])
+
 function selectPlayerRows(
     database: Database,
     definition: PlayerSaveTableDefinition,
@@ -200,9 +207,15 @@ function selectPlayerRows(
     const orderBy = primaryKey.length > 0
         ? ` ORDER BY ${primaryKey.map(quotePlayerSaveIdentifier).join(", ")}`
         : ""
-    return database.prepare(
+    const rows = database.prepare(
         `SELECT * FROM ${identifier} WHERE ${predicate}${orderBy}`,
     ).all(playerId) as PlayerSaveRow[]
+    if (definition.name !== "players") return rows
+    return rows.map(row => {
+        const filtered: PlayerSaveRow = { ...row }
+        for (const column of SERVER_INTERNAL_PLAYER_COLUMNS) delete filtered[column]
+        return filtered
+    })
 }
 
 export function exportPlayerSaveV2Sync(
@@ -433,7 +446,10 @@ function updatePlayerRoot(
     metadata: ReadonlyMap<string, PlayerSaveTableMetadata>,
 ): void {
     const currentColumns = getMetadataColumns(database, "players", metadata).map(column => column.name)
-    const columns = currentColumns.filter(column => column !== "id" && column !== "account_id")
+    const columns = currentColumns.filter(column => column !== "id"
+        && column !== "account_id"
+        // F-09：旧版导出文件可能携带业务日标记——恢复时同样跳过（防御旧档）
+        && !SERVER_INTERNAL_PLAYER_COLUMNS.has(column))
     const availableColumns = columns.filter(
         column => Object.prototype.hasOwnProperty.call(sourceRow, column) || column === "time_offset",
     )
