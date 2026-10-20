@@ -308,6 +308,15 @@ function flattenAndValidateV2Snapshot(
     if (!Number.isSafeInteger(producerSchema) || producerSchema < 1) {
         throw new Error("Player save producer schema is invalid")
     }
+    // F-13：producerSchema 下限——首个 v2 发布版（28c24292）registry 最高
+    // introducedSchema=12 且导出戳取自 live user_version，真实 v2 档不可能低于它。
+    // 压低声明会把"缺表=空域清空"的合法路径变成任意域清空的后门
+    const MINIMUM_V2_PRODUCER_SCHEMA = 12
+    if (producerSchema < MINIMUM_V2_PRODUCER_SCHEMA) {
+        throw new Error(
+            `Player save producer schema ${producerSchema} predates the first v2 release; refusing to treat missing tables as empty domains`,
+        )
+    }
     if (producerSchema > currentSchema) {
         throw new Error(`Cannot restore a newer database schema ${producerSchema} into schema ${currentSchema}`)
     }

@@ -693,11 +693,15 @@ test("v2 validation rejects future schemas and missing tables that existed in th
         /players_ex_boost_pending_draws.*missing/i,
     )
 
-    const older = cloneJson(snapshot)
-    older.producer.dbSchemaVersion = 10
-    delete older.domains.events.tables.players_score_attack_battle_history
-    delete older.domains.economy.tables.players_shop_campaign_lineups
-    assert.doesNotThrow(() => restorePlayerSaveV2Sync(older, playerId))
+    // F-13：低于首个 v2 发布版（12）的声明必须整档拒绝——缺表清空的后门
+    const forged = cloneJson(snapshot)
+    forged.producer.dbSchemaVersion = 10
+    delete forged.domains.events.tables.players_score_attack_battle_history
+    delete forged.domains.economy.tables.players_shop_campaign_lineups
+    assert.throws(
+        () => restorePlayerSaveV2Sync(forged, playerId),
+        /predates the first v2 release/i,
+    )
 
     const schema12 = cloneJson(snapshot)
     schema12.producer.dbSchemaVersion = 12
