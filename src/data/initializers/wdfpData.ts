@@ -184,6 +184,13 @@ export default function init(
         FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
     )`).run();
 
+    // F-12：鉴权热路径（resolvePlayerIdSync → getAccountPlayersSync）按
+    // account_id 全表扫，多账号存档部署下放大；account 维度统一建索引
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_account_id
+        ON players (account_id)`).run()
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_account_id
+        ON sessions (account_id)`).run()
+
     // migration: add tutorial_gacha_character_id to existing tables
     ensureSchemaColumn(database, "players.tutorial_gacha_character_id")
 
@@ -406,6 +413,9 @@ export default function init(
         last_seen DATE NOT NULL,
         FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
     )`).run();
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_device_bindings_account_id
+        ON device_bindings (account_id)`).run()
 
     // migration: device_bindings.name for admin panel identification
     ensureSchemaColumn(database, "device_bindings.name")

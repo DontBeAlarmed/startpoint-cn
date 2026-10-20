@@ -70,3 +70,21 @@ test("a v3 database missing players_periodic_snapshots still receives later migr
     `).get(playerId)
     assert.equal(migrated?.last_granted_index, 2, "旧表数据必须并入新表")
 })
+
+test("account-dimension lookups use indexes on all three tables (F-12)", () => {
+    for (const [table, where] of [
+        ["players", "account_id = ?"],
+        ["sessions", "account_id = ?"],
+        ["device_bindings", "account_id = ?"],
+    ]) {
+        const plan = db.prepare(
+            `EXPLAIN QUERY PLAN SELECT id FROM ${table} WHERE ${where}`
+        ).all(1)
+        const planText = plan.map(step => step.detail).join(" | ")
+        assert.match(
+            planText,
+            /USING (COVERING )?INDEX idx_\w+account_id/,
+            `${table} 按 account_id 查询必须走索引（实际计划：${planText}）`,
+        )
+    }
+})
