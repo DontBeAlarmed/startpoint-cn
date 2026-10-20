@@ -125,7 +125,7 @@ async function handshake(room, viewerId, extra = {}, options = {}) {
 test("room handshake rejects unknown, non-joinable, mismatched and full rooms", async t => {
     const missing = await handshake(null, 201)
     assert.equal(missing.ended, true)
-    assert.deepEqual(missing.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.deepEqual(missing.messages.at(-1), [1, "DENIED"])
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(201, "missing-room"), undefined)
 
     const battleRoom = createRoom(101, 1_101, 1, 1, 501, 0, 101)
@@ -195,8 +195,8 @@ test("room admission is required and consumed once", async t => {
     t.after(() => sessionManager.removeClientBySocket(accepted))
 
     assert.equal(accepted.ended, false)
-    assert.deepEqual(replayed.messages.at(-1), [3, "HANDSHAKE_DENIED"])
-    assert.deepEqual(missing.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.deepEqual(replayed.messages.at(-1), [1, "DENIED"])
+    assert.deepEqual(missing.messages.at(-1), [1, "DENIED"])
 })
 
 test("room handshake rejects an admission whose participant viewer differs from the TCP viewer", async t => {
@@ -221,7 +221,7 @@ test("room handshake rejects an admission whose participant viewer differs from 
 
     assert.equal(socket.ended, true)
     assert.equal(released, 1)
-    assert.deepEqual(socket.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.deepEqual(socket.messages.at(-1), [1, "DENIED"])
     assert.equal(sessionManager.getClientByParticipant(room.room_number, {
         nodeSessionId: "node-a",
         viewerId: 227,
@@ -260,7 +260,7 @@ test("an active room participant rejects the same viewer id from a different nod
     })
 
     assert.equal(socketB.ended, true)
-    assert.deepEqual(socketB.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.deepEqual(socketB.messages.at(-1), [1, "DENIED"])
     assert.equal(sessionManager.getClientByParticipant(room.room_number, nodeA)?.socket, socketA)
     assert.equal(sessionManager.getClientByParticipant(room.room_number, nodeB), undefined)
 

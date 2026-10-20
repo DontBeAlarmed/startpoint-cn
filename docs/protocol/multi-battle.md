@@ -234,6 +234,22 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 
 握手阶段只完成连接注册。Welcome 和 Mates 在客户端随后发送 Enter notify 后进入 lobby 流程。
 
+#### 握手结果分级（五值语义与拒绝裁决）
+
+客户端 `SockletConnection.socket_handshakeMultiBattle` 按枚举 index 分发五种握手结果：
+
+| 帧 | 结果 | 客户端行为 | 服务端使用 |
+|---|---|---|---|
+| `[0, connectionId, roomNumber]` | Accept | 建立会话，进入 lobby 流程 | 正常路径 |
+| `[1, "DENIED"]` | Denied | 关闭连接，软提示"连接被拒"，可回大厅重试 | 可恢复拒绝（见下表） |
+| `[2, host, port]` | Reconnect | 拆连接并按服务端给的新地址自动转拨 | 预留（多节点组网时节点转拨；单进程部署无触发场景） |
+| `[3, "HANDSHAKE_DENIED"]` | Exception(Fatal) | `serverError(Fatal)` 错误弹框 | 协议级参数错误与 battle 侧拒绝 |
+| `[4]` | Complete | 静默关闭，无任何 UI 回调 | 预留（"无声关门"场景，当前无使用） |
+
+cooperation_room 拒绝裁决（F-02，2026-10 用户定案）：**日常可恢复拒绝一律走 `[1]`**——房间不存在（`room_missing`，切出期间房主解散/宽限到期被清扫）、房间不在招募态（`room_state_*`）、类别/关卡不一致（`quest_mismatch`）、真人满员（`room_full`）、同 viewer 冲突连接（`viewer_conflict`）、准入券缺失/失效（`admission_unavailable`）与准入身份不符（`admission_viewer_mismatch`）。这些场景是联机日常而非异常，客户端语义里 `[1]` 是唯一"有软提示、能回大厅"的通道（`[4]` 无反馈、`[2]` 是转拨不是拒绝）。
+
+保留 Fatal `[3]`：握手协议参数错误（缺 room number / viewer 非法 / connection id 非法——正常客户端发不出来，出现即协议栈级异常）。cooperation_battle 分支整体保留 `[3]`：战斗期拒绝（房间未开战/未知参与者/重复连接）走 HTTP 兜底链，客户端战斗界面有独立处理，不动。
+
 首个 `socklet` 握手是每条 TCP 连接的顺序屏障。握手与 Enter、SceneReady 等后续帧即使出现在
 同一个 TCP 数据块中，服务端也必须保留后续帧，等待连接注册和节点会话复核完成后再按原顺序处理；
 握手失败、节点失效或连接关闭时不再处理排队帧。客户端和 Launcher 不需要为此人为增加发送延迟。
