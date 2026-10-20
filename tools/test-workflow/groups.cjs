@@ -45,6 +45,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_client_fallback.test.cjs",
             "tools/content_snapshot_reload.test.cjs",
             "tools/content_management.test.cjs",
+            "tools/content_smoke_validators.test.cjs",
             "tools/social_follows_main.test.cjs",
             "tools/social_follows_shared.test.cjs",
             "tools/stale_guard_selfheal.test.cjs",

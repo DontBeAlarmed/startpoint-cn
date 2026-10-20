@@ -1,4 +1,6 @@
 import { buildGachaCatalog } from "./gacha-catalog/catalog"
+import { buildShopCatalog } from "./shop/catalog"
+import { validateQuestContentTablesSync } from "./quest-content"
 import type { ReadonlyContentRepository } from "../content/runtime/content-snapshot"
 
 export class ContentSmokeValidationError extends Error {
@@ -18,11 +20,25 @@ type SmokeValidator = {
 
 // 已知故障面驱动：gacha 142（period reversed）/ gacha 1518（rarity mismatch）
 // 均为 buildGachaCatalog 的惰性校验抛错——在 apply 生效前跑一次即可拦截。
+// N-02 扩表族：shop 目录（campaign/lineup/period 结构）与任务表族（/load 直达面，
+// 坏根/坏 id 会打挂登录与存档导出）。校验器列表按已知故障面继续扩展。
 const SMOKE_VALIDATORS: readonly SmokeValidator[] = [
     {
         name: "gacha-catalog",
         run: repository => {
             buildGachaCatalog(repository)
+        },
+    },
+    {
+        name: "shop-catalog",
+        run: repository => {
+            buildShopCatalog(repository)
+        },
+    },
+    {
+        name: "quest-content-tables",
+        run: repository => {
+            validateQuestContentTablesSync(repository)
         },
     },
 ]

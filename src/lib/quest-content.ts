@@ -4,7 +4,7 @@ import {
     type ReadonlyContentRepository,
 } from "../content/runtime/content-snapshot";
 import { deepFreeze } from "../content/deep-freeze";
-import type { QuestTableName } from "../content/converters/quest";
+import { QUEST_TABLE_SOURCES, type QuestTableName } from "../content/converters/quest";
 
 export class QuestConfigurationError extends Error {
     constructor(
@@ -23,8 +23,11 @@ const questTablesByRepository = new WeakMap<
     Map<QuestTableName | "practice_quest.json", RawQuests>
 >()
 
-function getQuestTable(tableName: QuestTableName | "practice_quest.json"): RawQuests {
-    const repository = getContentSnapshot().repository
+function getQuestTable(
+    tableName: QuestTableName | "practice_quest.json",
+    repositoryOverride?: ReadonlyContentRepository,
+): RawQuests {
+    const repository = repositoryOverride ?? getContentSnapshot().repository
     let cachedTables = questTablesByRepository.get(repository)
     if (cachedTables === undefined) {
         cachedTables = new Map()
@@ -49,6 +52,23 @@ function getQuestTable(tableName: QuestTableName | "practice_quest.json"): RawQu
 
 function getPracticeQuestContentTableSync(): RawQuests {
     return getQuestTable("practice_quest.json")
+}
+
+/**
+ * N-02 冒烟入口：对给定仓库遍历全部任务表，提前触发与运行时一致的
+ * 结构校验（根必须为对象、任务 id 必须为正整数、条目必须为对象）。
+ * apply 预检在候选快照生效前调用，坏任务表在此被拒而不是打挂 /load。
+ */
+export function validateQuestContentTablesSync(
+    repository: ReadonlyContentRepository,
+): void {
+    const tableNames = [
+        ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]),
+        "practice_quest.json",
+    ] as const
+    for (const tableName of tableNames) {
+        getQuestTable(tableName, repository)
+    }
 }
 
 /** Derived admin quest lookup ("category_questId" → display name). */
