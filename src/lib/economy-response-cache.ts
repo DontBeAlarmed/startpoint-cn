@@ -13,6 +13,14 @@
 const TTL_MS = 10 * 60 * 1000
 const MAX_ENTRIES = 4000
 
+// 登录世代：客户端 api_count 是会话内计数，回标题即归零
+//（TitleScene → Top.resetLogicAll → RequestQueue.reset → accessCount=0），
+// 重登后的同计数请求与旧会话必然同 (playerId, api_count)——若键不含世代，
+// TTL 窗口内的重登会把新会话请求误回放成旧响应（静默跳过业务执行）。
+// signup（每次进游戏必发）时 bump，精确对齐客户端语义：跨会话不回放、
+// 会话内重试照常回放。
+const playerGenerations = new Map<number, number>()
+
 interface CacheEntry {
     readonly endpoint: string
     payload: string
@@ -42,7 +50,12 @@ function sweep(now: number): void {
 }
 
 function cacheKey(playerId: number, apiCount: number): string {
-    return `${playerId}:${apiCount}`
+    return `${playerId}:${playerGenerations.get(playerId) ?? 0}:${apiCount}`
+}
+
+/** signup 成功时推进登录世代：旧世代的缓存条目全部失配（等 TTL 清扫）。 */
+export function bumpEconomyGenerationForPlayer(playerId: number): void {
+    playerGenerations.set(playerId, (playerGenerations.get(playerId) ?? 0) + 1)
 }
 
 /** 查找回放。endpoint 不一致视为未命中（防跨端点误回放）。 */
@@ -90,6 +103,7 @@ export function rememberEconomyResponse(
 /** 测试注入：清空缓存。 */
 export function resetEconomyResponseCacheForTest(): void {
     entries.clear()
+    playerGenerations.clear()
 }
 
 /** 测试观测：当前条目数。 */

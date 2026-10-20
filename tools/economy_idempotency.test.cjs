@@ -141,3 +141,45 @@ test("同 api_count 重试回放同一响应且业务只执行一次；异计数
     assert.notEqual(result.findEconomyReplay(playerId, 7, "/api/index.php/gacha/exec"), null, "同端点命中")
     assert.equal(result.findEconomyReplay(playerId, 7, "/api/index.php/other"), null, "异端点未命中")
 })
+
+test("登录世代推进后同计数不回放、业务照常执行（跨会话误回放修复）", async t => {
+    initializeDatabase()
+    const db = getDb()
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `economy-gen-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const viewerId = 800000602
+    db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+        .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+    grantInventoryFixtureItemSync(playerId, TICKET, 2)
+    updatePlayerSync({ id: playerId, stamina: 100, totalStaminaUsed: 0, totalDashes: 0 })
+
+    const fastify = await buildApp()
+    t.after(() => fastify.close())
+
+    // 旧会话：api_count=1 执行并缓存
+    const first = await execGacha(fastify, viewerId, 1)
+    assert.equal(first.statusCode, 200, first.body)
+    assert.equal(getPlayerItemSync(playerId, TICKET), 1, "旧会话首次执行扣一张券")
+
+    // 重登（signup bump 世代）：客户端 api_count 归零后重新从 1 计数——
+    // 同计数同端点必须执行业务而不是回放旧响应
+    const { bumpEconomyGenerationForPlayer } = require("../src/lib/economy-response-cache")
+    bumpEconomyGenerationForPlayer(playerId)
+    const relogin = await execGacha(fastify, viewerId, 1)
+    assert.equal(relogin.statusCode, 200, relogin.body)
+    assert.equal(getPlayerItemSync(playerId, TICKET), 0, "新世代同计数必须照常执行（再扣一张）")
+    const reloginBody = decodeBody(relogin)
+    const firstBody = decodeBody(first)
+    assert.notDeepEqual(reloginBody.data, firstBody.data, "新世代响应必须是新执行结果而非回放")
+
+    // 同世代内重试仍回放（世代不清除会话内幂等语义）
+    const retry = await execGacha(fastify, viewerId, 1)
+    assert.deepEqual(decodeBody(retry).data, reloginBody.data, "同世代重试照常回放")
+    assert.equal(getPlayerItemSync(playerId, TICKET), 0, "重试不再扣费")
+})

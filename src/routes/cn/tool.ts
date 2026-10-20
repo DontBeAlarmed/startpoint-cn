@@ -2,9 +2,10 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { generateDataHeaders, generateViewerId } from "../../utils";
 import { deleteAccountSessionsOfTypeSync, deleteDeviceBindingSync, getAccountSessionsOfTypeSync, getDeviceBindingSync, insertDeviceBindingSync, insertSessionWithToken } from "../../data/domains/session"
 import { getAccountSync, insertAccountSync, updateAccountSync } from "../../data/domains/account"
-import { getPlayerSync, insertDefaultPlayerSync } from "../../data/domains/player"
+import { insertDefaultPlayerSync } from "../../data/domains/player"
 import { SessionType } from "../../data/types";
-import { saveAccountDefaultPlayer } from "../../data/activeAccount";
+import { saveAccountDefaultPlayer, resolvePlayerIdSync } from "../../data/activeAccount";
+import { bumpEconomyGenerationForPlayer } from "../../lib/economy-response-cache";
 import { getAccountIdentityProvider } from "../../lib/account-identity-provider";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
 import { getRealNow, getRealNowMs } from "../../runtime/time/game-time";
@@ -133,6 +134,13 @@ const routes = async (fastify: FastifyInstance) => {
         });
 
         viewerIdToAccountId.set(viewerId, accountId);
+
+        // 新登录会话：推进经济幂等世代——客户端 api_count 回标题归零，重登后
+        // 同计数请求不得回放旧会话响应（跨会话误回放=静默跳过业务执行）
+        const signupPlayerId = resolvePlayerIdSync(accountId)
+        if (signupPlayerId !== null) {
+            bumpEconomyGenerationForPlayer(signupPlayerId)
+        }
 
         reply.header("content-type", "application/x-msgpack");
         reply.status(200).send({
