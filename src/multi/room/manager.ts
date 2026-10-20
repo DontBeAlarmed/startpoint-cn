@@ -1,7 +1,6 @@
 import { randomBytes, randomInt } from "crypto";
 import { describeError } from "../describe-error";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
-import { getServerTime } from "../../utils";
 import { getRealNowMs } from "../../runtime/time/game-time";
 import { sessionManager } from "../state/SessionManager";
 import type { ParticipantIdentity } from "../coordinator/contracts";

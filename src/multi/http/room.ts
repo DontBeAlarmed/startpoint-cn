@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { describeError } from "../describe-error";
 import { PrepareBody, SummonBody, RestoreRoomBody, ShareRoomBody } from "../types";
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders } from "../../utils";
 import { getRealNowMs } from "../../runtime/time/game-time";
 import { serializeRoomStatusConnection } from "../room/serializer";
 import { buildNpcMates } from "../npc/builder";

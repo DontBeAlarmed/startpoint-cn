@@ -320,6 +320,73 @@ async function main() {
         "重发 [3] 不得更换 attention_key",
     )
 
+    // ---- F-06 边界：虚拟偏移在场时，真实钟已过期的招募行不得投递 ----
+    // 写侧（share_room/get-or-create）锚真实钟；修复前读侧（check 路由）传虚拟钟，
+    // 虚拟落后真实约 2 年 → expires_at_ms > now 恒真 → 过期铃铛永远可见。
+    const { setServerTimeOffset } = require("../src/utils")
+    const boundaryHost = await createPlayer()
+    const boundaryGuest = await createPlayer()
+    const boundaryRoom = createRoom(
+        boundaryHost.viewerId, boundaryHost.playerId, 1, 1, 1001001, 0, 341005,
+    )
+    const realNow = Date.now()
+    const expiredRecruitment = getOrCreateRecruitmentForRoom({
+        hostPid: boundaryHost.playerId,
+        hostViewerId: boundaryHost.viewerId,
+        category: 1,
+        questId: 1001001,
+        roomNumber: boundaryRoom.room_number,
+        isNewbieHost: false,
+        establisherJson: buildEstablisherSnapshot({
+            character: 341005,
+            rankLevel: 30,
+            hostEntryTime: Math.floor(realNow / 1000),
+        }),
+        nowMs: realNow,
+    })
+    // 真实域内把该行改为已过期（写侧即真实钟，直接改库模拟到期）
+    db.prepare(
+        "UPDATE attention_recruitments SET expires_at_ms = ? WHERE id = ?"
+    ).run(realNow - 1, expiredRecruitment.id)
+    // 虚拟偏移 ≈ 2 年（对齐默认部署 2024-08 vs 真实 2026）
+    setServerTimeOffset(-2 * 365 * 24 * 3600 * 1000)
+    try {
+        const boundaryChecked = unpack(Buffer.from((await post(fastify, "/api/index.php/attention/check", {
+            viewer_id: boundaryGuest.viewerId, holding_number: 1, retry_count: 0, request_number: 3,
+        })).body, "base64")).data
+        assert.equal(
+            boundaryChecked.multi.filter(bell => bell.attention_key === expiredRecruitment.attentionKey).length,
+            0,
+            "F-06：虚拟偏移下真实已过期的招募行不得投递",
+        )
+
+        // 阳性对照：同偏移下新建未过期（真实钟）行必须可投递——证明阴性结果是过期语义而非管线断裂
+        const liveRecruitment = getOrCreateRecruitmentForRoom({
+            hostPid: boundaryHost.playerId,
+            hostViewerId: boundaryHost.viewerId,
+            category: 1,
+            questId: 1001001,
+            roomNumber: boundaryRoom.room_number + 1,
+            isNewbieHost: false,
+            establisherJson: buildEstablisherSnapshot({
+                character: 341005,
+                rankLevel: 30,
+                hostEntryTime: Math.floor(realNow / 1000),
+            }),
+            nowMs: Date.now(),
+        })
+        const liveChecked = unpack(Buffer.from((await post(fastify, "/api/index.php/attention/check", {
+            viewer_id: boundaryGuest.viewerId, holding_number: 2, retry_count: 0, request_number: 3,
+        })).body, "base64")).data
+        assert.equal(
+            liveChecked.multi.filter(bell => bell.attention_key === liveRecruitment.attentionKey).length,
+            1,
+            "F-06 阳性对照：虚拟偏移下真实未过期行照常投递",
+        )
+    } finally {
+        setServerTimeOffset(null)
+    }
+
     console.log("attention routes: all assertions passed")
     await fastify.close()
 }

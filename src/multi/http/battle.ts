@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { describeError } from "../describe-error";
-import { getRealNow } from "../../runtime/time/game-time";
+import { getRealNow, getRealNowMs } from "../../runtime/time/game-time";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
-import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
+import { generateDataHeaders, realToVirtual } from "../../utils";
 import { getRoom, disbandRoom } from "../room/manager";
 import { sessionManager } from "../state/SessionManager";
 import {
@@ -99,7 +99,8 @@ export function resolveBellRecruitmentForStart(
 ): AttentionRecruitment | null {
     if (attentionKey === null) return null;
     try {
-        const recruitment = findOpenRecruitmentByKey(attentionKey, getServerTime() * 1000);
+        // F-06：招募行 TTL 写侧锚真实钟，过期判定与响应记账必须同域（虚拟钟会恒判未过期）
+        const recruitment = findOpenRecruitmentByKey(attentionKey, getRealNowMs());
         if (recruitment === null) return null;
         if (recruitment.roomNumber !== roomNumber || recruitment.hostViewerId !== hostViewerId) {
             return null;
@@ -281,7 +282,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         if (bellRecruitment !== null && !isRoomHost) {
             // 铃铛响应记账尽力而为：开战主流程不得被投递行 UPDATE 失败阻断
             try {
-                recordResponse(bellRecruitment.id, viewer_id, "accepted", getServerTime() * 1000);
+                recordResponse(bellRecruitment.id, viewer_id, "accepted", getRealNowMs());
             } catch (error) {
                 console.warn("[MULTI] bell accepted bookkeeping failed", describeError(error));
             }

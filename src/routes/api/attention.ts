@@ -9,7 +9,8 @@ import {
 import { getLocalFollowRelationSync } from "../../data/domains/follow"
 import { touchPresence } from "../../multi/presence"
 import { isBellDeliveryEligible } from "../../multi/bell-gate"
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders } from "../../utils";
+import { getRealNowMs } from "../../runtime/time/game-time";
 
 // 与下方 config.return_attention_max_num 保持一致：单次 check 最多携带的铃铛数
 const RETURN_ATTENTION_MAX_NUM = 3
@@ -69,7 +70,8 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // 读时惰性投递：guest 轮询时才写入投递行（对齐官方"房主 15s 重发 × guest 轮询"）
-        const nowMs = getServerTime() * 1000
+        // F-06：招募行 TTL（expires_at）写侧锚真实钟，读侧必须同域——虚拟钟会恒判未过期
+        const nowMs = getRealNowMs()
         let bells: ReturnType<typeof deliverOpenRecruitmentsToViewer> = []
         try {
             // T1 投递谓词（设计 §5）：本节点房间过房间态门（未开战/房主在线/真人未满员），

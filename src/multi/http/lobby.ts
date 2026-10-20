@@ -2,7 +2,8 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { describeError } from "../describe-error"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
 import { getQuestFromCategorySync } from "../../lib/quest-content"
-import { generateDataHeaders, getServerTime } from "../../utils"
+import { generateDataHeaders } from "../../utils"
+import { getRealNowMs } from "../../runtime/time/game-time"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
@@ -27,7 +28,8 @@ function isPositiveSafeInteger(value: number): boolean {
  */
 function buildFriendRoomLobby(viewerId: number, categoryId: number): Record<string, unknown>[] {
     if (!Number.isSafeInteger(categoryId)) return []
-    const nowMs = getServerTime() * 1000
+    // F-06：共享注册行 TTL（expires_at）写侧锚真实钟，读侧同域——虚拟钟会恒判未过期
+    const nowMs = getRealNowMs()
     const rooms: Record<string, unknown>[] = []
     // 注册表查询失败（如未初始化数据库的 stub/降级环境）→ 空列表安全终态：
     // get_rooms 任何情况下都不 500
