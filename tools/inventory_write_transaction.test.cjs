@@ -164,6 +164,30 @@ test("stamina recovery rolls item deduction back when player update fails", asyn
     assert.equal(getPlayerSync(playerId).stamina, 0)
 })
 
+test("item sale rejects mana gain that overflows the free+paid total (F-07)", async () => {
+    const { playerId, viewerId } = await createPlayer("item-sell-total-cap")
+    setInventoryFixtureItemExactSync(playerId, 30005, 10)
+    const { getCurrencyCapacityPolicySync } = require("../src/lib/config-content")
+    const { getItemSaleSync } = require("../src/lib/item-content")
+    const maxMana = getCurrencyCapacityPolicySync().maxMana
+    const salePrice = getItemSaleSync(30005).sale_price
+    assert.ok(salePrice > 0, "fixture item must have a positive sale price")
+    // free-only 口径放行（0 + price ≤ max），总额口径必拒（paid 已顶满）——旧 bug 即此形
+    updatePlayerSync({ id: playerId, freeMana: 0, paidMana: maxMana })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/item/sell",
+        payload: { viewer_id: viewerId, item_id: 30005, sell_number: 1 },
+    })
+
+    // 拒绝走 400 + code=2102（路由失败分支），道具与玛纳都不得变动
+    assert.equal(response.statusCode, 400)
+    assert.equal(response.json().code, 2102)
+    assert.equal(getPlayerItemSync(playerId, 30005), 10, "拒绝时道具不得扣减")
+    assert.equal(getPlayerSync(playerId).freeMana, 0, "拒绝时玛纳不得变动")
+})
+
 test("item sale rolls item deduction back when mana update fails", async t => {
     const { playerId, viewerId } = await createPlayer("item-sell-rollback")
     setInventoryFixtureItemExactSync(playerId, 30005, 10)

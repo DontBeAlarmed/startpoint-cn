@@ -4,6 +4,7 @@ import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { getDb } from "../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "./inventory"
 import { settleManaAdditionMissions } from "./mana-addition-mission-settlement"
+import { planManaCapacity } from "./inventory/mana-capacity-plan"
 import { getServerDate } from "../utils"
 import type { MissionSettlementResult } from "./mission/settlement"
 
@@ -67,10 +68,17 @@ export function sellItemSync(
                 return { ok: false, error: "At least three ability souls must remain." }
             }
 
-            // Check mana limit
+            // Check mana limit（F-07：总额口径 free+paid，与邮件领取的
+            // planManaCapacity 一致——旧口径只看 free 会绕顶溢出）
             const manaGained = saleData.sale_price * sellNumber
             const maxMana = getCurrencyCapacityPolicySync().maxMana
-            if (player.freeMana + manaGained > maxMana) {
+            const manaPlan = planManaCapacity({
+                freeMana: player.freeMana,
+                paidMana: player.paidMana,
+                maxMana,
+                requestedMana: manaGained,
+            })
+            if (manaPlan.overflowMana > 0) {
                 return { ok: false, errorCode: 2102, error: "Mana would exceed maximum." }
             }
 
