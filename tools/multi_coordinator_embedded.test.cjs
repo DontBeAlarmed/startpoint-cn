@@ -15,8 +15,12 @@ function stubModule(relativePath, exports) {
     }
 }
 
-stubModule("../src/utils", {
-    getServerTime: () => 1_725_000_000,
+// R-15=B 后 host_entry_time 锚 runtime/time 的真实钟（不再读 src/utils.getServerTime），
+// stub 必须打在真实消费的模块上；展开原导出只覆写 getRealNowMs，
+// 避免打断依赖链上其他 game-time 消费方
+stubModule("../src/runtime/time/game-time", {
+    ...require("../src/runtime/time/game-time"),
+    getRealNowMs: () => 1_725_000_000 * 1000,
 })
 
 let embeddedModule = {}
