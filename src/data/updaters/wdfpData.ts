@@ -181,8 +181,9 @@ export function updateAfterInit(
             SELECT 1 FROM sqlite_master
             WHERE type = 'table' AND name = 'players_periodic_snapshots'
         `).get()
-        if (!hasPeriodicSnapshots) return
-
+        // F-11：缺表只跳过本段（guard 块），不得裸 return——调用方会无条件推进
+        // user_version，裸 return 会连带跳过后续 v18/v22 迁移（旧库半迁移）
+        if (hasPeriodicSnapshots) {
         database.prepare(`
             INSERT OR IGNORE INTO players_periodic_snapshots (
                 player_id, period_type, quest_clears, stamina_used,
@@ -264,6 +265,7 @@ export function updateAfterInit(
                     WHERE player_id = players_periodic_snapshots.player_id
                 ), 0)
         `).run()
+        }
     }
 
     if (18 >= currentVersion) {

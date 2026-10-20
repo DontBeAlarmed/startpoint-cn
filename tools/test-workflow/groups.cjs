@@ -68,6 +68,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/runtime_capabilities.test.cjs",
             "tools/runtime_capabilities_wiring.test.cjs",
             "tools/release_contract.test.cjs",
+            "tools/migration_missing_table.test.cjs",
         ],
     },
     "quick:modes": {

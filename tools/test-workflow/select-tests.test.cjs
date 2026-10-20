@@ -1164,6 +1164,10 @@ test("routes admin operations gate feature files to focused groups", () => {
     assert.ok(TEST_GROUPS["quick:runtime"].tests.includes(
         "tools/release_contract.test.cjs",
     ))
+    assert.ok(TEST_GROUPS["quick:runtime"].tests.includes(
+        "tools/migration_missing_table.test.cjs",
+    ), "F-11 迁移回归必须在 quick:runtime",
+    )
 
     assert.deepEqual(
         selectTestGroups(["src/routes/cn/tool.ts"]),
