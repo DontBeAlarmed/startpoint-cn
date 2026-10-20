@@ -77,6 +77,12 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     // （replacePlayerDataSync 的 DELETE FROM players 会经 FK CASCADE 波及它们）
     "players_follows",
     "players_scheduled_resource_state",
+    // F-10：防双领台账（FK CASCADE 同样会被级联清空）——v1 导入后若被清，
+    // 排名奖励/嘉年华奖励可重复领取、收集登录日重置
+    "players_ranking_reward_claims",
+    "players_mission_counters",
+    "players_collect_mission_login_days",
+    "players_carnival_event_rewards",
 ])
 
 export {
@@ -595,10 +601,19 @@ function restoreLegacyV1SaveSync(
         legacyData.player.expPooledTime,
         getRealNow(),
     )
+    // F-10：totalLoginDays 是服务端累计事实（通行证登录进度派生源），v1 客户端
+    // 快照不含该字段（deserialize 缺省 1）——保留存量行值，与收集登录日台账配套
+    const preservedTotalLoginDays = database.prepare(
+        "SELECT total_login_days FROM players WHERE id = ?",
+    ).get(targetPlayerId) as { total_login_days: number } | undefined
 
     database.transaction(() => {
         database.pragma("defer_foreign_keys = ON")
         replacePlayerDataSync(legacyData)
+        if (preservedTotalLoginDays !== undefined) {
+            database.prepare("UPDATE players SET total_login_days = ? WHERE id = ?")
+                .run(preservedTotalLoginDays.total_login_days, targetPlayerId)
+        }
         clearGiftRedemptionsForExternalRestoreSync(targetPlayerId, database)
         const insertMissingGachaParent = database.prepare(`
             INSERT INTO players_gacha_info (

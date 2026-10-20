@@ -925,6 +925,18 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
     getDb().transaction(() => {
         recordScheduledResourceGrantsWithinTransactionSync(playerId, [restockRule.id], "2026-08-24", new Date())
     })()
+    // F-10：防双领台账在 v1 恢复后必须保留（FK CASCADE 会被 replacePlayerDataSync 波及）
+    db.prepare(`INSERT INTO players_ranking_reward_claims
+        (player_id, ranking_event_id, claimed_at) VALUES (?, 700001, 1700000000)`).run(playerId)
+    db.prepare(`INSERT INTO players_mission_counters
+        (player_id, counter_key, dimension, scope_type, scope_key, value)
+        VALUES (?, 'rescue_count', 'character', 'global', '{}', 3)`).run(playerId)
+    db.prepare(`INSERT INTO players_collect_mission_login_days
+        (player_id, mission_id, last_counted_day) VALUES (?, 555001, 19200)`).run(playerId)
+    db.prepare(`INSERT INTO players_carnival_event_rewards
+        (player_id, event_id, reward_id) VALUES (?, 880001, 1)`).run(playerId)
+    // F-10：totalLoginDays 保留存量行值（v1 客户端快照不含该字段）
+    db.prepare("UPDATE players SET total_login_days = 7 WHERE id = ?").run(playerId)
 
     const result = restorePlayerSaveSnapshotSync({
         schema: "starpoint-cn-save",
@@ -956,6 +968,32 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
         db.prepare("SELECT COUNT(*) AS n FROM players_scheduled_resource_state WHERE player_id = ?").get(playerId).n,
         1,
         "定时资源状态必须在 v1 恢复后保留",
+    )
+    // F-10：四张防双领台账必须在 v1 恢复后保留
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS n FROM players_ranking_reward_claims WHERE player_id = ? AND ranking_event_id = 700001").get(playerId).n,
+        1,
+        "排名奖励领取台账必须在 v1 恢复后保留",
+    )
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS n FROM players_mission_counters WHERE player_id = ? AND counter_key = 'rescue_count'").get(playerId).n,
+        1,
+        "任务计数事实表必须在 v1 恢复后保留",
+    )
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS n FROM players_collect_mission_login_days WHERE player_id = ? AND mission_id = 555001").get(playerId).n,
+        1,
+        "收集任务登录日台账必须在 v1 恢复后保留",
+    )
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS n FROM players_carnival_event_rewards WHERE player_id = ? AND event_id = 880001").get(playerId).n,
+        1,
+        "嘉年华奖励台账必须在 v1 恢复后保留",
+    )
+    assert.equal(
+        db.prepare("SELECT total_login_days FROM players WHERE id = ?").get(playerId).total_login_days,
+        7,
+        "totalLoginDays 必须保留存量行值（v1 快照缺省 1 不得覆盖）",
     )
     assert.deepEqual(
         db.prepare(`SELECT gacha_id FROM players_gacha_info
