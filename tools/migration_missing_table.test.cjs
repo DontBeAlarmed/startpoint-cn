@@ -78,7 +78,7 @@ test("account-dimension lookups use indexes on all three tables (F-12)", () => {
         ["device_bindings", "account_id = ?"],
     ]) {
         const plan = db.prepare(
-            `EXPLAIN QUERY PLAN SELECT id FROM ${table} WHERE ${where}`
+            `EXPLAIN QUERY PLAN SELECT 1 FROM ${table} WHERE ${where}`
         ).all(1)
         const planText = plan.map(step => step.detail).join(" | ")
         assert.match(
