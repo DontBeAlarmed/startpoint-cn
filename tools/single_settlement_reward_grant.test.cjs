@@ -399,6 +399,39 @@ test("real settlement state chain carries score currency and character overflow 
     })
 })
 
+test("response state projects write-point mission settlement rewards (N-06)", () => {
+    const { createSingleSettlementResponseState } = require("../src/lib/quest/finish/single-settlement-response-state")
+    const playerId = createPlayer("n06-projection")
+    const player = getPlayerSync(playerId)
+
+    const state = createSingleSettlementResponseState(playerId, player)
+    // playerAfter 是结算前快照；写入点结算在 persist 阶段给出更新的 free_mana/itemList
+    state.observeGrant(Object.freeze({
+        playerAfter: {
+            playerId,
+            freeMana: player.freeMana,
+            freeVmoney: player.freeVmoney,
+            expPool: player.expPool,
+        },
+        assets: Object.freeze({ items: Object.freeze([]), currencies: Object.freeze([]) }),
+        manaAdditionMissionSettlement: {
+            missionInfo: [],
+            itemList: { 30005: 41 },
+            characterList: [],
+            equipmentList: [],
+            degreeIds: [],
+            passCardPoints: {},
+            userInfo: { free_mana: player.freeMana + 120 },
+        },
+    }))
+
+    assert.equal(
+        state.playerState.freeMana,
+        player.freeMana + 120,
+        "写入点结算的 free_mana 必须即时进响应投影（不再低报到下次同步）",
+    )
+})
+
 test("a later owner reward failure rolls the real settlement state chain back", () => {
     const {
         grantSingleSettlementScoreRewardsWithinTransactionSync,

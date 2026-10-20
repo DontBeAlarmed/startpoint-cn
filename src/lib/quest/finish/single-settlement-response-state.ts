@@ -97,6 +97,21 @@ export function createSingleSettlementResponseState(
             String(item.itemId),
             item.afterAmount,
         ])))
+        // N-06：写入点（玛纳入账）结算在 persist 阶段发生，其奖励晚于
+        // playerAfter ——结算的 itemList/userInfo 必须并入响应投影，
+        // 否则 finish 响应的 free_mana/库存低报到下次同步
+        const settlement = grant.manaAdditionMissionSettlement
+        if (settlement !== undefined) {
+            observeItems(settlement.itemList)
+            if (settlement.userInfo !== undefined) {
+                playerState = {
+                    playerId: playerState.playerId,
+                    freeMana: settlement.userInfo.free_mana ?? playerState.freeMana,
+                    freeVmoney: settlement.userInfo.free_vmoney ?? playerState.freeVmoney,
+                    expPool: settlement.userInfo.exp_pool ?? playerState.expPool,
+                }
+            }
+        }
     }
     return {
         get playerState(): RewardGrantKnownPlayerState {
