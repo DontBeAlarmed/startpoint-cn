@@ -37,6 +37,8 @@ export type EventTradeExpirySettlementResult =
         readonly totalMana: number
         readonly acceptedMana: number
         readonly overflowMana?: number
+        /** R-F04：玛纳入账结算结果（acceptedMana>0 时存在），供调用方投影 */
+        readonly manaAdditionSettlement?: MissionSettlementResult
     }
 
 function requirePlayerId(value: number): void {
@@ -138,6 +140,10 @@ export function settleEventTradeExpiryOnLoadSync(
             totalMana: expiryPlan.totalMana,
             acceptedMana: capacity.acceptedMana,
             ...(capacity.overflowMana > 0 ? { overflowMana: capacity.overflowMana } : {}),
+            // R-F04：玛纳入账结算结果并入返回值（R-07 出口完备性——原为死存储）。
+            // 当前唯一调用方 /load 转换后重拉 player 全量同步，不消费该投影；
+            // 携带它防下一个调用方接入时复现 N-06 类"结算了但响应看不见"。
+            ...(manaAdditionSettlement !== null ? { manaAdditionSettlement } : {}),
         })
     })()
 }

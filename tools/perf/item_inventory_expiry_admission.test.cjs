@@ -185,6 +185,9 @@ test("production expiry load keeps Content, SQL and transaction work bounded", (
         setPlayerItemForMaintenanceSync(singlePlayer, batchIds[0], 3)
         const single = measureSettlement(singlePlayer)
         assert.equal(single.result.status, "converted")
+        // R-F04：玛纳入账结算结果必须并入 converted 返回值（原死存储）
+        assert.ok(single.result.manaAdditionSettlement !== undefined,
+            "acceptedMana>0 时返回值必须携带 manaAdditionSettlement")
         // +1 玩家读取 / +1 事务（savepoint 轮）：锻块入账门的当场窄域结算
         //（任务 66 族在事实写入点结清，特性预期成本，仅锻块条目触发）
         assert.deepEqual(single.counts, {
