@@ -47,6 +47,22 @@ function sweep(now: number): void {
         if (oldestKey === null) break
         entries.delete(oldestKey)
     }
+    // R-F01：世代键与条目缓存同治理——回收无任何条目引用的世代，
+    // 防重复登录玩家长期累积（误清在用世代仅表现为缓存失配多执行业务，无正确性风险）
+    if (playerGenerations.size > 0 && entries.size > 0) {
+        const livePlayers = new Set<number>()
+        for (const key of entries.keys()) {
+            const separator = key.indexOf(":")
+            if (separator <= 0) continue
+            const playerId = Number(key.slice(0, separator))
+            if (Number.isSafeInteger(playerId)) livePlayers.add(playerId)
+        }
+        for (const playerId of playerGenerations.keys()) {
+            if (!livePlayers.has(playerId)) playerGenerations.delete(playerId)
+        }
+    } else if (entries.size === 0) {
+        playerGenerations.clear()
+    }
 }
 
 function cacheKey(playerId: number, apiCount: number): string {
@@ -109,4 +125,9 @@ export function resetEconomyResponseCacheForTest(): void {
 /** 测试观测：当前条目数。 */
 export function economyResponseCacheSizeForTest(): number {
     return entries.size
+}
+
+/** 测试观测：世代键集合（R-F01 回收断言用）。 */
+export function economyGenerationSizeForTest(): Set<number> {
+    return new Set(playerGenerations.keys())
 }

@@ -183,3 +183,22 @@ test("登录世代推进后同计数不回放、业务照常执行（跨会话�
     assert.deepEqual(decodeBody(retry).data, reloginBody.data, "同世代重试照常回放")
     assert.equal(getPlayerItemSync(playerId, TICKET), 0, "重试不再扣费")
 })
+
+test("世代 Map 随 sweep 回收无条目引用的键（R-F01）", async () => {
+    initializeDatabase()
+    const result = require("../src/lib/economy-response-cache")
+    result.resetEconomyResponseCacheForTest()
+
+    // 无条目玩家的世代 bump 后：任一 remember 触发 sweep 即回收
+    result.bumpEconomyGenerationForPlayer(990001)
+    result.bumpEconomyGenerationForPlayer(990002)
+    result.rememberEconomyResponse(990003, 1, "/api/index.php/gacha/exec", "{}")
+    assert.equal(result.economyGenerationSizeForTest().has(990001), false,
+        "无条目引用的世代键必须在 sweep 后回收")
+    assert.equal(result.economyGenerationSizeForTest().has(990002), false,
+        "无条目引用的世代键必须在 sweep 后回收")
+    // 有条目的玩家世代保留（其回放语义依赖它）
+    assert.equal(result.economyGenerationSizeForTest().has(990003), true,
+        "有条目引用的世代键不得被回收")
+    result.resetEconomyResponseCacheForTest()
+})
