@@ -31,3 +31,7 @@ tmp/
 
 # local implementation plans (kept untracked on purpose)
 docs/plans/
+
+# 嵌套 worktree 与构建基线副本（合计 501MB，一次 git add -A 即误提交——R-F06）
+.worktrees/
+out.base-*/
