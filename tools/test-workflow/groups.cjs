@@ -707,6 +707,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/quest_host_finish.test.cjs",
             "tools/single_battle_finish_validation.test.cjs",
             "tools/single_battle_finish_asset_flag.test.cjs",
+            "tools/single_finish_mana_capacity.test.cjs",
             "tools/single_finish_authority_transaction.test.cjs",
             "tools/single_finish_final_projection.test.cjs",
             "tools/single_finish_awake_reward_owner.test.cjs",

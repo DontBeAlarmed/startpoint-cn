@@ -9,6 +9,9 @@ import { insertPlayerPracticeBattleHistorySync } from "../../../data/domains/pra
 import type { Player } from "../../../data/types"
 import { givePlayerCharactersExpSync } from "../../character"
 import { getCommonScoreRewardCount } from "../../score-reward-lottery"
+import { planManaCapacity } from "../../inventory/mana-capacity-plan"
+import { insertManaOverflowMailsWithinTransactionSync } from "../../mail-overflow"
+import { getCurrencyCapacityPolicySync } from "../../config-content"
 import { QuestCategory } from "../../types"
 import { addStaminaWithOverflowCap, getMaxStamina } from "../../stamina"
 import { getAdditionalRewardTable, settleAdditionalRewardsSync } from "../../additional-reward"
@@ -122,14 +125,41 @@ export function executeSingleSettlementWrites(
     const afterStaminaHealTime = releasedEntryResources
         ? releasedEntryResources.afterStaminaHealTime
         : didLevelUp ? getRealNow() : settlementPlayer.staminaHealTime
+    // R-F03：固定+战斗玛纳入账走总额容量口径（与 item-sell/event-trade/奖励
+    // 引擎一致）——越顶部分转 FREE_MANA 溢出邮件，钱包封顶；totalManaObtained
+    // 同 event-trade 只计 accepted。正常域（未越顶）数值逐字节不变。
+    const manaCapacity = planManaCapacity({
+        freeMana: settlementPlayer.freeMana,
+        paidMana: settlementPlayer.paidMana,
+        maxMana: getCurrencyCapacityPolicySync().maxMana,
+        requestedMana: manaObtained,
+    })
+    const cappedPlayerValues = manaCapacity.overflowMana > 0
+        ? {
+            ...playerValues,
+            freeMana: settlementPlayer.freeMana + manaCapacity.acceptedMana,
+            totalManaObtained: settlementPlayer.totalManaObtained + manaCapacity.acceptedMana,
+        }
+        : playerValues
+    if (manaCapacity.overflowMana > 0) {
+        const maxAttachmentNumber = Math.max(
+            1,
+            Math.min(getCurrencyCapacityPolicySync().maxMana, 2_147_483_647),
+        )
+        insertManaOverflowMailsWithinTransactionSync(
+            playerId,
+            manaCapacity.overflowMana,
+            maxAttachmentNumber,
+        )
+    }
     updatePlayerSync({
         id: playerId,
-        ...playerValues,
+        ...cappedPlayerValues,
         ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
     })
     responseState.setPlayerState({
         playerId: responseState.playerState.playerId,
-        freeMana: playerValues.freeMana,
+        freeMana: cappedPlayerValues.freeMana,
         freeVmoney: responseState.playerState.freeVmoney,
         expPool: newExpPool,
     })
