@@ -47,21 +47,20 @@ function sweep(now: number): void {
         if (oldestKey === null) break
         entries.delete(oldestKey)
     }
-    // R-F01：世代键与条目缓存同治理——回收无任何条目引用的世代，
-    // 防重复登录玩家长期累积（误清在用世代仅表现为缓存失配多执行业务，无正确性风险）
-    if (playerGenerations.size > 0 && entries.size > 0) {
-        const livePlayers = new Set<number>()
-        for (const key of entries.keys()) {
-            const separator = key.indexOf(":")
-            if (separator <= 0) continue
-            const playerId = Number(key.slice(0, separator))
-            if (Number.isSafeInteger(playerId)) livePlayers.add(playerId)
-        }
-        for (const playerId of playerGenerations.keys()) {
-            if (!livePlayers.has(playerId)) playerGenerations.delete(playerId)
-        }
-    } else if (entries.size === 0) {
-        playerGenerations.clear()
+    // R-F01：世代键与条目缓存同治理——回收无任何条目引用的世代，防重复
+    // 登录玩家长期累积。安全性：回收仅在玩家无存活条目时发生，故同号世代
+    // 复用不可能与旧会话存活条目碰撞（误清在用世代仅表现为缓存失配多执行
+    // 业务，无错误回放）。
+    if (playerGenerations.size === 0) return
+    const livePlayers = new Set<number>()
+    for (const key of entries.keys()) {
+        const separator = key.indexOf(":")
+        if (separator <= 0) continue
+        const playerId = Number(key.slice(0, separator))
+        if (Number.isSafeInteger(playerId)) livePlayers.add(playerId)
+    }
+    for (const playerId of playerGenerations.keys()) {
+        if (!livePlayers.has(playerId)) playerGenerations.delete(playerId)
     }
 }
 
@@ -99,13 +98,13 @@ export function rememberEconomyResponse(
     payload: string,
 ): void {
     const now = Date.now()
-    sweep(now)
     const key = cacheKey(playerId, apiCount)
     const existing = entries.get(key)
     if (existing !== undefined) {
         existing.payload = payload
         existing.expiresAt = now + TTL_MS
         existing.touchedAt = now
+        sweep(now)
         return
     }
     entries.set(key, {
@@ -114,6 +113,9 @@ export function rememberEconomyResponse(
         expiresAt: now + TTL_MS,
         touchedAt: now,
     })
+    // R-F01：插入后清扫——若在插入前回收，刚 bump 的世代尚无条目会被立即
+    // 回收，条目落到 gen 0，世代值在 0/1 间无谓抖动
+    sweep(now)
 }
 
 /** 测试注入：清空缓存。 */
