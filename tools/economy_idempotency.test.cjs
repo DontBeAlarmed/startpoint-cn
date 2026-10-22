@@ -192,6 +192,7 @@ test("世代 Map 随 sweep 回收无条目引用的键（R-F01）", async () => 
     // 无条目玩家的世代 bump 后：任一 remember 触发 sweep 即回收
     result.bumpEconomyGenerationForPlayer(990001)
     result.bumpEconomyGenerationForPlayer(990002)
+    result.bumpEconomyGenerationForPlayer(990003)
     result.rememberEconomyResponse(990003, 1, "/api/index.php/gacha/exec", "{}")
     assert.equal(result.economyGenerationSizeForTest().has(990001), false,
         "无条目引用的世代键必须在 sweep 后回收")
