@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { SessionType } from "../../data/types";
 import { generateViewerIdSession, getAccountSessionsOfType, getSession } from "../../data/domains/session"
 import { getPlayerFromAccountIdSync, insertDefaultPlayerSync } from "../../data/domains/player"
+import { bumpEconomyGenerationForPlayer } from "../../lib/economy-response-cache";
 import { generateDataHeaders } from "../../utils";
 
 interface GetHeaderResponseBody {
@@ -65,6 +66,13 @@ const routes = async (fastify: FastifyInstance) => {
         // generate viewer id
         const viewerIds = await getAccountSessionsOfType(accountId, SessionType.VIEWER)
         const viewerId = !viewerIds[0] ? await generateViewerIdSession(accountId) : viewerIds[0]
+
+        // 新登录会话：推进经济幂等世代（R-F02，与 cn/tool.ts 对称）——客户端
+        // api_count 回标题归零，重登后同计数请求不得回放旧会话响应
+        const signupPlayer = getPlayerFromAccountIdSync(accountId)
+        if (signupPlayer !== null) {
+            bumpEconomyGenerationForPlayer(signupPlayer.id)
+        }
 
         reply.header("content-type", "application/x-msgpack")
         reply.status(200).send({

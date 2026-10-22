@@ -137,6 +137,17 @@ test("tool/signup 以 ZAT 换发 VIEWER 会话；tool/get_header_response 回显
     })
     assert.equal(decodeResponse(again).data_headers.viewer_id, viewerId, "同 ZAT 重入必须返回同一 viewer")
 
+    // R-F02：api 入口 signup 必须推进经济幂等世代（与 cn/tool.ts 对称）——
+    // 客户端 api_count 回标题归零，不 bump 则重登同计数会误回放旧会话响应
+    const { economyGenerationSizeForTest } = require("../src/lib/economy-response-cache")
+    const { resolvePlayerIdSync } = require("../src/data/activeAccount")
+    const signupPlayerId = resolvePlayerIdSync(account.id)
+    assert.ok(signupPlayerId !== null, "signup 必须已建立玩家")
+    assert.ok(
+        economyGenerationSizeForTest().has(signupPlayerId),
+        "api 入口 signup 后该玩家的幂等世代必须存在（已推进）",
+    )
+
     const header = await fastify.inject({
         method: "POST",
         url: "/api/index.php/tool/get_header_response",
