@@ -110,12 +110,14 @@ test("abort complete and recovery identities each read stored active once", asyn
                 const measured = await harness.measure(() => harness.post("abort", payload))
                 if (measured.error) throw measured.error
                 assert.equal(measured.value.statusCode, 200)
+                // R-07（f54fbd35）abort 响应投影退还后状态：+1 players 读
+                //（statements/SELECT/Player SELECT 各 +1，其余不变）
                 assertSql(measured.sql, {
-                    statements: 9,
-                    selectStatements: 5,
+                    statements: 10,
+                    selectStatements: 6,
                     writeStatements: 2,
                     transactionStatements: 2,
-                    playerReads: 2,
+                    playerReads: 3,
                     activeReads: 1,
                 }, `abort ${requestKind}`)
             })

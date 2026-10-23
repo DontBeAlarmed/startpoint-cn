@@ -13,11 +13,15 @@
             },
             "quest_name": "",
             "start_time": "fixed-server-time",
-            "user_info": {}
+            "user_info": {
+              "free_mana": 2000,
+              "free_vmoney": 100,
+              "stamina": 100,
+              "stamina_heal_time": "matches-database-virtual-time"
+            }
           },
           "data_headers": {
             "asset_update": false,
-            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -90,11 +94,15 @@
             "item_list": {},
             "quest_name": "",
             "start_time": "fixed-server-time",
-            "user_info": {}
+            "user_info": {
+              "free_mana": 2000,
+              "free_vmoney": 100,
+              "stamina": 100,
+              "stamina_heal_time": "matches-database-virtual-time"
+            }
           },
           "data_headers": {
             "asset_update": false,
-            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -125,7 +133,6 @@
           },
           "data_headers": {
             "asset_update": false,
-            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -135,16 +142,16 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "ae5b937034bc460b1274c8668ef6a8de456bb7df22b8eda0d09d6ad1cf3d63b3",
+      "behaviorSha256": "71afdf5a8b372fbecd8bdf814268922510cd10acaab5b6943676445315dab8ee",
       "sql": {
-        "statements": 42,
-        "selectStatements": 27,
+        "statements": 44,
+        "selectStatements": 29,
         "writeStatements": 7,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 8,
-            "reads": 6,
+            "statements": 10,
+            "reads": 8,
             "writes": 2
           },
           "players_active_quests": {
@@ -1216,7 +1223,6 @@
           },
           "data_headers": {
             "asset_update": false,
-            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -1226,7 +1232,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "5bfce83985303ef86392f71203581b4447d2bc9b8514337a547c35be0b259f64",
+      "behaviorSha256": "1c188bda34b2b23bdd269dd10c99e16d8b66348cc2d82e893073f880d70cc1b4",
       "sql": {
         "statements": 110,
         "selectStatements": 63,
@@ -2235,7 +2241,6 @@
           },
           "data_headers": {
             "asset_update": false,
-            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -2245,7 +2250,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "07bf4f4c3e3a13847885ace2b2e33d7e08bb3a548d88890f1ac5e49bb4b3101c",
+      "behaviorSha256": "3a0abc02ac26bfde3340ab9f5afb2078d5ac6e1d321f89932e4bb0f6983153f7",
       "sql": {
         "statements": 102,
         "selectStatements": 62,
@@ -4311,7 +4316,6 @@
             },
             "data_headers": {
               "asset_update": false,
-              "force_news": 0,
               "force_update": false,
               "result_code": 1,
               "servertime": "fixed-server-time",
@@ -4322,7 +4326,7 @@
           }
         }
       },
-      "behaviorSha256": "5cc82d7fa274400e2955a15a67c18a0796f76eec08395c99f967fd7094ed7272",
+      "behaviorSha256": "ecf4b90004f9f97572364c403ef24817a30dc70a90093633435ec70d197aac3e",
       "sql": {
         "statements": 102,
         "selectStatements": 65,
@@ -4485,7 +4489,6 @@
           },
           "data_headers": {
             "asset_update": false,
-            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -4495,7 +4498,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "e358308084491906c14820b1937e56b1ce72767b631ffd82111bd1c415559da5",
+      "behaviorSha256": "5b5670ec3feaba0fb3919e0db1cad9efa33ee8cf6efa2def989400bba923868d",
       "sql": {
         "statements": 9,
         "selectStatements": 5,
@@ -4652,7 +4655,6 @@
           },
           "data_headers": {
             "asset_update": false,
-            "force_news": 0,
             "force_update": false,
             "result_code": 1,
             "servertime": "fixed-server-time",
@@ -4662,7 +4664,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "b41fcab216c3f7a0acf366c2b04b1c006dbe0b441508d63f4a27dece8ccf44fa",
+      "behaviorSha256": "10188d2d75a9fc197cfc7ec7debe7951308d3f6ef091f00c5e5db2bd78011677",
       "sql": {
         "statements": 25,
         "selectStatements": 18,

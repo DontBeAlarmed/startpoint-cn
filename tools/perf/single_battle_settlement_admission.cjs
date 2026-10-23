@@ -213,10 +213,26 @@ function evaluateSingleBattleAdmission(current, snapshot, {
         )) {
             failures.push(`${name} behavior differs`)
         }
+        // R-G02 具名语义 SQL 增长例外（快照 2026-10-17 入库后，abort 路径 +2 players 读）：
+        // ① R-03（f8da57a5/574a40ab）经济幂等预处理的会话解析 → resolvePlayerIdSync 各 +1 读；
+        // ② R-07（f54fbd35）abort 响应投影退还后状态 +1 读。
+        // 两处均为有意的语义变更，基线快照当时未随再准入。例外按键+额度放行
+        // （增长 ≤ 额度），其余场景零增长仍必须拒绝。
+        const NAMED_SQL_GROWTH_EXCEPTIONS = Object.freeze({
+            "abort_entry_item_refund_once.statements": 2,
+            "abort_entry_item_refund_once.selectStatements": 2,
+            "abort_entry_item_refund_once.byTable.players.reads": 2,
+            "abort_entry_item_refund_once.byTable.players.statements": 2,
+        })
+        const allowsSqlGrowth = (key, growth) =>
+            (NAMED_SQL_GROWTH_EXCEPTIONS[key] ?? 0) >= growth
         if (allowSqlReduction) {
             for (const field of STRUCTURAL_SQL_FIELDS) {
                 if (currentScenario.canonical.sql[field] > snapshotScenario.canonical.sql[field]) {
-                    failures.push(`${name}.${field} structural SQL regression`)
+                    const growth = currentScenario.canonical.sql[field] - snapshotScenario.canonical.sql[field]
+                    if (!allowsSqlGrowth(`${name}.${field}`, growth)) {
+                        failures.push(`${name}.${field} structural SQL regression`)
+                    }
                 }
             }
             const currentTables = currentScenario.canonical.sql.byTable
@@ -228,7 +244,10 @@ function evaluateSingleBattleAdmission(current, snapshot, {
                 }
                 for (const field of TABLE_FIELDS) {
                     if (currentTables[table][field] > snapshotTables[table][field]) {
-                        failures.push(`${name}.byTable.${table}.${field} structural SQL regression`)
+                        const growth = currentTables[table][field] - snapshotTables[table][field]
+                        if (!allowsSqlGrowth(`${name}.byTable.${table}.${field}`, growth)) {
+                            failures.push(`${name}.byTable.${table}.${field} structural SQL regression`)
+                        }
                     }
                 }
             }
