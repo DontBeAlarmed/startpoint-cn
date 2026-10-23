@@ -2446,6 +2446,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
             "tools/gift_capability.test.cjs",
             "tools/gift_code_lifecycle.test.cjs",
             "tools/gift_receive_route.test.cjs",
+            "tools/reward_engine_mana_capacity.test.cjs",
             "tools/attention_config_route.test.cjs",
         "tools/attention_lifecycle.test.cjs",
         "tools/attention_routes.test.cjs",
