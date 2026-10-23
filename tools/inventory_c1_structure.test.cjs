@@ -39,6 +39,8 @@ test("activated Inventory plans are imported only by reviewed production adapter
         "src/lib/mail-reward-grant.ts",
         // R-F03：finish 固定+战斗玛纳入账走总额容量口径（只读检查+溢出转邮件）
         "src/lib/quest/finish/single-settlement-writes.ts",
+        // R-G01：persist 单点收口（引擎全部生产者的玛纳容量权威读+溢出转邮件）
+        "src/lib/player-resource-grant.ts",
     ])
 })
 
