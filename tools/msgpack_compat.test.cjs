@@ -2,7 +2,7 @@ const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
-const { pack, unpack } = require("msgpackr")
+const { pack, unpack, Packr } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
@@ -220,10 +220,17 @@ test("fixUint32Tags stays byte-identical across payload shapes", () => {
 
     // Containers across array16/array32/map16/map32 header widths.
     assertIdenticalRewrite("array16", pack(Array.from({ length: 20 }, () => 100_000)))
-    assertIdenticalRewrite("array32", pack(Array.from({ length: 70_000 }, (_v, i) => i)))
+    // msgpackr 1.12：>65535 条目的容器在函数式 pack 上直接抛错（第二参只收
+    // 数字位标志，不收 Options 对象）——超大容器改用专用 Packr 实例编码
+    //（variableMapSize+useRecords:false，纯 map/数组头，无 0xce 伪装面）。
+    // 断言对象是 fixUint32Tags 改写保真性，wire 来源不限于函数式 pack。
+    const widePayloadPackr = new Packr({ variableMapSize: true, useRecords: false })
+    assertIdenticalRewrite("array32", widePayloadPackr.pack(
+        Array.from({ length: 70_000 }, (_v, i) => i),
+    ))
     const wideMap = {}
     for (let index = 0; index < 70_000; index++) wideMap[`k${index}`] = index
-    assertIdenticalRewrite("map32", pack(wideMap))
+    assertIdenticalRewrite("map32", widePayloadPackr.pack(wideMap))
 
     // Empty response and empty top-level stream.
     assertIdenticalRewrite("empty-object", pack({}))
