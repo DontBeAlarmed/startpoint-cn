@@ -61,6 +61,9 @@ export interface RuntimeCoordinatorDependencies {
     readonly adminAvailable: boolean
     readonly shutdownStepTimeoutMs?: number
     readonly reportStartupFailure?: (stage: RuntimeStartupStage) => void
+    /** R-G03 补充：启动失败必须把根因（含 cause 链）打到 stderr——
+     *  只打 stage 名会让 ABI 不匹配/权限/路径类环境病完全不可诊断 */
+    readonly reportStartupError?: (stage: RuntimeStartupStage, error: unknown) => void
     readonly reportShutdownFailures?: (failures: readonly RuntimeShutdownFailure[]) => void
     readonly reportShutdownComplete?: () => void
 }
@@ -251,12 +254,13 @@ class Coordinator implements RuntimeCoordinator {
             if (this.interrupted()) return
 
             this.phase = "ready"
-        } catch {
+        } catch (error) {
             if (this.interrupted()) return
             this.phase = "failed"
             this.terminalExitCode = startupExitCode(this.stage)
             const failures = await this.cleanupStartupFailure()
             if (failures.length > 0) this.dependencies.reportShutdownFailures?.(failures)
+            this.dependencies.reportStartupError?.(this.stage, error)
             this.dependencies.reportStartupFailure?.(this.stage)
             this.dependencies.setExitCode(this.terminalExitCode)
             if (!this.hasCleanupWork()) this.removeSignals()

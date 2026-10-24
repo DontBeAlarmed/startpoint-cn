@@ -491,6 +491,17 @@ runtimeCoordinator = createRuntimeCoordinator({
     nodeVersion: process.version,
     adminAvailable: true,
     reportStartupFailure: stage => console.error(`[runtime] ${stage} startup failed`),
+    reportStartupError: (stage, error) => {
+        // 根因链原样落 stderr（ABI 不匹配/权限/路径类环境病的第一现场）
+        let cause = error
+        let depth = 0
+        while (cause !== null && cause !== undefined && depth < 4) {
+            const message = cause instanceof Error ? cause.message : String(cause)
+            console.error(`[runtime] ${stage} startup error${depth > 0 ? ` cause[${depth}]` : ""}: ${message}`)
+            cause = (cause as { cause?: unknown }).cause ?? null
+            depth += 1
+        }
+    },
     reportShutdownFailures: failures => console.error(
         `[runtime] shutdown failed steps=${failures.map(failure => (
             `${failure.step}:${failure.code ?? "UNKNOWN"}`

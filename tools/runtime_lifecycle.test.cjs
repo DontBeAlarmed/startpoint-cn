@@ -105,6 +105,28 @@ test("server time restore failure reports the database startup stage", async () 
     )), false)
 })
 
+test("startup failure surfaces the root cause with its cause chain (R-G03)", async () => {
+    const rootCause = new Error("NODE_MODULE_VERSION 127 vs 137")
+    const startupErrors = []
+    const harness = createHarness({
+        initializeDatabase() {
+            harness.calls.push("database-failure")
+            throw new Error("database initialization failed", { cause: rootCause })
+        },
+        reportStartupError(stage, error) {
+            startupErrors.push({ stage, chain: [error.message, error.cause?.message] })
+        },
+    })
+
+    await harness.coordinator.start()
+
+    assert.equal(harness.coordinator.getPhase(), "failed")
+    assert.deepEqual(startupErrors, [{
+        stage: "database",
+        chain: ["database initialization failed", "NODE_MODULE_VERSION 127 vs 137"],
+    }], "启动失败必须把根因链交给上报依赖（stderr 落地由 cn-server 实现）")
+})
+
 function listen(server) {
     return new Promise((resolve, reject) => {
         server.once("error", reject)
