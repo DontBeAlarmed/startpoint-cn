@@ -49,7 +49,10 @@ export default defineConfig(({ mode }) => {
         },
         build: {
             outDir: "../web/dist",
-            emptyOutDir: true
+            emptyOutDir: true,
+            // 管理台是局域网单用户工具：单 bundle（~1.4MB min）是刻意取舍，
+            // 不做路由级 code-split；阈值上调到 2MB 仅为止噪
+            chunkSizeWarningLimit: 2000
         }
     }
 })
