@@ -53,7 +53,7 @@ export type QuestDerivedTableName =
     | "event_challenge_point_map.json"
     | "quest_entry_costs.json"
     | "quest_lookup.json"
-    | "boss_battle_join_gates.json"
+    | "quest_join_gates.json"
     | "quest_prerequisites.json"
     | "quest_unlock_costs.json"
 export type QuestConversionOutput = Readonly<Record<
@@ -785,11 +785,12 @@ function questIdForRow(tableName: QuestTableName, row: QuestRow): string {
     return tableName === "character_quest.json" ? row.path[0] : row.fields[0]
 }
 
-// R-G04：领主战参加门派生。客户端以 viewable_need_quest_1/2（col7-11/col12-16）
-// 门住 boss 档位链：col7/col12 为引用类别判别（QuestReferenceIdKind 序号的字符串
-// 形态），col11/col16 为**已解析的目标任务 id**（官方数据实证：一档门=主线关卡
-// 进度，高档门=前一档通关）。投影为 {category, questId} 供多人加入路径校验。
-const BOSS_BATTLE_REFERENCE_KIND_TO_CATEGORY: Readonly<Record<string, number>> = Object.freeze({
+// R-G04：任务参加门派生。客户端在 20 张任务表的行上以 viewable_need_quest_1/2
+// 门住进度链（列位随表异，经各表 Values 构造器逐一锚定：kind=resolved-4、
+// resolved=col 上**已解析的目标任务 id**；实证：boss 一档门=主线关卡进度、
+// 高档门=前一档通关、降临中级门=降临初级通关）。投影为 {category, questId}
+// 供多人加入路径校验——键 `${category}_${questId}` 防跨类别 id 碰撞。
+const QUEST_REFERENCE_KIND_TO_CATEGORY: Readonly<Record<string, number>> = Object.freeze({
     "0": 1,   // Main
     "1": 4,   // Ex
     "2": 2,   // BossBattle
@@ -812,32 +813,68 @@ const BOSS_BATTLE_REFERENCE_KIND_TO_CATEGORY: Readonly<Record<string, number>> =
     "19": 27, // ScoreAttackEvent
 })
 
-export function buildBossBattleJoinGates(
-    tree: CsvOrderedMapTree,
+const JOIN_GATE_TABLE_COLUMNS: Readonly<Record<string, { resolved1: number; resolved2: number }>> = Object.freeze({
+    advent_event_quest: { resolved1: 11, resolved2: 16 },
+    boss_battle_quest: { resolved1: 11, resolved2: 16 },
+    carnival_event_quest: { resolved1: 13, resolved2: 18 },
+    challenge_dungeon_event_quest: { resolved1: 11, resolved2: 16 },
+    character_quest: { resolved1: 12, resolved2: 17 },
+    daily_exp_mana_event_quest: { resolved1: 11, resolved2: 16 },
+    daily_week_event_quest: { resolved1: 10, resolved2: 15 },
+    ex_quest: { resolved1: 10, resolved2: 15 },
+    expert_single_event_quest: { resolved1: 13, resolved2: 18 },
+    hard_multi_event_quest: { resolved1: 11, resolved2: 16 },
+    main_quest: { resolved1: 10, resolved2: 15 },
+    practice_quest: { resolved1: 11, resolved2: 16 },
+    raid_event_quest: { resolved1: 13, resolved2: 18 },
+    ranking_event_single_quest: { resolved1: 11, resolved2: 16 },
+    rush_event_quest: { resolved1: 13, resolved2: 18 },
+    score_attack_event_quest: { resolved1: 13, resolved2: 18 },
+    solo_time_attack_event_quest: { resolved1: 12, resolved2: 17 },
+    story_event_single_quest: { resolved1: 11, resolved2: 16 },
+    tower_dungeon_event_quest: { resolved1: 13, resolved2: 18 },
+    world_story_event_boss_battle_quest: { resolved1: 11, resolved2: 16 },
+    world_story_event_quest: { resolved1: 11, resolved2: 16 },
+})
+
+export function buildQuestJoinGates(
+    questTrees: Readonly<Partial<Record<QuestTableName, CsvOrderedMapTree>>>,
 ): Readonly<Record<string, unknown>> {
-    const source = QUEST_TABLE_SOURCES["boss_battle_quest.json"]
     const output: Record<string, unknown> = {}
-    for (const { fields } of collectRows("boss_battle_quest.json", tree, source.nestingDepth)) {
-        const questId = Number(fields[0])
-        if (!Number.isSafeInteger(questId)) {
-            invalidQuest("boss_battle_quest.json", `row id ${String(fields[0])} is not numeric`)
-        }
-        const gates: { category: number; questId: number }[] = []
-        for (const [kindColumn, resolvedColumn] of [[7, 11], [12, 16]] as const) {
-            const kind = fields[kindColumn]
-            const resolved = fields[resolvedColumn]
-            if (kind === "(None)" || kind === "" || resolved === "(None)" || resolved === "") continue
-            const category = BOSS_BATTLE_REFERENCE_KIND_TO_CATEGORY[kind]
-            if (category === undefined) {
-                invalidQuest("boss_battle_quest.json", `unknown viewable reference kind ${String(kind)}`)
+    for (const [tableName, columns] of Object.entries(JOIN_GATE_TABLE_COLUMNS)) {
+        const tableKey = `${tableName}.json` as QuestTableName
+        const tree = questTrees[tableKey]
+        const source = QUEST_TABLE_SOURCES[tableKey]
+        if (!tree || !source) continue
+        for (const { path: rowPath, fields } of collectRows(tableName, tree, source.nestingDepth)) {
+            const questId = Number(fields[0])
+            if (!Number.isSafeInteger(questId)) {
+                invalidQuest(tableName, `row id ${String(fields[0])} is not numeric`)
             }
-            const refQuestId = Number(resolved)
-            if (!Number.isSafeInteger(refQuestId)) {
-                invalidQuest("boss_battle_quest.json", `resolved reference ${String(resolved)} is not numeric`)
+            const gates: { category: number; questId: number }[] = []
+            for (const [kindColumn, resolvedColumn] of [
+                [columns.resolved1 - 4, columns.resolved1],
+                [columns.resolved2 - 4, columns.resolved2],
+            ] as const) {
+                const kind = fields[kindColumn]
+                const resolved = fields[resolvedColumn]
+                if (kind === "(None)" || kind === "" || resolved === "(None)" || resolved === "") continue
+                const category = QUEST_REFERENCE_KIND_TO_CATEGORY[kind]
+                if (category === undefined) {
+                    invalidQuest(tableName, `unknown viewable reference kind ${String(kind)} at row ${questId}`)
+                }
+                const refQuestId = Number(resolved)
+                if (!Number.isSafeInteger(refQuestId)) {
+                    invalidQuest(tableName, `resolved reference ${String(resolved)} is not numeric`)
+                }
+                gates.push({ category, questId: refQuestId })
             }
-            gates.push({ category, questId: refQuestId })
+            if (gates.length > 0) {
+                const section = (output[tableName] ?? {}) as Record<string, unknown>
+                section[String(questId)] = gates
+                output[tableName] = section
+            }
         }
-        if (gates.length > 0) output[String(questId)] = gates
     }
     return output
 }
@@ -1189,7 +1226,7 @@ export async function convertQuests(
         ...questTables,
         "daily_challenge_point_lookup.json": dailyChallengePointLookup,
         "event_challenge_point_map.json": eventChallengePointMap,
-        "boss_battle_join_gates.json": buildBossBattleJoinGates(questTrees["boss_battle_quest.json"]),
+        "quest_join_gates.json": buildQuestJoinGates(questTrees),
         "quest_entry_costs.json": buildQuestEntryCosts(questTrees),
         "quest_lookup.json": buildQuestLookup(
             questTables,

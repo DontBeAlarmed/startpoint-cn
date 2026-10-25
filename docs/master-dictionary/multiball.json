@@ -40,14 +40,14 @@
       "status": "client-only"
     },
     {
-      "index": 12,
+      "index": 22,
       "name": "support_skill3",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only"
     },
     {
-      "index": 10,
+      "index": 21,
       "name": "support_skill2",
       "as3Type": "Option",
       "parseRule": "option-int",

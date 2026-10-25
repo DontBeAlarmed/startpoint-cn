@@ -19,7 +19,7 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 16,
+      "index": 2,
       "name": "trigger",
       "as3Type": "EnemyAbilityTriggerMasterValue",
       "parseRule": "composite",

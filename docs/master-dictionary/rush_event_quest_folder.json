@@ -38,16 +38,16 @@
       }
     },
     {
-      "index": 32,
+      "index": 33,
       "name": "reward9_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 5,
+        "distinctCount": 2,
         "noneOrEmpty": 50,
-        "intMin": 4,
-        "intMax": 49
+        "intMin": 1,
+        "intMax": 1
       }
     },
     {
@@ -64,16 +64,16 @@
       }
     },
     {
-      "index": 29,
+      "index": 30,
       "name": "reward8_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 5,
+        "distinctCount": 2,
         "noneOrEmpty": 50,
-        "intMin": 3,
-        "intMax": 48
+        "intMin": 2,
+        "intMax": 2
       }
     },
     {
@@ -90,16 +90,16 @@
       }
     },
     {
-      "index": 26,
+      "index": 27,
       "name": "reward7_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 9,
+        "distinctCount": 3,
         "noneOrEmpty": 44,
-        "intMin": 2,
-        "intMax": 48
+        "intMin": 1,
+        "intMax": 3
       }
     },
     {
@@ -116,16 +116,16 @@
       }
     },
     {
-      "index": 23,
+      "index": 24,
       "name": "reward6_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 10,
+        "distinctCount": 4,
         "noneOrEmpty": 43,
         "intMin": 1,
-        "intMax": 99
+        "intMax": 8
       }
     },
     {
@@ -142,16 +142,16 @@
       }
     },
     {
-      "index": 20,
+      "index": 21,
       "name": "reward5_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 14,
+        "distinctCount": 3,
         "noneOrEmpty": 37,
         "intMin": 1,
-        "intMax": 49
+        "intMax": 5
       }
     },
     {
@@ -168,16 +168,16 @@
       }
     },
     {
-      "index": 17,
+      "index": 18,
       "name": "reward4_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 10,
+        "distinctCount": 4,
         "noneOrEmpty": 36,
         "intMin": 1,
-        "intMax": 48
+        "intMax": 4
       }
     },
     {
@@ -194,16 +194,16 @@
       }
     },
     {
-      "index": 14,
+      "index": 15,
       "name": "reward3_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 6,
+        "distinctCount": 4,
         "noneOrEmpty": 35,
-        "intMin": 2,
-        "intMax": 47
+        "intMin": 1,
+        "intMax": 3
       }
     },
     {
@@ -220,16 +220,16 @@
       }
     },
     {
-      "index": 11,
+      "index": 12,
       "name": "reward2_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 6,
+        "distinctCount": 4,
         "noneOrEmpty": 35,
-        "intMin": 1,
-        "intMax": 46
+        "intMin": 4,
+        "intMax": 8
       }
     },
     {
@@ -246,16 +246,16 @@
       }
     },
     {
-      "index": 8,
+      "index": 9,
       "name": "reward1_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 8,
+        "distinctCount": 7,
         "noneOrEmpty": 35,
-        "intMin": 2370001,
-        "intMax": 2370007
+        "intMin": 50,
+        "intMax": 400
       }
     },
     {
@@ -272,7 +272,7 @@
       }
     },
     {
-      "index": 35,
+      "index": 36,
       "name": "reward10_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -280,8 +280,8 @@
       "sample": {
         "distinctCount": 2,
         "noneOrEmpty": 50,
-        "intMin": 99,
-        "intMax": 99
+        "intMin": 2,
+        "intMax": 2
       }
     },
     {

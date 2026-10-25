@@ -42,7 +42,7 @@
       "status": "client-only"
     },
     {
-      "index": 5,
+      "index": 12,
       "name": "shadow_animation_path",
       "as3Type": "String",
       "parseRule": "composite",
@@ -63,7 +63,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 11,
       "name": "marker_timeline_path",
       "as3Type": "String",
       "parseRule": "composite",
@@ -98,7 +98,7 @@
       "status": "client-only"
     },
     {
-      "index": 2,
+      "index": 9,
       "name": "gender",
       "as3Type": "String",
       "parseRule": "composite",
@@ -182,14 +182,14 @@
       "status": "client-only"
     },
     {
-      "index": 7,
+      "index": 14,
       "name": "damage_check_fore_animation_path",
       "as3Type": "Option",
       "parseRule": "option-string",
       "status": "client-only"
     },
     {
-      "index": 6,
+      "index": 13,
       "name": "damage_check_back_animation_path",
       "as3Type": "Option",
       "parseRule": "option-string",

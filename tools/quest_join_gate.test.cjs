@@ -1,8 +1,9 @@
 "use strict"
 
-// R-G04 回归：领主战参加门——创建/加入 boss 任务房间时，加入者（含房主）的
-// 任务进度必须满足 viewable 前置链（boss_battle_join_gates.json 派生）。
-// 真实数据链：1001002 ← 主线 6010004；1001003 ← boss 1001002；1001001/1001005 无门。
+// R-G04 回归：任务参加门（泛化版）——创建/加入带前置链的任务房间时，加入者
+// （含房主）的任务进度必须满足 viewable 前置链（quest_join_gates.json 派生）。
+// 真实数据链：boss 1001002 ← 主线 6010004、1001003 ← boss 1001002；
+// 降临 100004002 ← 降临 100004001（风神·雷神中级←初级）；1001001/1001005 无门。
 
 require("ts-node/register/transpile-only")
 
@@ -27,7 +28,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
-const { isBossQuestJoinAllowed } = require("../src/lib/boss-join-gate")
+const { isQuestJoinAllowed } = require("../src/lib/quest-join-gate")
 const { createEmbeddedMultiHttpContext } = require("../src/multi/http/context")
 const { registerRoomRoutes } = require("../src/multi/http/room")
 const { registerLobbyRoutes } = require("../src/multi/http/lobby")
@@ -183,10 +184,20 @@ test("ungated boss quests stay open to players without any progress", async () =
     assert.equal(response.statusCode, 200, response.body)
 })
 
-test("non-boss categories are never gated", () => {
-    assert.equal(isBossQuestJoinAllowed(1, 6010004, () => null), true,
-        "主线任务不受 boss 参加门约束")
-    assert.equal(isBossQuestJoinAllowed(2, 1001002, () => ({ finished: false })), false)
-    assert.equal(isBossQuestJoinAllowed(2, 1001002, () => ({ finished: true })), true)
-    assert.equal(isBossQuestJoinAllowed(2, 1001001, () => null), true, "无门 boss 恒放行")
+test("non-boss categories are gated by their own viewable chains (R-G04 泛化)", () => {
+    // 降临链（风神·雷神中级←初级）——实测未拦的原始场景
+    assert.equal(isQuestJoinAllowed(7, 100004002, () => null), false,
+        "降临中级：未通关初级必须拒绝")
+    assert.equal(isQuestJoinAllowed(7, 100004002, () => ({ finished: true })), true)
+    assert.equal(isQuestJoinAllowed(8, 100004002, () => null), false,
+        "降临 multi 变体（category 8）同链")
+    // 主线门：主线任务自身也有进度链（6010004 ← 6010003）——门正确生效，
+    // boss 一档的门引用的是主线通关事实，不受影响
+    assert.equal(isQuestJoinAllowed(1, 6010004, () => null), false,
+        "主线 6010004 有自身进度链（←6010003）")
+    assert.equal(isQuestJoinAllowed(1, 6010004, () => ({ finished: true })), true)
+    // boss 链回归
+    assert.equal(isQuestJoinAllowed(2, 1001002, () => ({ finished: false })), false)
+    assert.equal(isQuestJoinAllowed(2, 1001002, () => ({ finished: true })), true)
+    assert.equal(isQuestJoinAllowed(2, 1001001, () => null), true, "无门 boss 恒放行")
 })

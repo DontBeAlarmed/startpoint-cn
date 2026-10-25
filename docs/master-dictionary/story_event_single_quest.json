@@ -28,7 +28,7 @@
   ],
   "columns": [
     {
-      "index": 13,
+      "index": 16,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -50,16 +50,16 @@
       }
     },
     {
-      "index": 8,
+      "index": 11,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 7,
+        "distinctCount": 57,
         "noneOrEmpty": 290,
-        "intMin": 100001,
-        "intMax": 300001
+        "intMin": 100001001,
+        "intMax": 300001004
       }
     },
     {
@@ -181,13 +181,13 @@
       }
     },
     {
-      "index": 40,
+      "index": 43,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "always-empty",
       "sample": {
-        "distinctCount": 2,
+        "distinctCount": 1,
         "noneOrEmpty": 348
       }
     },
@@ -203,7 +203,7 @@
       }
     },
     {
-      "index": 35,
+      "index": 38,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -211,8 +211,8 @@
       "sample": {
         "distinctCount": 3,
         "noneOrEmpty": 342,
-        "intMin": 2,
-        "intMax": 6
+        "intMin": 2009007,
+        "intMax": 6010006
       }
     },
     {
@@ -295,7 +295,7 @@
       }
     },
     {
-      "index": 26,
+      "index": 29,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -317,7 +317,7 @@
       }
     },
     {
-      "index": 21,
+      "index": 24,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -325,8 +325,8 @@
       "sample": {
         "distinctCount": 2,
         "noneOrEmpty": 347,
-        "intMin": 2,
-        "intMax": 2
+        "intMin": 2009007,
+        "intMax": 2009007
       }
     },
     {
@@ -428,16 +428,16 @@
       }
     },
     {
-      "index": 51,
+      "index": 128,
       "name": "daily_challenge_point_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 2,
-        "noneOrEmpty": 0,
-        "intMin": 0,
-        "intMax": 1
+        "distinctCount": 236,
+        "noneOrEmpty": 113,
+        "intMin": 8,
+        "intMax": 418
       }
     }
   ]

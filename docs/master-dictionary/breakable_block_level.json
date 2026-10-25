@@ -28,7 +28,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 11,
       "name": "tp_basic_curve_id",
       "as3Type": "String",
       "parseRule": "composite",
@@ -56,14 +56,14 @@
       "status": "client-only"
     },
     {
-      "index": 1,
+      "index": 10,
       "name": "atk_correction_curve_id",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only"
     },
     {
-      "index": 0,
+      "index": 7,
       "name": "atk_basic_curve_id",
       "as3Type": "String",
       "parseRule": "composite",

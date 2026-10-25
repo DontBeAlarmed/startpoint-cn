@@ -56,7 +56,7 @@
       "status": "client-only"
     },
     {
-      "index": 19,
+      "index": 22,
       "name": "need_quest_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -84,7 +84,7 @@
       "status": "client-only"
     },
     {
-      "index": 2,
+      "index": 3,
       "name": "max_phase",
       "as3Type": "Option",
       "parseRule": "option-int",

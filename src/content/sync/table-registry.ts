@@ -692,8 +692,19 @@ const definitionInputs: TableSourceInput[] = [
         ["assets/practice_quest.json"],
     ),
     questDerivedDefinition(
-        "boss_battle_join_gates.json",
-        [QUEST_TABLE_SOURCES["boss_battle_quest.json"].logicalPath],
+        "quest_join_gates.json",
+        Object.keys(QUEST_TABLE_SOURCES)
+            .filter(table => table in {
+                advent_event_quest: 1, boss_battle_quest: 1, carnival_event_quest: 1,
+                challenge_dungeon_event_quest: 1, character_quest: 1, daily_exp_mana_event_quest: 1,
+                daily_week_event_quest: 1, ex_quest: 1, expert_single_event_quest: 1,
+                hard_multi_event_quest: 1, main_quest: 1, practice_quest: 1, raid_event_quest: 1,
+                ranking_event_single_quest: 1, rush_event_quest: 1, score_attack_event_quest: 1,
+                solo_time_attack_event_quest: 1, story_event_single_quest: 1,
+                tower_dungeon_event_quest: 1, world_story_event_boss_battle_quest: 1,
+                world_story_event_quest: 1,
+            })
+            .map(table => QUEST_TABLE_SOURCES[table as keyof typeof QUEST_TABLE_SOURCES].logicalPath),
     ),
     questDerivedDefinition(
         "quest_unlock_costs.json",

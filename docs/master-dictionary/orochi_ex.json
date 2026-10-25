@@ -73,14 +73,14 @@
       }
     },
     {
-      "index": 12,
+      "index": 23,
       "name": "shadow_animation_path",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 1
+        "noneOrEmpty": 0
       }
     },
     {
@@ -647,16 +647,14 @@
       }
     },
     {
-      "index": 94,
+      "index": 96,
       "name": "phase2_attack3",
       "as3Type": "Object",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0,
-        "intMin": 1,
-        "intMax": 1
+        "noneOrEmpty": 0
       }
     },
     {
@@ -673,16 +671,14 @@
       }
     },
     {
-      "index": 82,
+      "index": 84,
       "name": "phase2_attack2",
       "as3Type": "Object",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0,
-        "intMin": 2,
-        "intMax": 2
+        "noneOrEmpty": 0
       }
     },
     {
@@ -699,16 +695,14 @@
       }
     },
     {
-      "index": 70,
+      "index": 72,
       "name": "phase2_attack1",
       "as3Type": "Object",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0,
-        "intMin": 0,
-        "intMax": 0
+        "noneOrEmpty": 0
       }
     },
     {
@@ -825,14 +819,14 @@
       }
     },
     {
-      "index": 14,
+      "index": 34,
       "name": "phase1_head1_id",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 1
+        "noneOrEmpty": 0
       }
     },
     {
@@ -875,25 +869,25 @@
       }
     },
     {
-      "index": 10,
+      "index": 22,
       "name": "marker_timeline_path",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 1
+        "noneOrEmpty": 0
       }
     },
     {
-      "index": 8,
+      "index": 21,
       "name": "marker_set",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 1
+        "noneOrEmpty": 0
       }
     },
     {
@@ -954,25 +948,25 @@
       }
     },
     {
-      "index": 4,
+      "index": 17,
       "name": "gender",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 1
+        "noneOrEmpty": 0
       }
     },
     {
-      "index": 3,
+      "index": 1,
       "name": "element",
       "as3Type": "BossElementKind",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 1
+        "noneOrEmpty": 0
       }
     },
     {

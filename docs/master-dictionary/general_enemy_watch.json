@@ -99,7 +99,7 @@
       "status": "client-only"
     },
     {
-      "index": 22,
+      "index": 18,
       "name": "action_content",
       "as3Type": "GeneralEnemyWatchActionContent",
       "parseRule": "composite",

@@ -51,7 +51,7 @@
       "status": "client-only"
     },
     {
-      "index": 9,
+      "index": 12,
       "name": "quest_rank_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -114,7 +114,7 @@
       "status": "client-only"
     },
     {
-      "index": 9,
+      "index": 13,
       "name": "item_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -135,7 +135,7 @@
       "status": "client-only"
     },
     {
-      "index": 10,
+      "index": 14,
       "name": "equipment_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -205,7 +205,7 @@
       "status": "client-only"
     },
     {
-      "index": 11,
+      "index": 15,
       "name": "character_id",
       "as3Type": "Option",
       "parseRule": "option-int",

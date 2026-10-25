@@ -28,7 +28,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 1,
       "name": "kind",
       "as3Type": "MissionClientCheckKindMasterValue",
       "parseRule": "composite",

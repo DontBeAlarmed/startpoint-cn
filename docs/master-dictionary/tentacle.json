@@ -21,13 +21,13 @@
   ],
   "columns": [
     {
-      "index": 2,
+      "index": 9,
       "name": "shadow_animation_path",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 2,
+        "distinctCount": 1,
         "noneOrEmpty": 0
       }
     },
@@ -43,16 +43,14 @@
       }
     },
     {
-      "index": 0,
+      "index": 8,
       "name": "marker_timeline_path",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 1,
-        "noneOrEmpty": 0,
-        "intMin": 0,
-        "intMax": 0
+        "distinctCount": 2,
+        "noneOrEmpty": 0
       }
     },
     {

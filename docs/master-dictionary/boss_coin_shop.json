@@ -77,7 +77,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 5,
       "name": "optional_prepend_name",
       "as3Type": "Option",
       "parseRule": "option-string",

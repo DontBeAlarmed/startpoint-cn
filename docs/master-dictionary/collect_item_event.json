@@ -63,7 +63,7 @@
       "status": "client-only"
     },
     {
-      "index": 24,
+      "index": 27,
       "name": "need_quest_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -84,7 +84,7 @@
       "status": "client-only"
     },
     {
-      "index": 3,
+      "index": 4,
       "name": "max_phase",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -112,7 +112,7 @@
       "status": "client-only"
     },
     {
-      "index": 18,
+      "index": 19,
       "name": "flash_frame_reference",
       "as3Type": "Option",
       "parseRule": "option-int",

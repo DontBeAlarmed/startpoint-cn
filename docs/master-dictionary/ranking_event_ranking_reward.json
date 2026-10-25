@@ -26,7 +26,7 @@
   ],
   "columns": [
     {
-      "index": 28,
+      "index": 29,
       "name": "reward9_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -48,7 +48,7 @@
       }
     },
     {
-      "index": 25,
+      "index": 26,
       "name": "reward8_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -70,7 +70,7 @@
       }
     },
     {
-      "index": 22,
+      "index": 23,
       "name": "reward7_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -92,7 +92,7 @@
       }
     },
     {
-      "index": 19,
+      "index": 20,
       "name": "reward6_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -114,16 +114,16 @@
       }
     },
     {
-      "index": 16,
+      "index": 17,
       "name": "reward5_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 3,
+        "distinctCount": 5,
         "noneOrEmpty": 55,
-        "intMin": 999004,
-        "intMax": 999005
+        "intMin": 1,
+        "intMax": 7
       }
     },
     {
@@ -140,16 +140,16 @@
       }
     },
     {
-      "index": 13,
+      "index": 14,
       "name": "reward4_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 3,
+        "distinctCount": 5,
         "noneOrEmpty": 28,
-        "intMin": 12002,
-        "intMax": 13001
+        "intMin": 1,
+        "intMax": 7
       }
     },
     {
@@ -166,14 +166,16 @@
       }
     },
     {
-      "index": 10,
+      "index": 11,
       "name": "reward3_number",
       "as3Type": "Option",
       "parseRule": "option-int",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
-        "distinctCount": 1,
-        "noneOrEmpty": 63
+        "distinctCount": 6,
+        "noneOrEmpty": 54,
+        "intMin": 150,
+        "intMax": 1500
       }
     },
     {
@@ -190,16 +192,16 @@
       }
     },
     {
-      "index": 7,
+      "index": 8,
       "name": "reward2_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 2,
+        "distinctCount": 7,
         "noneOrEmpty": 54,
-        "intMin": 49100,
-        "intMax": 49100
+        "intMin": 5,
+        "intMax": 50
       }
     },
     {
@@ -216,16 +218,16 @@
       }
     },
     {
-      "index": 4,
+      "index": 5,
       "name": "reward1_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 8,
-        "noneOrEmpty": 45,
-        "intMin": 12002,
-        "intMax": 54040
+        "distinctCount": 5,
+        "noneOrEmpty": 27,
+        "intMin": 1,
+        "intMax": 20000
       }
     },
     {
@@ -242,7 +244,7 @@
       }
     },
     {
-      "index": 31,
+      "index": 32,
       "name": "reward10_number",
       "as3Type": "Option",
       "parseRule": "option-int",

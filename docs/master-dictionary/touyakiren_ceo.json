@@ -76,14 +76,14 @@
       }
     },
     {
-      "index": 14,
+      "index": 24,
       "name": "weapon_fl_character_animation_path",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 3
+        "noneOrEmpty": 0
       }
     },
     {
@@ -177,14 +177,14 @@
       }
     },
     {
-      "index": 12,
+      "index": 23,
       "name": "shadow_animation_path",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 3
+        "noneOrEmpty": 0
       }
     },
     {
@@ -524,36 +524,36 @@
       }
     },
     {
-      "index": 10,
+      "index": 22,
       "name": "marker_timeline_path",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 3
+        "noneOrEmpty": 0
       }
     },
     {
-      "index": 8,
+      "index": 21,
       "name": "marker_set",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 3
+        "noneOrEmpty": 0
       }
     },
     {
-      "index": 4,
+      "index": 17,
       "name": "gender",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 3
+        "noneOrEmpty": 0
       }
     },
     {
@@ -1136,14 +1136,14 @@
       }
     },
     {
-      "index": 3,
+      "index": 1,
       "name": "element",
       "as3Type": "BossElementKind",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 3
+        "noneOrEmpty": 0
       }
     },
     {

@@ -42,7 +42,7 @@
       "status": "client-only"
     },
     {
-      "index": 3,
+      "index": 5,
       "name": "image",
       "as3Type": "Option",
       "parseRule": "option-string",

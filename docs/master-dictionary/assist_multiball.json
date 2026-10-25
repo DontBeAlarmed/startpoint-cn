@@ -47,7 +47,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 14,
       "name": "support_skill1",
       "as3Type": "Option",
       "parseRule": "option-int",

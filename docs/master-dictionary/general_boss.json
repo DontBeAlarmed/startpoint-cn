@@ -188,14 +188,14 @@
       }
     },
     {
-      "index": 14,
+      "index": 24,
       "name": "marker_set",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 70,
-        "noneOrEmpty": 538
+        "distinctCount": 6,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -243,14 +243,14 @@
       }
     },
     {
-      "index": 4,
+      "index": 17,
       "name": "gender",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 70,
-        "noneOrEmpty": 538
+        "distinctCount": 3,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -859,14 +859,14 @@
       }
     },
     {
-      "index": 3,
+      "index": 1,
       "name": "element",
       "as3Type": "BossElementKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 76,
-        "noneOrEmpty": 538
+        "distinctCount": 132,
+        "noneOrEmpty": 211
       }
     },
     {
@@ -1446,14 +1446,14 @@
       }
     },
     {
-      "index": 63,
+      "index": 69,
       "name": "cutin001",
       "as3Type": "Option",
       "parseRule": "option-string",
       "status": "client-only",
       "sample": {
-        "distinctCount": 2,
-        "noneOrEmpty": 740
+        "distinctCount": 109,
+        "noneOrEmpty": 195
       }
     },
     {

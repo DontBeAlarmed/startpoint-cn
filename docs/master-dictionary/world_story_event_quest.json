@@ -28,7 +28,7 @@
   ],
   "columns": [
     {
-      "index": 13,
+      "index": 16,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -50,16 +50,16 @@
       }
     },
     {
-      "index": 8,
+      "index": 11,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 50,
+        "distinctCount": 818,
         "noneOrEmpty": 57,
-        "intMin": 100100,
-        "intMax": 500014
+        "intMin": 100100001,
+        "intMax": 500014008
       }
     },
     {
@@ -181,13 +181,13 @@
       }
     },
     {
-      "index": 40,
+      "index": 43,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "always-empty",
       "sample": {
-        "distinctCount": 2,
+        "distinctCount": 1,
         "noneOrEmpty": 913
       }
     },
@@ -203,7 +203,7 @@
       }
     },
     {
-      "index": 35,
+      "index": 38,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -306,7 +306,7 @@
       }
     },
     {
-      "index": 26,
+      "index": 29,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -314,8 +314,8 @@
       "sample": {
         "distinctCount": 6,
         "noneOrEmpty": 902,
-        "intMin": 2,
-        "intMax": 400006
+        "intMin": 2009007,
+        "intMax": 400006014
       }
     },
     {
@@ -332,7 +332,7 @@
       }
     },
     {
-      "index": 21,
+      "index": 24,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -340,8 +340,8 @@
       "sample": {
         "distinctCount": 15,
         "noneOrEmpty": 871,
-        "intMin": 2,
-        "intMax": 500005
+        "intMin": 2009007,
+        "intMax": 500005010
       }
     },
     {

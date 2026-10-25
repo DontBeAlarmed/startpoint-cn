@@ -21,7 +21,7 @@
   ],
   "columns": [
     {
-      "index": 83,
+      "index": 2,
       "name": "unisonable",
       "as3Type": "Boolean",
       "parseRule": "composite",

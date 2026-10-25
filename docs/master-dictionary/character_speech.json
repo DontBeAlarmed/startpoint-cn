@@ -21,7 +21,7 @@
   ],
   "columns": [
     {
-      "index": 0,
+      "index": 4,
       "name": "voice_path",
       "as3Type": "Option",
       "parseRule": "option-string",

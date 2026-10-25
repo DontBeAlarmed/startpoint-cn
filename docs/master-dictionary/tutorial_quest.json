@@ -33,7 +33,7 @@
       "status": "client-only"
     },
     {
-      "index": 25,
+      "index": 4,
       "name": "start_time",
       "as3Type": "Number",
       "parseRule": "composite",
@@ -68,7 +68,7 @@
       "status": "client-only"
     },
     {
-      "index": 26,
+      "index": 5,
       "name": "end_time",
       "as3Type": "Option",
       "parseRule": "composite",

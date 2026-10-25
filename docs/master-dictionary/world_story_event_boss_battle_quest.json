@@ -41,7 +41,7 @@
       }
     },
     {
-      "index": 13,
+      "index": 16,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -63,16 +63,16 @@
       }
     },
     {
-      "index": 8,
+      "index": 11,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 32,
+        "distinctCount": 96,
         "noneOrEmpty": 0,
-        "intMin": 100100,
-        "intMax": 500014
+        "intMin": 100100001,
+        "intMax": 500014007
       }
     },
     {
@@ -177,7 +177,7 @@
       }
     },
     {
-      "index": 40,
+      "index": 43,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -199,7 +199,7 @@
       }
     },
     {
-      "index": 35,
+      "index": 38,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -289,7 +289,7 @@
       }
     },
     {
-      "index": 26,
+      "index": 29,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -311,7 +311,7 @@
       }
     },
     {
-      "index": 21,
+      "index": 24,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -921,7 +921,7 @@
       }
     },
     {
-      "index": 117,
+      "index": 118,
       "name": "battle_fixed_party",
       "as3Type": "Option",
       "parseRule": "option-int",

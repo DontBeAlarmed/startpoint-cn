@@ -39,7 +39,7 @@
       "status": "client-only"
     },
     {
-      "index": 0,
+      "index": 2,
       "name": "short_description",
       "as3Type": "Option",
       "parseRule": "option-string",

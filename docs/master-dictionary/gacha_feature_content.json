@@ -34,16 +34,14 @@
       }
     },
     {
-      "index": 3,
+      "index": 1,
       "name": "asset_kind",
       "as3Type": "GachaFeatureContentAssetKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 3,
-        "noneOrEmpty": 1153,
-        "intMin": 0,
-        "intMax": 1
+        "distinctCount": 65,
+        "noneOrEmpty": 1923
       }
     }
   ]

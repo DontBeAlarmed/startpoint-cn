@@ -148,14 +148,14 @@
       }
     },
     {
-      "index": 32,
+      "index": 35,
       "name": "outhole_animation_path",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 5,
-        "noneOrEmpty": 1322
+        "distinctCount": 210,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -205,14 +205,14 @@
       }
     },
     {
-      "index": 34,
+      "index": 36,
       "name": "dash_panel_directory",
       "as3Type": "Option",
       "parseRule": "option-string",
       "status": "client-only",
       "sample": {
-        "distinctCount": 5,
-        "noneOrEmpty": 1322
+        "distinctCount": 140,
+        "noneOrEmpty": 0
       }
     },
     {

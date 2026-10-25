@@ -24,7 +24,7 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 14,
+      "index": 17,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -46,7 +46,7 @@
       }
     },
     {
-      "index": 9,
+      "index": 12,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -156,7 +156,7 @@
       }
     },
     {
-      "index": 41,
+      "index": 44,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -178,7 +178,7 @@
       }
     },
     {
-      "index": 36,
+      "index": 39,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -320,7 +320,7 @@
       }
     },
     {
-      "index": 27,
+      "index": 30,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -342,7 +342,7 @@
       }
     },
     {
-      "index": 22,
+      "index": 25,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",

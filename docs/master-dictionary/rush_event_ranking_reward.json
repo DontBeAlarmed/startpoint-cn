@@ -27,16 +27,16 @@
   ],
   "columns": [
     {
-      "index": 4,
+      "index": 5,
       "name": "reward1_number",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 21,
+        "distinctCount": 1,
         "noneOrEmpty": 0,
-        "intMin": 64000,
-        "intMax": 64020
+        "intMin": 1,
+        "intMax": 1
       }
     },
     {

@@ -47,16 +47,16 @@
       }
     },
     {
-      "index": 2,
+      "index": 3,
       "name": "kind",
       "as3Type": "QuestRewardKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 377,
-        "noneOrEmpty": 121,
+        "distinctCount": 59,
+        "noneOrEmpty": 66,
         "intMin": 1,
-        "intMax": 10000142
+        "intMax": 40000
       }
     },
     {

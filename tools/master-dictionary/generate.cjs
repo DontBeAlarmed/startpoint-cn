@@ -57,18 +57,22 @@ function parseValuesClass(filePath) {
             index = Number(direct[2])
             rule = classifyExpression(direct[1])
         } else {
-            // 间接绑定：定位对 name 的赋值表达式（含 _locN_ 局部），再追该局部来自哪个 param1
+            // 间接绑定：定位对 name 的赋值表达式（含 _locN_ 局部），再追该局部
+            // 最近的 param1 来源——局部变量在构造器中被复用，必须取字段赋值
+            // 位置**之前**最近的一次（haxe 生成代码同名局部串用）
             const assign = new RegExp(`${name} = ([^;]{0,400});`).exec(body)
             if (assign) {
                 rule = classifyExpression(assign[1])
                 const localMatch = /(_loc\d+_)/.exec(assign[1])
                 if (localMatch) {
                     const local = localMatch[1]
-                    const localDef = new RegExp(
-                        `${local}\\s*(:[A-Za-z]+)?\\s*=[^;]{0,100}?param1\\[(\\d+)\\]`,
-                    ).exec(body)
-                    if (localDef) index = Number(localDef[2])
-                    if (rule === null || rule === "composite") rule = rule ?? "composite"
+                    const assignPos = body.indexOf(assign[0])
+                    const before = body.slice(0, assignPos)
+                    const localDefs = [...before.matchAll(
+                        new RegExp(`${local}\\s*(:[A-Za-z]+)?\\s*=[^;]{0,100}?param1\\[(\\d+)\\]`, 'g'),
+                    )]
+                    if (localDefs.length > 0) index = Number(localDefs[localDefs.length - 1][2])
+                    rule = rule ?? "composite"
                 }
             }
         }

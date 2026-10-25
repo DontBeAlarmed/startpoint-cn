@@ -15,7 +15,7 @@ import {
 } from "../../lib/quest/active-quest-service";
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
-import { isBossQuestJoinAllowed } from "../../lib/boss-join-gate";
+import { isQuestJoinAllowed } from "../../lib/quest-join-gate";
 import {
     getPlayerSync,
     updatePlayerSync,
@@ -206,7 +206,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         }
         // R-G04：领主战参加门——开战者的任务进度必须满足 viewable 前置链
         //（铃铛加入等绕过 select_room 的路径在此兜底）
-        if (!isBossQuestJoinAllowed(
+        if (!isQuestJoinAllowed(
             room.value.category,
             room.value.questId,
             (refCategory, refQuestId) => getPlayerSingleQuestProgressSync(ctx.playerId, refCategory, refQuestId),

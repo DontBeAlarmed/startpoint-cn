@@ -24,7 +24,7 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 12,
+      "index": 15,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -46,16 +46,16 @@
       }
     },
     {
-      "index": 7,
+      "index": 10,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 20,
+        "distinctCount": 91,
         "noneOrEmpty": 24,
-        "intMin": 1,
-        "intMax": 19
+        "intMin": 1001,
+        "intMax": 19017
       }
     },
     {
@@ -149,7 +149,7 @@
       }
     },
     {
-      "index": 39,
+      "index": 42,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -171,7 +171,7 @@
       }
     },
     {
-      "index": 34,
+      "index": 37,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -272,7 +272,7 @@
       }
     },
     {
-      "index": 25,
+      "index": 28,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -294,7 +294,7 @@
       }
     },
     {
-      "index": 20,
+      "index": 23,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",

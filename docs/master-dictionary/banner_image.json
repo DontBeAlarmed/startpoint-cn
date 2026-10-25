@@ -54,16 +54,14 @@
       }
     },
     {
-      "index": 1,
+      "index": 4,
       "name": "home_banner_path",
       "as3Type": "Option",
       "parseRule": "option-string",
       "status": "client-only",
       "sample": {
-        "distinctCount": 2,
-        "noneOrEmpty": 0,
-        "intMin": 0,
-        "intMax": 1
+        "distinctCount": 325,
+        "noneOrEmpty": 6
       }
     },
     {

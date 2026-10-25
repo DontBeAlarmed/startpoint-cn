@@ -106,14 +106,14 @@
       }
     },
     {
-      "index": 34,
+      "index": 37,
       "name": "routine_id",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 2,
-        "noneOrEmpty": 1104
+        "distinctCount": 616,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -139,25 +139,29 @@
       }
     },
     {
-      "index": 51,
+      "index": 54,
       "name": "num_wince_state_frames",
       "as3Type": "Option",
       "parseRule": "option-int",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
-        "distinctCount": 1,
-        "noneOrEmpty": 1114
+        "distinctCount": 7,
+        "noneOrEmpty": 884,
+        "intMin": 1,
+        "intMax": 300
       }
     },
     {
-      "index": 47,
+      "index": 53,
       "name": "num_stun_state_frames",
       "as3Type": "Option",
       "parseRule": "option-int",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
-        "distinctCount": 1,
-        "noneOrEmpty": 1114
+        "distinctCount": 5,
+        "noneOrEmpty": 1051,
+        "intMin": 1,
+        "intMax": 300
       }
     },
     {
@@ -207,27 +211,25 @@
       }
     },
     {
-      "index": 35,
+      "index": 38,
       "name": "initial_state_id",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 3,
-        "noneOrEmpty": 1104
+        "distinctCount": 25,
+        "noneOrEmpty": 0
       }
     },
     {
-      "index": 33,
+      "index": 36,
       "name": "initial_position_name",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
         "distinctCount": 2,
-        "noneOrEmpty": 0,
-        "intMin": 0,
-        "intMax": 1
+        "noneOrEmpty": 0
       }
     },
     {
@@ -264,14 +266,14 @@
       }
     },
     {
-      "index": 2,
+      "index": 9,
       "name": "gender",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 30,
-        "noneOrEmpty": 933
+        "distinctCount": 2,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -858,14 +860,14 @@
       }
     },
     {
-      "index": 13,
+      "index": 8,
       "name": "element",
       "as3Type": "EnemyElementKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 3,
-        "noneOrEmpty": 1049
+        "distinctCount": 18,
+        "noneOrEmpty": 0
       }
     },
     {

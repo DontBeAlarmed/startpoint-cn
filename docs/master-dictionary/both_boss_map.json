@@ -70,7 +70,7 @@
       "status": "client-only"
     },
     {
-      "index": 10,
+      "index": 13,
       "name": "default_quest1",
       "as3Type": "Option",
       "parseRule": "option-int",

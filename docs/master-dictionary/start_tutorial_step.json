@@ -25,14 +25,14 @@
   ],
   "columns": [
     {
-      "index": 0,
+      "index": 6,
       "name": "player",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 1,
       "name": "kind",
       "as3Type": "StartTutorialStepKind",
       "parseRule": "composite",

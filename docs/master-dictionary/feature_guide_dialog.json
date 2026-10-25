@@ -46,7 +46,7 @@
       "status": "client-only"
     },
     {
-      "index": 0,
+      "index": 1,
       "name": "need_player_rank",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -74,7 +74,7 @@
       "status": "client-only"
     },
     {
-      "index": 16,
+      "index": 1,
       "name": "frequency",
       "as3Type": "FeatureGuideDialogFrequencyKind",
       "parseRule": "composite",

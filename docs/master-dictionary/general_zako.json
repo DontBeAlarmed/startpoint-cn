@@ -113,14 +113,14 @@
       }
     },
     {
-      "index": 4,
+      "index": 11,
       "name": "shadow_animation_path",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 75,
-        "noneOrEmpty": 22
+        "distinctCount": 3,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -146,14 +146,14 @@
       }
     },
     {
-      "index": 3,
+      "index": 10,
       "name": "marker_timeline_path",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 74,
-        "noneOrEmpty": 22
+        "distinctCount": 13,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -190,25 +190,25 @@
       }
     },
     {
-      "index": 7,
+      "index": 14,
       "name": "hit_count_check_back_animation_path",
       "as3Type": "Option",
       "parseRule": "option-string",
-      "status": "client-only",
+      "status": "always-empty",
       "sample": {
-        "distinctCount": 75,
-        "noneOrEmpty": 22
+        "distinctCount": 1,
+        "noneOrEmpty": 122
       }
     },
     {
-      "index": 2,
+      "index": 9,
       "name": "gender",
       "as3Type": "String",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 75,
-        "noneOrEmpty": 22
+        "distinctCount": 3,
+        "noneOrEmpty": 0
       }
     },
     {
@@ -333,25 +333,25 @@
       }
     },
     {
-      "index": 6,
+      "index": 13,
       "name": "damage_check_fore_animation_path",
       "as3Type": "Option",
       "parseRule": "option-string",
-      "status": "client-only",
+      "status": "always-empty",
       "sample": {
-        "distinctCount": 75,
-        "noneOrEmpty": 22
+        "distinctCount": 1,
+        "noneOrEmpty": 122
       }
     },
     {
-      "index": 5,
+      "index": 12,
       "name": "damage_check_back_animation_path",
       "as3Type": "Option",
       "parseRule": "option-string",
-      "status": "client-only",
+      "status": "always-empty",
       "sample": {
-        "distinctCount": 74,
-        "noneOrEmpty": 22
+        "distinctCount": 1,
+        "noneOrEmpty": 122
       }
     },
     {

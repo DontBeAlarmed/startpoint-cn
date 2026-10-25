@@ -42,7 +42,7 @@
       "status": "server-used"
     },
     {
-      "index": 33,
+      "index": 5,
       "name": "product_kind",
       "as3Type": "EquipmentEnhancementKind",
       "parseRule": "composite",

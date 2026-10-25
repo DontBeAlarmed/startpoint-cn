@@ -142,16 +142,16 @@
       }
     },
     {
-      "index": 29,
+      "index": 32,
       "name": "condition_quest_clear_2_multiplied_ids",
       "as3Type": "Option",
       "parseRule": "option-string",
       "status": "client-only",
       "sample": {
-        "distinctCount": 9,
-        "noneOrEmpty": 1953,
-        "intMin": 6,
-        "intMax": 200013
+        "distinctCount": 30,
+        "noneOrEmpty": 1918,
+        "intMin": 6010006,
+        "intMax": 33100601
       }
     },
     {
@@ -168,16 +168,16 @@
       }
     },
     {
-      "index": 24,
+      "index": 27,
       "name": "condition_quest_clear_1_multiplied_ids",
       "as3Type": "Option",
       "parseRule": "option-string",
       "status": "client-only",
       "sample": {
-        "distinctCount": 34,
-        "noneOrEmpty": 1257,
-        "intMin": 1,
-        "intMax": 500009
+        "distinctCount": 278,
+        "noneOrEmpty": 717,
+        "intMin": 4001,
+        "intMax": 100009001
       }
     },
     {

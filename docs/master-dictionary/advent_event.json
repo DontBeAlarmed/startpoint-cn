@@ -84,7 +84,7 @@
       "status": "client-only"
     },
     {
-      "index": 6,
+      "index": 8,
       "name": "logo_image",
       "as3Type": "Option",
       "parseRule": "option-string",
@@ -126,7 +126,7 @@
       "status": "client-only"
     },
     {
-      "index": 10,
+      "index": 11,
       "name": "flash_frame_reference",
       "as3Type": "Option",
       "parseRule": "option-int",

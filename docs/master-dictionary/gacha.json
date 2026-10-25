@@ -125,7 +125,7 @@
       "status": "client-only"
     },
     {
-      "index": 13,
+      "index": 27,
       "name": "once_ticket_item_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -146,7 +146,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 11,
       "name": "odds_rarity_string_id",
       "as3Type": "String",
       "parseRule": "composite",

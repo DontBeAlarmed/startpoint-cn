@@ -21,7 +21,7 @@
   ],
   "columns": [
     {
-      "index": 5,
+      "index": 6,
       "name": "reward1_number",
       "as3Type": "Option",
       "parseRule": "option-int",

@@ -68,7 +68,7 @@
       "status": "client-only"
     },
     {
-      "index": 1,
+      "index": 4,
       "name": "background_animation",
       "as3Type": "String",
       "parseRule": "composite",

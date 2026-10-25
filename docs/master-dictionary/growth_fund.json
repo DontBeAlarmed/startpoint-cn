@@ -71,7 +71,7 @@
       "status": "client-only"
     },
     {
-      "index": 5,
+      "index": 7,
       "name": "fund_kind",
       "as3Type": "GrowthFundKind",
       "parseRule": "composite",

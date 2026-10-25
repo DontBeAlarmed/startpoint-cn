@@ -47,7 +47,7 @@
       "status": "client-only"
     },
     {
-      "index": 2,
+      "index": 6,
       "name": "pixelart",
       "as3Type": "String",
       "parseRule": "composite",

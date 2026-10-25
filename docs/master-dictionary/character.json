@@ -220,7 +220,7 @@
       "status": "client-only"
     },
     {
-      "index": 18,
+      "index": 19,
       "name": "ability_1",
       "as3Type": "Option",
       "parseRule": "option-int",

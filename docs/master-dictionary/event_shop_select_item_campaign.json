@@ -42,7 +42,7 @@
       "status": "client-only"
     },
     {
-      "index": 1,
+      "index": 3,
       "name": "header_background_image",
       "as3Type": "String",
       "parseRule": "composite",

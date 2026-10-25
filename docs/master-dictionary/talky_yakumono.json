@@ -23,7 +23,7 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 9,
+      "index": 10,
       "name": "synchronize_id",
       "as3Type": "Option",
       "parseRule": "option-string",

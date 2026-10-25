@@ -54,7 +54,7 @@
       "status": "client-only"
     },
     {
-      "index": 36,
+      "index": 40,
       "name": "quest_rank_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -215,7 +215,7 @@
       "status": "client-only"
     },
     {
-      "index": 37,
+      "index": 41,
       "name": "item_id",
       "as3Type": "Option",
       "parseRule": "option-int",

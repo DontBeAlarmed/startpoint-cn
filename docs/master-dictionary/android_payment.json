@@ -36,7 +36,7 @@
       "status": "client-only"
     },
     {
-      "index": 2,
+      "index": 9,
       "name": "reason_id",
       "as3Type": "Option",
       "parseRule": "option-int",
