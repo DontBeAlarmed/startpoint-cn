@@ -1516,6 +1516,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/release_contract.test.cjs",
             "tools/migration_missing_table.test.cjs",
             "tools/msgpackr_runtime_compat.test.cjs",
+            "tools/master_dictionary.test.cjs",
         ],
     })
     assert.deepEqual(

@@ -44,7 +44,7 @@
       "status": "client-only"
     },
     {
-      "index": 12,
+      "index": 9,
       "name": "quest_rank_id",
       "as3Type": "Option",
       "parseRule": "option-int",

@@ -70,7 +70,7 @@
       "status": "client-only"
     },
     {
-      "index": 7,
+      "index": 17,
       "name": "rarity",
       "as3Type": "int",
       "parseRule": "composite",

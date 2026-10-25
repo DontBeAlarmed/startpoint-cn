@@ -41,7 +41,7 @@
       }
     },
     {
-      "index": 16,
+      "index": 13,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -49,8 +49,8 @@
       "sample": {
         "distinctCount": 6,
         "noneOrEmpty": 454,
-        "intMin": 200013006,
-        "intMax": 200076006
+        "intMin": 200013,
+        "intMax": 200076
       }
     },
     {
@@ -67,16 +67,16 @@
       }
     },
     {
-      "index": 11,
+      "index": 8,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 370,
+        "distinctCount": 86,
         "noneOrEmpty": 85,
-        "intMin": 1001,
-        "intMax": 300005006
+        "intMin": 1,
+        "intMax": 300005
       }
     },
     {
@@ -183,7 +183,7 @@
       }
     },
     {
-      "index": 45,
+      "index": 42,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -205,7 +205,7 @@
       }
     },
     {
-      "index": 40,
+      "index": 37,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -295,7 +295,7 @@
       }
     },
     {
-      "index": 31,
+      "index": 28,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -317,7 +317,7 @@
       }
     },
     {
-      "index": 26,
+      "index": 23,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -325,8 +325,8 @@
       "sample": {
         "distinctCount": 5,
         "noneOrEmpty": 441,
-        "intMin": 1008004,
-        "intMax": 11010003
+        "intMin": 1,
+        "intMax": 11
       }
     },
     {

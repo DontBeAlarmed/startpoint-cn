@@ -55,14 +55,14 @@
       "status": "client-only"
     },
     {
-      "index": 7,
+      "index": 6,
       "name": "rarity",
       "as3Type": "int",
       "parseRule": "composite",
       "status": "client-only"
     },
     {
-      "index": 9,
+      "index": 8,
       "name": "price",
       "as3Type": "Option",
       "parseRule": "composite",

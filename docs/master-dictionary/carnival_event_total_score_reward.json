@@ -34,7 +34,7 @@
       "status": "server-used"
     },
     {
-      "index": 21,
+      "index": 20,
       "name": "reward6_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -48,7 +48,7 @@
       "status": "client-only"
     },
     {
-      "index": 18,
+      "index": 17,
       "name": "reward5_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -62,7 +62,7 @@
       "status": "client-only"
     },
     {
-      "index": 15,
+      "index": 14,
       "name": "reward4_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -76,7 +76,7 @@
       "status": "client-only"
     },
     {
-      "index": 12,
+      "index": 11,
       "name": "reward3_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -90,7 +90,7 @@
       "status": "client-only"
     },
     {
-      "index": 9,
+      "index": 8,
       "name": "reward2_number",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -104,7 +104,7 @@
       "status": "client-only"
     },
     {
-      "index": 6,
+      "index": 5,
       "name": "reward1_number",
       "as3Type": "Option",
       "parseRule": "option-int",

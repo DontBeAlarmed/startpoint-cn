@@ -34,11 +34,11 @@
       "status": "client-only"
     },
     {
-      "index": null,
+      "index": 2,
       "name": "kind",
       "as3Type": "QuestRewardKind",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     }
   ]
 }

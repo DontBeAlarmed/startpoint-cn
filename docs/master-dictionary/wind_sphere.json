@@ -3164,14 +3164,14 @@
       }
     },
     {
-      "index": 15,
+      "index": 3,
       "name": "element",
       "as3Type": "BossElementKind",
       "parseRule": "composite",
-      "status": "client-only",
+      "status": "always-empty",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0
+        "noneOrEmpty": 1
       }
     }
   ]

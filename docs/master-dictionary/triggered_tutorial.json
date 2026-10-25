@@ -91,29 +91,29 @@
       }
     },
     {
-      "index": 13,
+      "index": 10,
       "name": "multiplied_not_cleared_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 3,
+        "distinctCount": 2,
         "noneOrEmpty": 75,
-        "intMin": 1001001,
-        "intMax": 1001002
+        "intMin": 1,
+        "intMax": 1
       }
     },
     {
-      "index": 8,
+      "index": 5,
       "name": "multiplied_cleared_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 13,
+        "distinctCount": 8,
         "noneOrEmpty": 64,
-        "intMin": 1003,
-        "intMax": 100002001
+        "intMin": 1,
+        "intMax": 100002
       }
     },
     {

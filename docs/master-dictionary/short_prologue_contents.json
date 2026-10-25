@@ -25,11 +25,11 @@
   ],
   "columns": [
     {
-      "index": null,
+      "index": 1,
       "name": "kind",
       "as3Type": "ShortPrologueContentKind",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     }
   ]
 }

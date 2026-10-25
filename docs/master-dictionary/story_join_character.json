@@ -51,7 +51,7 @@
       "status": "unknown-semantics"
     },
     {
-      "index": 4,
+      "index": 1,
       "name": "emergence_conditions",
       "as3Type": "QuestReferenceIdKind",
       "parseRule": "composite",

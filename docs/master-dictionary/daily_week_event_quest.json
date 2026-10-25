@@ -24,7 +24,7 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 15,
+      "index": 12,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -46,16 +46,16 @@
       }
     },
     {
-      "index": 10,
+      "index": 7,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 91,
+        "distinctCount": 20,
         "noneOrEmpty": 24,
-        "intMin": 1001,
-        "intMax": 19017
+        "intMin": 1,
+        "intMax": 19
       }
     },
     {
@@ -149,7 +149,7 @@
       }
     },
     {
-      "index": 42,
+      "index": 39,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -171,7 +171,7 @@
       }
     },
     {
-      "index": 37,
+      "index": 34,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -272,7 +272,7 @@
       }
     },
     {
-      "index": 28,
+      "index": 25,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -294,7 +294,7 @@
       }
     },
     {
-      "index": 23,
+      "index": 20,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -585,14 +585,16 @@
       }
     },
     {
-      "index": 51,
+      "index": 68,
       "name": "battle_reward_exp",
       "as3Type": "int",
       "parseRule": "composite",
-      "status": "always-empty",
+      "status": "client-only",
       "sample": {
-        "distinctCount": 1,
-        "noneOrEmpty": 114
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 30
       }
     },
     {

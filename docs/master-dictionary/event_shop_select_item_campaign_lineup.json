@@ -21,11 +21,11 @@
   ],
   "columns": [
     {
-      "index": null,
+      "index": 2,
       "name": "reward_kind",
       "as3Type": "GeneralRewardKind",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     },
     {
       "index": 0,

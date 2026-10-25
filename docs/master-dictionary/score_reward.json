@@ -32,16 +32,16 @@
   ],
   "columns": [
     {
-      "index": 2,
+      "index": 3,
       "name": "lottery",
       "as3Type": "QuestRewardLotteryKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 4,
-        "noneOrEmpty": 936,
-        "intMin": 0,
-        "intMax": 5
+        "distinctCount": 179,
+        "noneOrEmpty": 995,
+        "intMin": 1,
+        "intMax": 70068
       }
     },
     {

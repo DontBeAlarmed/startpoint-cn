@@ -29,7 +29,7 @@
   ],
   "columns": [
     {
-      "index": 7,
+      "index": 6,
       "name": "reward_kind",
       "as3Type": "CampaignRewardMultiplierKind",
       "parseRule": "composite",

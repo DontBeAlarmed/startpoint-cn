@@ -159,14 +159,16 @@
       }
     },
     {
-      "index": 2,
+      "index": 1,
       "name": "objective",
       "as3Type": "ZoneObjective",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 61,
-        "noneOrEmpty": 966
+        "distinctCount": 51,
+        "noneOrEmpty": 900,
+        "intMin": 1,
+        "intMax": 999
       }
     },
     {

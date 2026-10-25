@@ -33,7 +33,7 @@
       "status": "client-only"
     },
     {
-      "index": 5,
+      "index": 2,
       "name": "quest_kind",
       "as3Type": "QuestReferenceIdKind",
       "parseRule": "composite",

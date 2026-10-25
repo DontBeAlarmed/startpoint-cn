@@ -63,7 +63,7 @@
       "status": "client-only"
     },
     {
-      "index": 3,
+      "index": 2,
       "name": "event",
       "as3Type": "EventIdKind",
       "parseRule": "composite",

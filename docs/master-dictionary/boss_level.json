@@ -39,7 +39,7 @@
       "status": "client-only"
     },
     {
-      "index": 7,
+      "index": 5,
       "name": "hp_curve",
       "as3Type": "EnemyHpCurveKind",
       "parseRule": "composite",

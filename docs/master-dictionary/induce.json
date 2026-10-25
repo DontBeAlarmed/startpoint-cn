@@ -19,14 +19,14 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 4,
+      "index": 1,
       "name": "multiplied_until_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only"
     },
     {
-      "index": 9,
+      "index": 6,
       "name": "multiplied_since_id",
       "as3Type": "Option",
       "parseRule": "option-int",

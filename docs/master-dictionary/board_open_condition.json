@@ -19,11 +19,17 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": null,
+      "index": 0,
       "name": "required_over_limit_step",
       "as3Type": "int",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 6
+      }
     }
   ]
 }

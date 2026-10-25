@@ -30,7 +30,7 @@
       "status": "client-only"
     },
     {
-      "index": 2,
+      "index": 1,
       "name": "max_over_limit_count",
       "as3Type": "int",
       "parseRule": "composite",

@@ -19,7 +19,7 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 9,
+      "index": 6,
       "name": "need_viewable_quest_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -27,8 +27,8 @@
       "sample": {
         "distinctCount": 2,
         "noneOrEmpty": 61,
-        "intMin": 1001,
-        "intMax": 1001
+        "intMin": 1,
+        "intMax": 1
       }
     },
     {
@@ -45,7 +45,7 @@
       }
     },
     {
-      "index": 14,
+      "index": 11,
       "name": "need_selectable_quest_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -53,8 +53,8 @@
       "sample": {
         "distinctCount": 2,
         "noneOrEmpty": 61,
-        "intMin": 1001,
-        "intMax": 1001
+        "intMin": 1,
+        "intMax": 1
       }
     },
     {
@@ -84,16 +84,16 @@
       }
     },
     {
-      "index": 4,
+      "index": 1,
       "name": "multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 28,
+        "distinctCount": 12,
         "noneOrEmpty": 15,
-        "intMin": 1002,
-        "intMax": 400003104
+        "intMin": 1,
+        "intMax": 400003
       }
     },
     {

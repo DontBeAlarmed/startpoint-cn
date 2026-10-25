@@ -46,14 +46,14 @@
       "status": "client-only"
     },
     {
-      "index": null,
+      "index": 8,
       "name": "rarity",
       "as3Type": "int",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     },
     {
-      "index": 2,
+      "index": 1,
       "name": "kind",
       "as3Type": "StarCrumbExchangeKind",
       "parseRule": "composite",

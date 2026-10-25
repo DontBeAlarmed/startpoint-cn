@@ -859,14 +859,14 @@
       }
     },
     {
-      "index": 15,
+      "index": 3,
       "name": "element",
       "as3Type": "BossElementKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
-        "distinctCount": 25,
-        "noneOrEmpty": 0
+        "distinctCount": 76,
+        "noneOrEmpty": 538
       }
     },
     {

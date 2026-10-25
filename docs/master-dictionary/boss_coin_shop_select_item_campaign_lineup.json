@@ -28,7 +28,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 3,
       "name": "reward_kind",
       "as3Type": "GeneralRewardKind",
       "parseRule": "composite",

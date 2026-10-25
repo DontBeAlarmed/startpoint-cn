@@ -181,7 +181,7 @@
       "status": "server-used"
     },
     {
-      "index": 11,
+      "index": 10,
       "name": "guarantee_rarity",
       "as3Type": "int",
       "parseRule": "composite",

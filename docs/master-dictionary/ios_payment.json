@@ -155,7 +155,7 @@
       "status": "client-only"
     },
     {
-      "index": 7,
+      "index": 3,
       "name": "display_kind",
       "as3Type": "PaymentProductDisplayKind",
       "parseRule": "composite",

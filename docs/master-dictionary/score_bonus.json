@@ -25,11 +25,11 @@
   ],
   "columns": [
     {
-      "index": null,
+      "index": 3,
       "name": "kind",
       "as3Type": "ScoreBonusKind",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     },
     {
       "index": 0,

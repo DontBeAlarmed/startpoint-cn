@@ -493,7 +493,7 @@
       }
     },
     {
-      "index": 15,
+      "index": 3,
       "name": "element",
       "as3Type": "BossElementKind",
       "parseRule": "composite",

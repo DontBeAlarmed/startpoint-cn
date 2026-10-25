@@ -22,14 +22,14 @@
   ],
   "columns": [
     {
-      "index": 2,
+      "index": 1,
       "name": "watch_kind",
       "as3Type": "ConcertedBossWatchKind",
       "parseRule": "composite",
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 3,
       "name": "self_state",
       "as3Type": "ConcertedBossStateKind",
       "parseRule": "composite",
@@ -43,7 +43,7 @@
       "status": "client-only"
     },
     {
-      "index": 6,
+      "index": 5,
       "name": "partner_state",
       "as3Type": "ConcertedBossStateKind",
       "parseRule": "composite",
@@ -57,11 +57,11 @@
       "status": "client-only"
     },
     {
-      "index": null,
+      "index": 12,
       "name": "action_content",
       "as3Type": "ConcertedBossWatchActionContent",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     }
   ]
 }

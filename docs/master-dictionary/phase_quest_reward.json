@@ -95,7 +95,7 @@
       }
     },
     {
-      "index": 6,
+      "index": 5,
       "name": "battle_reward_exp",
       "as3Type": "int",
       "parseRule": "composite",
@@ -103,8 +103,8 @@
       "sample": {
         "distinctCount": 4,
         "noneOrEmpty": 0,
-        "intMin": 780,
-        "intMax": 2460
+        "intMin": 266,
+        "intMax": 1650
       }
     },
     {

@@ -21,7 +21,7 @@
   ],
   "columns": [
     {
-      "index": 2,
+      "index": 1,
       "name": "event",
       "as3Type": "EventIdKind",
       "parseRule": "composite",

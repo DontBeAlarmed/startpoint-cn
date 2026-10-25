@@ -31,11 +31,11 @@
       "status": "client-only"
     },
     {
-      "index": null,
+      "index": 3,
       "name": "rarity",
       "as3Type": "int",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     },
     {
       "index": 1,

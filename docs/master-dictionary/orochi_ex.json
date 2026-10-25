@@ -634,14 +634,16 @@
       }
     },
     {
-      "index": 96,
+      "index": 95,
       "name": "phase2_attack3_trial_kind",
       "as3Type": "TrialKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
       }
     },
     {
@@ -658,14 +660,16 @@
       }
     },
     {
-      "index": 84,
+      "index": 83,
       "name": "phase2_attack2_trial_kind",
       "as3Type": "TrialKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0
+        "noneOrEmpty": 0,
+        "intMin": 40,
+        "intMax": 40
       }
     },
     {
@@ -682,14 +686,16 @@
       }
     },
     {
-      "index": 72,
+      "index": 71,
       "name": "phase2_attack1_trial_kind",
       "as3Type": "TrialKind",
       "parseRule": "composite",
       "status": "client-only",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
       }
     },
     {
@@ -959,14 +965,14 @@
       }
     },
     {
-      "index": 15,
+      "index": 3,
       "name": "element",
       "as3Type": "BossElementKind",
       "parseRule": "composite",
-      "status": "client-only",
+      "status": "always-empty",
       "sample": {
         "distinctCount": 1,
-        "noneOrEmpty": 0
+        "noneOrEmpty": 1
       }
     },
     {

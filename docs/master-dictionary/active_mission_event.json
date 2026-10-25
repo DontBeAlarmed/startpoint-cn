@@ -56,7 +56,7 @@
       "status": "client-only"
     },
     {
-      "index": 22,
+      "index": 19,
       "name": "need_quest_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",

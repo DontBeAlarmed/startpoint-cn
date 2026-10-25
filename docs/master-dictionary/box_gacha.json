@@ -54,7 +54,7 @@
       "status": "client-only"
     },
     {
-      "index": 3,
+      "index": 2,
       "name": "cost_kind",
       "as3Type": "TradeCostKind",
       "parseRule": "composite",

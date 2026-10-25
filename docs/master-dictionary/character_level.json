@@ -28,11 +28,17 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": null,
+      "index": 0,
       "name": "total_experience",
       "as3Type": "int",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 100,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 308043
+      }
     }
   ]
 }

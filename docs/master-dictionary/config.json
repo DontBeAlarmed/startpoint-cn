@@ -122,7 +122,7 @@
       "name": "privacy_policy_url",
       "as3Type": "String",
       "parseRule": "composite",
-      "status": "client-only"
+      "status": "server-used"
     },
     {
       "index": 8,
@@ -230,11 +230,11 @@
       "status": "server-used"
     },
     {
-      "index": 26,
+      "index": 25,
       "name": "max_equipment_stack",
       "as3Type": "int",
       "parseRule": "composite",
-      "status": "client-only"
+      "status": "server-used"
     },
     {
       "index": 11,

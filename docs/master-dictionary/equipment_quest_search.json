@@ -19,7 +19,7 @@
   "enumRefs": [],
   "columns": [
     {
-      "index": 4,
+      "index": 1,
       "name": "quest",
       "as3Type": "QuestReferenceIdKind",
       "parseRule": "composite",

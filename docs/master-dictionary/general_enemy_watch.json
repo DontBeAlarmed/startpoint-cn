@@ -22,7 +22,7 @@
   ],
   "columns": [
     {
-      "index": 9,
+      "index": 8,
       "name": "watch_kind",
       "as3Type": "GeneralEnemyWatchKind",
       "parseRule": "composite",
@@ -36,7 +36,7 @@
       "status": "client-only"
     },
     {
-      "index": 4,
+      "index": 3,
       "name": "self_state",
       "as3Type": "GeneralEnemyWatchStateKind",
       "parseRule": "composite",
@@ -57,7 +57,7 @@
       "status": "client-only"
     },
     {
-      "index": 7,
+      "index": 6,
       "name": "partner_state",
       "as3Type": "GeneralEnemyWatchStateKind",
       "parseRule": "composite",
@@ -99,11 +99,11 @@
       "status": "client-only"
     },
     {
-      "index": null,
+      "index": 22,
       "name": "action_content",
       "as3Type": "GeneralEnemyWatchActionContent",
       "parseRule": "composite",
-      "status": "unknown-semantics"
+      "status": "client-only"
     }
   ]
 }

@@ -26,7 +26,7 @@
   ],
   "columns": [
     {
-      "index": 18,
+      "index": 15,
       "name": "viewable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -48,16 +48,16 @@
       }
     },
     {
-      "index": 13,
+      "index": 10,
       "name": "viewable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
       "status": "client-only",
       "sample": {
-        "distinctCount": 433,
+        "distinctCount": 2,
         "noneOrEmpty": 0,
-        "intMin": 1001,
-        "intMax": 4011005
+        "intMin": 1,
+        "intMax": 4
       }
     },
     {
@@ -175,7 +175,7 @@
       }
     },
     {
-      "index": 45,
+      "index": 42,
       "name": "selectable_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -197,7 +197,7 @@
       }
     },
     {
-      "index": 40,
+      "index": 37,
       "name": "selectable_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -287,7 +287,7 @@
       }
     },
     {
-      "index": 31,
+      "index": 28,
       "name": "no_warning_spoiler_need_quest_2_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
@@ -309,7 +309,7 @@
       }
     },
     {
-      "index": 26,
+      "index": 23,
       "name": "no_warning_spoiler_need_quest_1_multiplied_id",
       "as3Type": "Option",
       "parseRule": "option-int",
