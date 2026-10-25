@@ -4,6 +4,7 @@
 
 - [验证工作流](./verification-workflow.md)：测试分组、变更选择、提交前验证与性能基线。
 - [已知问题台账](./known-issues.md)：只记录不修复的问题定位（现象/根因/触发链路/状态）。
+- [全表列语义字典台账](./master-dictionary.md)：只记录不修复的问题定位（现象/根因/触发链路/状态）。
 - [当前运行时架构](../architecture.md)：模块边界、协议管线与持久化职责。
 - [文档入口](../README.md)：current、reference 和 status 文档分层。
 
