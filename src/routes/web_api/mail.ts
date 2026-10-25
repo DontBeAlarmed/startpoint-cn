@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
+import { getCurrencyCapacityPolicySync } from "../../lib/config-content"
 import { getAllAccountsSync, getAccountPlayersSync, getAccountSync } from "../../data/domains/account"
 import { insertMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
@@ -116,6 +117,7 @@ const routes = async (fastify: FastifyInstance) => {
             typeId,
             count,
             itemMaxCount,
+            freeVmoneyMax: mailType === 4 ? getCurrencyCapacityPolicySync().maxVmoney : undefined,
         })
         if (!attachmentValidation.ok) {
             return fail(attachmentValidation.error)

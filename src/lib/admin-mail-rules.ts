@@ -41,8 +41,19 @@ export function getMailAttachmentRule(
     mailType: number,
     typeId: number | null = null,
     itemMaxCount?: number,
+    freeVmoneyMax?: number,
 ): MailAttachmentRule {
     if (mailType === 5 || mailType === 6) return SINGLE_RULE
+    // 免费星导石（type 4）：附件数不得超过官方免费余额上限（维护者裁决
+    // 2026-10-26：领取端统一拒绝制，发送端同样收紧——不产生领取必拒的邮件）
+    if (mailType === 4 && Number.isSafeInteger(freeVmoneyMax) && (freeVmoneyMax ?? 0) >= 1) {
+        return {
+            min: 1,
+            max: freeVmoneyMax as number,
+            label: "免费星导石",
+            reason: "使用官方免费余额上限",
+        }
+    }
     if (mailType !== 1 || typeId === null) return DEFAULT_RULE
     if (!Number.isSafeInteger(itemMaxCount) || (itemMaxCount ?? 0) < 1) return DEFAULT_RULE
     return {
@@ -87,6 +98,7 @@ export function validateMailAttachment(input: {
     typeId: number | null
     count: number
     itemMaxCount?: number
+    freeVmoneyMax?: number
 }): ValidationResult<MailAttachmentRule> {
     const needsTypeId = mailTypeNeedsTypeId(input.mailType)
     if (needsTypeId && input.typeId === null) {
@@ -101,7 +113,7 @@ export function validateMailAttachment(input: {
         return { ok: false, error: `道具 ${input.typeId} 缺少 CDN 官方持有上限` }
     }
 
-    const rule = getMailAttachmentRule(input.mailType, input.typeId, input.itemMaxCount)
+    const rule = getMailAttachmentRule(input.mailType, input.typeId, input.itemMaxCount, input.freeVmoneyMax)
     if (input.count < rule.min || input.count > rule.max) {
         if (rule.max === 1) {
             return { ok: false, error: `${rule.reason}` }

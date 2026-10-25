@@ -264,9 +264,21 @@ function settleDedicatedMailBalance(
         rankPoint: player.rankPoint,
     }
     const update: Partial<DedicatedMailBalance> = {}
+    let freeVmoneyProjection = player.freeVmoney
     for (const mail of mails) {
         let field: keyof DedicatedMailBalance | null = null
         switch (mail.type) {
+            case MailType.FREE_VMONEY:
+                // 星导石邮件容量（维护者裁决 2026-10-26：统一拒绝制，与客户端
+                // canGetVirtualMoney 完全对齐——免费余额+附件数 > maxVmoney 即拒，
+                // 不做溢出、不部分领取）。多封同批时按顺序累加判定。
+                if (freeVmoneyProjection + mail.number > currencyPolicy.maxVmoney) {
+                    throw new MailRewardCapacityError(
+                        `Free Vmoney attachment exceeds capacity: balance ${freeVmoneyProjection} + ${mail.number} > max ${currencyPolicy.maxVmoney}.`,
+                    )
+                }
+                freeVmoneyProjection += mail.number
+                continue
             case MailType.PAID_VMONEY:
                 field = "vmoney"
                 break

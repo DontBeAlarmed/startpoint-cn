@@ -50,6 +50,8 @@ interface GachaExecSuccessBase {
     readonly exchangePoint: number
     readonly isDailyFirst: boolean
     readonly isAccountFirst: boolean
+    readonly dailyOneCount: number
+    readonly dailyTenCount: number
     readonly mailArrived: boolean
     readonly ticketItemBalances: Readonly<Record<number, number>>
     readonly campaignList: readonly GachaCampaignAfter[]

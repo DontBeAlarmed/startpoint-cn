@@ -44,6 +44,8 @@ import type {
     GachaPostCommitEffect,
 } from "./model"
 import { getPlayerGachaExecutionStateSync } from "./player-period"
+import { getPlayerGachaDetailSync, upsertPlayerGachaDetailSync } from "../../data/domains/gacha-state"
+import { getGachaCurrencyCapacityLimits } from "./daily-limits"
 
 function rejected(message: string): GachaExecRejected {
     return { ok: false, kind: "badRequest", message }
@@ -122,6 +124,30 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 if (prepared.kind !== "ordinary") {
                     return rejected("Crazy Gacha requires the candidate lifecycle.")
                 }
+
+                // 每日抽卡上限（官方语义：计数按池、上限全局、真实业务日重置）。
+                // 客户端 GachaSceneViewBase 显示 剩余 = max - 该池计数；预检读
+                // gacha_info_list 的 daily_one/ten_count。超额走既有 A-error 通道。
+                const dailyLimits = getGachaCurrencyCapacityLimits()
+                const isTenDraw = command.numberOfExec > 1
+                    || command.execType === GACHA_EXEC_TYPES.VMONEY_MULTI
+                    || command.execType === GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET
+                    || command.execType === GACHA_EXEC_TYPES.MULTI_TICKET
+                    || command.execType === GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET
+                    || command.execType === GACHA_EXEC_TYPES.CAMPAIGN_MULTI
+                    || command.execType === GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI
+                const gachaDetail = getPlayerGachaDetailSync(command.playerId, command.gachaId)
+                const currentOne = gachaDetail?.dailyOneCount ?? 0
+                const currentTen = gachaDetail?.dailyTenCount ?? 0
+                if (isTenDraw) {
+                    if (currentTen + 1 > dailyLimits.maxTenPerDay) {
+                        return rejected("Daily ten-draw limit reached for this banner.")
+                    }
+                } else if (currentOne + command.numberOfExec > dailyLimits.maxOnePerDay) {
+                    return rejected("Daily draw limit reached for this banner.")
+                }
+                const afterDailyOneCount = isTenDraw ? currentOne : currentOne + command.numberOfExec
+                const afterDailyTenCount = isTenDraw ? currentTen + 1 : currentTen
 
                 const insertPlayerGachaData = playerGachaData === null
                 playerGachaData = playerGachaData ?? {
@@ -303,6 +329,15 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 }
                 if (insertPlayerGachaData) insertPlayerGachaInfoSync(command.playerId, nextGachaData)
                 else updatePlayerGachaInfoSync(command.playerId, nextGachaData)
+                // 每日计数持久化（info 行就位后写 detail，避免 ensureBase 与首抽 insert 的 PK 竞争）
+                upsertPlayerGachaDetailSync({
+                    playerId: command.playerId,
+                    gachaId: command.gachaId,
+                    dailyOneCount: afterDailyOneCount,
+                    dailyTenCount: afterDailyTenCount,
+                    comebackPeriodStartTime: gachaDetail?.comebackPeriodStartTime ?? null,
+                    comebackPeriodEndTime: gachaDetail?.comebackPeriodEndTime ?? null,
+                })
                 if (prepared.banner.kind === "character") {
                     incrementActiveMissionGachaCharacterCountSync(command.playerId, drawResult.length)
                     recordDailyGachaDrawFacts(command.playerId, drawResult.length, new Date(command.nowMs))
@@ -325,6 +360,8 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     exchangePoint,
                     isDailyFirst: nextGachaData.isDailyFirst,
                     isAccountFirst: nextGachaData.isAccountFirst,
+                    dailyOneCount: afterDailyOneCount,
+                    dailyTenCount: afterDailyTenCount,
                     mailArrived,
                     ticketItemBalances,
                     campaignList,

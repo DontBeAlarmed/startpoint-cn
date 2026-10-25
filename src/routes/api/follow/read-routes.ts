@@ -34,6 +34,21 @@ function parseSearchViewerId(value: unknown): number | null {
 }
 
 export function registerFollowReadRoutes(fastify: FastifyInstance): void {
+    // follow/search_twitter：国服客户端不可达（SNS 绑定不在私服范围）。
+    // 返回空结果列表——合法 200 响应，防误触 404 踢回标题（维护者裁决 2026-10-26）。
+    fastify.post("/search_twitter", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as { viewer_id?: unknown }
+        const viewerId = Number(body?.viewer_id)
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0) {
+            return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
+        }
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            data_headers: generateDataHeaders({ viewer_id: viewerId }),
+            data: { twitter_follow_ids: [] },
+        })
+    })
+
     // follow/lists：与当前玩家有任一方向边的同服玩家 + 被关注数
     fastify.post("/lists", async (request: FastifyRequest, reply: FastifyReply) => {
         const viewer = await resolveFollowViewer(request, reply)

@@ -1122,7 +1122,8 @@ test("Stars free counts accumulate across daily reset and return absolute after-
         period_end_time: periodEndTime,
     })
     assert.equal(loadedInfo.daily_one_count, 0)
-    assert.equal(loadedInfo.daily_ten_count, 0)
+    // R-daily：免费十连（execType=8）同样计入每日十连计数——官方全局上限的一部分
+    assert.equal(loadedInfo.daily_ten_count, 1)
     assert.deepEqual(loaded.stars_gacha_campaign_list, [{
         campaign_id: 1,
         free_one_times: 0,

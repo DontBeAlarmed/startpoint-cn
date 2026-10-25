@@ -231,6 +231,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/gift_receive_route.test.cjs",
             "tools/reward_engine_mana_capacity.test.cjs",
             "tools/quest_join_gate.test.cjs",
+            "tools/daily_limits.test.cjs",
             "tools/attention_config_route.test.cjs",
             "tools/attention_lifecycle.test.cjs",
             "tools/attention_routes.test.cjs",

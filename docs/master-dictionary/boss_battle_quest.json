@@ -18,7 +18,6 @@
     "consumers": [
       "src/content/converters/quest.ts",
       "src/content/runtime/multi-battle-digest.ts",
-      "src/content/sync/table-registry.ts",
       "src/lib/mission/degree-content-tables.ts",
       "src/lib/mission/degree-coverage.ts",
       "src/lib/mission/event-battle-facts.ts",
