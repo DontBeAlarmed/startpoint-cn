@@ -847,6 +847,16 @@ test("production /finish settles activity hard multi periodic rewards for host a
                 { quest: activityHardMultiQuest },
             )
             const playId = `periodic-route-${label}`
+            // R-G04：100002001 的 viewable 前置链（挑战副本 1038 + 降临 200077004）
+            // ——seed 通关事实以通过参加门（生产环境语义：解锁后开战）
+            for (const [gateSection, gateQuestId] of [[13, 1038], [7, 200077004]]) {
+                home.db.prepare(`
+                    INSERT INTO players_quest_progress (
+                        section, quest_id, finished, unlocked, multi_clear_count, player_id
+                    ) VALUES (?, ?, 1, 1, 0, ?)
+                    ON CONFLICT (section, quest_id, player_id) DO UPDATE SET finished = 1
+                `).run(gateSection, gateQuestId, home.playerId)
+            }
             const questFields = {
                 category: activityHardMultiQuest.category,
                 quest_id: activityHardMultiQuest.questId,

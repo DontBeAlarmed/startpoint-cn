@@ -3,6 +3,7 @@ import { getPlayerSync } from "../../../data/domains/player"
 import { getViewerIdSync } from "../../../data/domains/session"
 import { getLocalFollowRelationSync } from "../../../data/domains/follow"
 import { getPlayerRankLevel } from "../../../lib/player-rank-content"
+import { getCharactersEvolutionImgLevels } from "../../../lib/character"
 import type { LocalFollowRelation, LocalFollowState } from "../../../data/domains/follow"
 
 /** F0 冻结的 follow_info / search_result 投影（CN 1.8.1 必填 + Option 字段）。 */
