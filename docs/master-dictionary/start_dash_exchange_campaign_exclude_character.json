@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "start_dash_exchange_campaign_exclude_character",
+  "domain": "campaign",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/StartDashExchangeCampaignExcludeCharacterValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/campaign/start_dash_exchange/start_dash_exchange_campaign_exclude_character.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "character_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

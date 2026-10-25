@@ -1,0 +1,214 @@
+{
+  "version": 1,
+  "table": "box",
+  "domain": "box_gacha",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BoxValues.as",
+    "clientMaxColumn": 15,
+    "dataRows": 269
+  },
+  "sources": [
+    {
+      "logicalPath": "master/box_gacha/box.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 4,
+      "name": "thumbnail",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 24,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 14,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 47,
+        "noneOrEmpty": 5
+      }
+    },
+    {
+      "index": 2,
+      "name": "short_name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 14,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 12,
+      "name": "reset_limit",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 269
+      }
+    },
+    {
+      "index": 11,
+      "name": "reset_kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 3,
+      "name": "required_box_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 10,
+        "noneOrEmpty": 48,
+        "intMin": 1,
+        "intMax": 9
+      }
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 25,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 269,
+        "noneOrEmpty": 0,
+        "intMin": 101,
+        "intMax": 800407
+      }
+    },
+    {
+      "index": 7,
+      "name": "logo_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 58,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 5,
+      "name": "locked_thumbnail",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 16,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 9,
+      "name": "gear_color",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 16777215,
+        "intMax": 16777215
+      }
+    },
+    {
+      "index": 15,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 6,
+      "name": "empty_thumbnail",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 8,
+      "name": "content_color",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 0,
+        "intMin": 1435116,
+        "intMax": 15977992
+      }
+    },
+    {
+      "index": 15,
+      "name": "close_kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 10,
+      "name": "advance_draw_number",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 3,
+        "intMax": 3
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "table": "daily_challenge_point_campaign",
+  "domain": "campaign",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/DailyChallengePointCampaignValues.as",
+    "clientMaxColumn": 4,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/campaign/daily_challenge_point_campaign.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 1,
+      "name": "daily_challenge_point_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "additional_challenge_point",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

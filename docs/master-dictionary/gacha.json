@@ -1,0 +1,240 @@
+{
+  "version": 1,
+  "table": "gacha",
+  "domain": "gacha",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GachaValues.as",
+    "clientMaxColumn": 46,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/gacha/gacha.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/gacha.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/gacha-catalog/catalog.ts"
+    ]
+  },
+  "enumRefs": [
+    "GachaPageKind",
+    "GachaPrizeKind"
+  ],
+  "columns": [
+    {
+      "index": 42,
+      "name": "tutorial_reason_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 41,
+      "name": "tutorial_once_cost",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 39,
+      "name": "tutorial_odds_rarity_string_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 40,
+      "name": "tutorial_movie_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "title",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 32,
+      "name": "ticket_expiry_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 28,
+      "name": "ten_times_ticket_item_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 34,
+      "name": "ten_times_reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 36,
+      "name": "ten_times_ex_boost_item_reason_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 30,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 33,
+      "name": "show_period",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 27,
+      "name": "prize_kind",
+      "as3Type": "GachaPrizeKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "page_kind",
+      "as3Type": "GachaPageKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "once_ticket_item_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "server-used"
+    },
+    {
+      "index": 33,
+      "name": "once_reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 35,
+      "name": "once_ex_boost_item_reason_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "odds_rarity_string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "note",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "list_order",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "is_stars_gacha",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 5,
+      "name": "is_comeback",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 11,
+      "name": "guarantee_rarity",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 9,
+      "name": "guarantee_number",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 5,
+      "name": "freemium_guarantee_available",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 31,
+      "name": "end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 45,
+      "name": "crazy_ten_times_ticket_item_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 39,
+      "name": "canbe_tutorial",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 37,
+      "name": "bgm",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "banner_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

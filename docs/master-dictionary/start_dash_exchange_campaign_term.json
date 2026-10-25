@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "start_dash_exchange_campaign_term",
+  "domain": "campaign",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/StartDashExchangeCampaignTermValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 1
+  },
+  "sources": [
+    {
+      "logicalPath": "master/campaign/start_dash_exchange/start_dash_exchange_campaign_term.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "term_start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

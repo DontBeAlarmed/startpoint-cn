@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "table": "gacha_feature_content",
+  "domain": "gacha",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GachaFeatureContentValues.as",
+    "clientMaxColumn": 8,
+    "dataRows": 2866
+  },
+  "sources": [
+    {
+      "logicalPath": "master/gacha/gacha_feature_content.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "GachaFeatureContentAssetKind",
+    "GachaFeatureContentLinkKind",
+    "GachaSkillPreviewSourceKind"
+  ],
+  "columns": [
+    {
+      "index": 1,
+      "name": "link_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 65,
+        "noneOrEmpty": 1923
+      }
+    },
+    {
+      "index": 3,
+      "name": "asset_kind",
+      "as3Type": "GachaFeatureContentAssetKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1153,
+        "intMin": 0,
+        "intMax": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "treasure_shop_discount_rate",
+  "domain": "shop",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TreasureShopDiscountRateValues.as",
+    "clientMaxColumn": 2,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/shop/treasure_shop_discount_rate.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "weight",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "discount_tag_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "discount_rate",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

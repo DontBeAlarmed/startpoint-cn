@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "table": "shop_pickup_schedule",
+  "domain": "shop",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ShopPickupScheduleValues.as",
+    "clientMaxColumn": 4,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/shop/shop_pickup_schedule.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "EventIdKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "event",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

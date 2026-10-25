@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "table": "gacha_campaign",
+  "domain": "gacha",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GachaCampaignValues.as",
+    "clientMaxColumn": 7,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/gacha/gacha_campaign.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "title",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "share",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "gacha_id",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

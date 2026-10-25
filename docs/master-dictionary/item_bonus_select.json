@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "table": "item_bonus_select",
+  "domain": "item",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ItemBonusSelectValues.as",
+    "clientMaxColumn": 19,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/item/item_bonus_select.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "ItemBonusSelectKind"
+  ],
+  "columns": [
+    {
+      "index": 19,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "bonus6_kind",
+      "as3Type": "ItemBonusSelectKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "bonus5_kind",
+      "as3Type": "ItemBonusSelectKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "bonus4_kind",
+      "as3Type": "ItemBonusSelectKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "bonus3_kind",
+      "as3Type": "ItemBonusSelectKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "bonus2_kind",
+      "as3Type": "ItemBonusSelectKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "bonus1_kind",
+      "as3Type": "ItemBonusSelectKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

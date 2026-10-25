@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "table": "gacha_skill_preview",
+  "domain": "gacha",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GachaSkillPreviewValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/gacha/gacha_skill_preview.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "quest_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "log",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "enables_powerflip",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 5,
+      "name": "enables_ability",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "clip",
+      "as3Type": "Object",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

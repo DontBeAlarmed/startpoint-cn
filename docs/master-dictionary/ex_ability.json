@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "table": "ex_ability",
+  "domain": "ex_boost",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ExAbilityValues.as",
+    "clientMaxColumn": 124,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/ex_boost/ex_ability.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/sync/table-registry.ts",
+      "src/lib/ex-boost-content.ts"
+    ]
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 82,
+      "name": "unisonable",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "trigger",
+      "as3Type": "AbilityTriggerMasterValue",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "rarity",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "battle_power",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

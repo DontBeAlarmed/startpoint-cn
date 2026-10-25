@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "table": "box_reward_old",
+  "domain": "box_gacha",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BoxRewardOldValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/box_gacha/old/box_reward_old.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "GeneralRewardKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "reward_number",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "reward_kind",
+      "as3Type": "GeneralRewardKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

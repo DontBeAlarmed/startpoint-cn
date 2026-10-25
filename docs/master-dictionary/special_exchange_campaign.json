@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "table": "special_exchange_campaign",
+  "domain": "campaign",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/SpecialExchangeCampaignValues.as",
+    "clientMaxColumn": 16,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/campaign/special_exchange/special_exchange_campaign.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 4,
+      "name": "type",
+      "as3Type": "ExchangeCampaignType",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "special_exchange_ticket_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "scene",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "product_thumbnail",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "product_price",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "product_obtain_source",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "product_name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "how_to_play",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "header_background_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "exchange_start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "exchange_end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "campaign_start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "campaign_end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

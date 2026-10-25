@@ -1,0 +1,240 @@
+{
+  "version": 1,
+  "table": "general_shop",
+  "domain": "shop",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GeneralShopValues.as",
+    "clientMaxColumn": 46,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/shop/general_shop.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/shop.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/shop/catalog.ts"
+    ]
+  },
+  "enumRefs": [
+    "PriceKind",
+    "ShopProductKind"
+  ],
+  "columns": [
+    {
+      "index": 7,
+      "name": "thumbnail_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 21,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "stage",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "specified_months",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "short_description",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "release_rank",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "rarity",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "price",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 28,
+      "name": "pickup_schedule_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "optional_prepend_name",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "monthly_stock",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "server-used"
+    },
+    {
+      "index": 24,
+      "name": "max_frequency",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "server-used"
+    },
+    {
+      "index": 4,
+      "name": "list_order",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "kind6",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 44,
+      "name": "kind5",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 41,
+      "name": "kind4",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 38,
+      "name": "kind3",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 35,
+      "name": "kind2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 32,
+      "name": "kind1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "group_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "description",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "daily_stock",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "cost_item_schedule_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "cost_item4",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "cost_item3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "cost_item2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "cost_item1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 23,
+      "name": "buy_max_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

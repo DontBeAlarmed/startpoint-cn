@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "table": "reward_campaign",
+  "domain": "campaign",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RewardCampaignValues.as",
+    "clientMaxColumn": 10,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/campaign/reward_campaign.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/reward-campaign.ts",
+      "src/content/runtime/multi-battle-digest.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/reward-campaign.ts"
+    ]
+  },
+  "enumRefs": [
+    "CampaignRepeatKind",
+    "CampaignRewardMultiplierKind",
+    "QuestRangeReferenceIdKind"
+  ],
+  "columns": [
+    {
+      "index": 7,
+      "name": "reward_kind",
+      "as3Type": "CampaignRewardMultiplierKind",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 5,
+      "name": "repeat_kind",
+      "as3Type": "CampaignRepeatKind",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": null,
+      "name": "quest_kind",
+      "as3Type": "QuestRangeReferenceIdKind",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "gacha_ticket_type",
+  "domain": "item",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GachaTicketTypeValues.as",
+    "clientMaxColumn": 2,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/item/gacha_ticket_type.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "star_crumb_number",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    }
+  ]
+}

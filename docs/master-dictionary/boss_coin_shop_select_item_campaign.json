@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "table": "boss_coin_shop_select_item_campaign",
+  "domain": "shop",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BossCoinShopSelectItemCampaignValues.as",
+    "clientMaxColumn": 12,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/shop/boss_coin_shop_select_item_campaign.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "how_to_play_content_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "header_background_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "flash_frame_reference",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "exchangeable_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "drop_item_id_list",
+      "as3Type": "Object",
+      "parseRule": "option-int",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 2,
+      "name": "boss_coin_shop_category_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "boss_battle_multi_pickup_event_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

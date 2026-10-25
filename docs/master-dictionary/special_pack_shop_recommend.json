@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "special_pack_shop_recommend",
+  "domain": "shop",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/SpecialPackShopRecommendValues.as",
+    "clientMaxColumn": 2,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/shop/special_pack_shop_recommend.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "special_pack_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 1,
+      "name": "recommend_start",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "recommend_end",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

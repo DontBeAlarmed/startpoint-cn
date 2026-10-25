@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "table": "equipment_enhancement_status",
+  "domain": "equipment_enhancement",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/EquipmentEnhancementStatusValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": 53
+  },
+  "sources": [
+    {
+      "logicalPath": "master/equipment_enhancement/equipment_enhancement_status.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "hp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 50
+      }
+    },
+    {
+      "index": 1,
+      "name": "atk",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 10
+      }
+    }
+  ]
+}

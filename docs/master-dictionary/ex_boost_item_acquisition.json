@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "table": "ex_boost_item_acquisition",
+  "domain": "ex_boost",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ExBoostItemAcquisitionValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": 18
+  },
+  "sources": [
+    {
+      "logicalPath": "master/ex_boost/ex_boost_item_acquisition.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 18,
+        "noneOrEmpty": 0,
+        "intMin": 14001,
+        "intMax": 14018
+      }
+    },
+    {
+      "index": 1,
+      "name": "item_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 3
+      }
+    }
+  ]
+}

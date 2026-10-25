@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "equipment_craft_point_exchange",
+  "domain": "item",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/EquipmentCraftPointExchangeValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/item/equipment_craft_point_exchange.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "dissolving_craft_point",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "awakening_craft_point",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}
