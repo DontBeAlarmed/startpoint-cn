@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "table": "bgm_asset",
+  "domain": "asset",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BgmAssetValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/asset/bgm_asset.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/asset/bgm_asset_bundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    },
+    {
+      "logicalPath": "master/asset/bgm_asset_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "volume",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "start_second",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "loop_start_second",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "loop_beat",
+      "as3Type": "Option",
+      "parseRule": "option-float",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "loading",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "bpm",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

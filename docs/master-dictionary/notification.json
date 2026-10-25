@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "table": "notification",
+  "domain": "notification",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/NotificationValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/notification/notification.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "message",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "group_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "delay_minute",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "player_item",
+  "domain": "player",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PlayerItemValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/player/player_item.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "number",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

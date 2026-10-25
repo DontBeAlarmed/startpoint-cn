@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "encyclopedia_tag_quest_relation",
+  "domain": "encyclopedia",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/EncyclopediaTagQuestRelationValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/encyclopedia/encyclopedia_tag_quest_relation.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "tag",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "quest_kind_multiplied_ids",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "quest_kind",
+      "as3Type": "QuestReferenceIdKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

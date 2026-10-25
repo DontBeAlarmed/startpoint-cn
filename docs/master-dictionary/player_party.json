@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "table": "player_party",
+  "domain": "player",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PlayerPartyValues.as",
+    "clientMaxColumn": 6,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/player/player_party.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/player/player_party_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 6,
+      "name": "unison_character_id_3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "unison_character_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "unison_character_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "party_name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "main_character_id_3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "main_character_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "main_character_id_1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

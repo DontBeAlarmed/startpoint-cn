@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "encyclopedia_triggered_tutorial_story",
+  "domain": "encyclopedia",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/EncyclopediaTriggeredTutorialStoryValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/encyclopedia/encyclopedia_triggered_tutorial_story.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "keyword_string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

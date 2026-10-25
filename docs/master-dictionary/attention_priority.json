@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "table": "attention_priority",
+  "domain": "attention",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AttentionPriorityValues.as",
+    "clientMaxColumn": 10,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/attention/attention_priority.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 5,
+      "name": "playing_score_recover",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "playing_score_minimum",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "playing_score_base",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "parasite",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "neglect",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "expire",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "disconnect",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "decline",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "action_score_recover",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "action_score_minimum",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "action_score_base",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

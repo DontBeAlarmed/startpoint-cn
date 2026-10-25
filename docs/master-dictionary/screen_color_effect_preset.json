@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "table": "screen_color_effect_preset",
+  "domain": "story",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ScreenColorEffectPresetValues.as",
+    "clientMaxColumn": 19,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/story/screen_color_effect_preset.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 19,
+      "name": "m34",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "m33",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "m32",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "m31",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "m30",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "m24",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "m23",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "m22",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "m21",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "m20",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "m14",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "m13",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "m12",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "m11",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "m10",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "m04",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "m03",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "m02",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "m01",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "m00",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

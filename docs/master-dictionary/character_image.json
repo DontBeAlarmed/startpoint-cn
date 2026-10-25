@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "table": "character_image",
+  "domain": "generated",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterImageValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": 988
+  },
+  "sources": [
+    {
+      "logicalPath": "master/generated/character_image.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "full_shot_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 325,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 543
+      }
+    },
+    {
+      "index": 0,
+      "name": "full_shot_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 470,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 743
+      }
+    },
+    {
+      "index": 2,
+      "name": "full_shot_width",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 611,
+        "noneOrEmpty": 0,
+        "intMin": 530,
+        "intMax": 1936
+      }
+    },
+    {
+      "index": 3,
+      "name": "full_shot_height",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 453,
+        "noneOrEmpty": 0,
+        "intMin": 441,
+        "intMax": 1995
+      }
+    }
+  ]
+}

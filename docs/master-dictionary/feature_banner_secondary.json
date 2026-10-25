@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "table": "feature_banner_secondary",
+  "domain": "feature_banner",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/FeatureBannerSecondaryValues.as",
+    "clientMaxColumn": 34,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/feature_banner/feature_banner_secondary.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "LinkSceneParameterKind",
+    "LinkSceneKind",
+    "FeatureBannerPopKind",
+    "EventIdKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "secondary_banner_image_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "pop_kind",
+      "as3Type": "FeatureBannerPopKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "link_kind",
+      "as3Type": "LinkSceneKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "link",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "home_banner_path",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 26,
+      "name": "banner_schedule",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 34,
+      "name": "announcement",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    }
+  ]
+}

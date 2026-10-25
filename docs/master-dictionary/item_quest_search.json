@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "item_quest_search",
+  "domain": "search",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ItemQuestSearchValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/search/item_quest_search.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 4,
+      "name": "quest",
+      "as3Type": "QuestReferenceIdKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "expected",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

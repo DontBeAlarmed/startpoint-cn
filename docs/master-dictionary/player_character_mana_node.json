@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "player_character_mana_node",
+  "domain": "player",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PlayerCharacterManaNodeValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/player/player_character_mana_node.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "mana_node_multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "learned_mana_node",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

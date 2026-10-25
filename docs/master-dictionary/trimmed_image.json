@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "table": "trimmed_image",
+  "domain": "generated",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TrimmedImageValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/generated/trimmed_image.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/generated/trimmed_image_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "width",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "height",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

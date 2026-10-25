@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "table": "link_scene",
+  "domain": "link",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/LinkSceneValues.as",
+    "clientMaxColumn": 24,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/link/link_scene.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "LinkSceneParameterKind",
+    "LinkSceneKind",
+    "EventIdKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "link_kind",
+      "as3Type": "LinkSceneKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "link",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

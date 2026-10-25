@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "table": "player",
+  "domain": "player",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PlayerValues.as",
+    "clientMaxColumn": 7,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/player/player.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/player/player_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 2,
+      "name": "vmoney",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "rp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "paid_mana",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "free_vmoney",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "free_mana",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "comment",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    }
+  ]
+}

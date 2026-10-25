@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "table": "player_history",
+  "domain": "player_history",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PlayerHistoryValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/player_history/player_history.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/sync/table-registry.ts",
+      "src/lib/player-history-catalog.ts"
+    ]
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 2,
+      "name": "aggregation_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "icon_tag",
+  "domain": "string",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/IconTagValues.as",
+    "clientMaxColumn": 2,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/string/icon_tag.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 2,
+      "name": "scale",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "color",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

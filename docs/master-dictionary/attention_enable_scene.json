@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "table": "attention_enable_scene",
+  "domain": "attention",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AttentionEnableSceneValues.as",
+    "clientMaxColumn": -1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/attention/attention_enable_scene.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": []
+}

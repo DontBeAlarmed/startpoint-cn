@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "table": "player_party_raid_event",
+  "domain": "player",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PlayerPartyRaidEventValues.as",
+    "clientMaxColumn": 7,
+    "dataRows": 18
+  },
+  "sources": [
+    {
+      "logicalPath": "master/player/player_party_raid_event.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 7,
+      "name": "unison_character_id_3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 18
+      }
+    },
+    {
+      "index": 6,
+      "name": "unison_character_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 18
+      }
+    },
+    {
+      "index": 5,
+      "name": "unison_character_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 18
+      }
+    },
+    {
+      "index": 1,
+      "name": "party_name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "party_kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 4,
+      "name": "main_character_id_3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 18
+      }
+    },
+    {
+      "index": 3,
+      "name": "main_character_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 18
+      }
+    },
+    {
+      "index": 2,
+      "name": "main_character_id_1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    }
+  ]
+}

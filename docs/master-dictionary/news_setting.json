@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "news_setting",
+  "domain": "news",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/NewsSettingValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/news/news_setting.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "max_news_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "limit_per_page",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

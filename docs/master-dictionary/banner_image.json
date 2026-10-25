@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "table": "banner_image",
+  "domain": "banner",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BannerImageValues.as",
+    "clientMaxColumn": 6,
+    "dataRows": 372
+  },
+  "sources": [
+    {
+      "logicalPath": "master/banner/banner_image.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "BannerImagePeriodKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 318,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 4,
+      "name": "period_kind",
+      "as3Type": "BannerImagePeriodKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 325,
+        "noneOrEmpty": 6
+      }
+    },
+    {
+      "index": 5,
+      "name": "list_banner_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 101,
+        "noneOrEmpty": 220
+      }
+    },
+    {
+      "index": 1,
+      "name": "home_banner_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 6,
+      "name": "header_mini_banner_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 37,
+        "noneOrEmpty": 326
+      }
+    }
+  ]
+}

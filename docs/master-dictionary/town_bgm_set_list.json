@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "town_bgm_set_list",
+  "domain": "town",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TownBgmSetListValues.as",
+    "clientMaxColumn": 2,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/town/town_bgm_set_list.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 2,
+      "name": "icon",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "header_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "album_name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "table": "town_content",
+  "domain": "town",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TownContentValues.as",
+    "clientMaxColumn": 19,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/town/town_content.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "TownContentKind",
+    "TownContentParticleBlendModeKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "particle",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "mask_image",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "kind",
+      "as3Type": "TownContentKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "bgm",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "background_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "background_blured_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

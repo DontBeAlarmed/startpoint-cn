@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "table": "game_system_unlock_condition",
+  "domain": "game_system_unlock",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GameSystemUnlockConditionValues.as",
+    "clientMaxColumn": 15,
+    "dataRows": 62
+  },
+  "sources": [
+    {
+      "logicalPath": "master/game_system_unlock/game_system_unlock_condition.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 9,
+      "name": "need_viewable_quest_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 61,
+        "intMin": 1001,
+        "intMax": 1001
+      }
+    },
+    {
+      "index": 9,
+      "name": "need_viewable_quest_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 61,
+        "intMin": 1001,
+        "intMax": 1001
+      }
+    },
+    {
+      "index": 14,
+      "name": "need_selectable_quest_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 61,
+        "intMin": 1001,
+        "intMax": 1001
+      }
+    },
+    {
+      "index": 14,
+      "name": "need_selectable_quest_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 61,
+        "intMin": 1001,
+        "intMax": 1001
+      }
+    },
+    {
+      "index": 15,
+      "name": "need_player_rank",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 44,
+        "intMin": 70,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 4,
+      "name": "multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 28,
+        "noneOrEmpty": 15,
+        "intMin": 1002,
+        "intMax": 400003104
+      }
+    },
+    {
+      "index": 4,
+      "name": "cleared_quest_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 28,
+        "noneOrEmpty": 15,
+        "intMin": 1002,
+        "intMax": 400003104
+      }
+    }
+  ]
+}

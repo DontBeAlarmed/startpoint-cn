@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "table": "story_character",
+  "domain": "story",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/StoryCharacterValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/story/story_character.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/story/story_character_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 2,
+      "name": "voice_directory",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name_label_background_color",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "face_image_path",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 4,
+      "name": "face",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "base_image_path",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

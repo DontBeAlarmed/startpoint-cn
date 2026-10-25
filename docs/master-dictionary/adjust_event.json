@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "table": "adjust_event",
+  "domain": "analytics",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AdjustEventValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/analytics/adjust_event.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    },
+    {
+      "logicalPath": "master/analytics/adjust_event_bundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "token",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

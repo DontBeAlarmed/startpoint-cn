@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "table": "voice_asset",
+  "domain": "asset",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/VoiceAssetValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/asset/voice_asset.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    },
+    {
+      "logicalPath": "master/asset/voice_asset_bundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    },
+    {
+      "logicalPath": "master/asset/voice_asset_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "volume",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

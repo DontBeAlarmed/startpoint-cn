@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "table": "feature_guide_dialog",
+  "domain": "feature_banner",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/FeatureGuideDialogValues.as",
+    "clientMaxColumn": 34,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/feature_banner/feature_guide_dialog.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "FeatureGuideDialogFrequencyKind",
+    "LinkSceneParameterKind",
+    "LinkSceneKind",
+    "FeatureBannerPopKind",
+    "EventIdKind"
+  ],
+  "columns": [
+    {
+      "index": 2,
+      "name": "title",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "text",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "pop_kind",
+      "as3Type": "FeatureBannerPopKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "need_player_rank",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 29,
+      "name": "link_kind",
+      "as3Type": "LinkSceneKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "link",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "image",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "frequency",
+      "as3Type": "FeatureGuideDialogFrequencyKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

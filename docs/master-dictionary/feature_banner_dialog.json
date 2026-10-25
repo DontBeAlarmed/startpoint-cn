@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "table": "feature_banner_dialog",
+  "domain": "feature_banner",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/FeatureBannerDialogValues.as",
+    "clientMaxColumn": 4,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/feature_banner/feature_banner_dialog.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 3,
+      "name": "url_parameter_type",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "url",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "message",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "achieve_mission_pattern",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "table": "score_bonus",
+  "domain": "score",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ScoreBonusValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/score/score_bonus.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/score/score_bonus_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "ScoreBonusKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "kind",
+      "as3Type": "ScoreBonusKind",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 0,
+      "name": "description",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "default_score",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

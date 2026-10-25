@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "table": "player_character",
+  "domain": "player",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PlayerCharacterValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 1
+  },
+  "sources": [
+    {
+      "logicalPath": "master/player/player_character.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/player/player_character_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "character_level",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 2
+      }
+    }
+  ]
+}

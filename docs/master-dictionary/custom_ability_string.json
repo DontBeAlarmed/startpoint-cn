@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "custom_ability_string",
+  "domain": "string",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CustomAbilityStringValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/string/custom_ability_string.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    }
+  ]
+}

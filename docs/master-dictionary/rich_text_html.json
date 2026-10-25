@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "table": "rich_text_html",
+  "domain": "rich_text",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RichTextHtmlValues.as",
+    "clientMaxColumn": -1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/rich_text/rich_text_html.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": []
+}

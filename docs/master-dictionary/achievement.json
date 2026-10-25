@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "table": "achievement",
+  "domain": "achievement",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AchievementValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/achievement/achievement.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 3,
+      "name": "trigger_regular_mission_stage",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "trigger_regular_mission_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "google_play_games_achievement_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "game_center_achievement_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "table": "attention_config",
+  "domain": "attention",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AttentionConfigValues.as",
+    "clientMaxColumn": 25,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/attention/attention_config.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 23,
+      "name": "summon_com_seconds",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "return_attention_max_num",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "polling_interval",
+      "as3Type": "Object",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "polling_delay",
+      "as3Type": "Object",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "multi_attention_lifetime_seconds",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "ignore_attention_count_max",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "disable",
+      "as3Type": "Object",
+      "parseRule": "enum-ref-or-composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "contribution_score_rate_to_parasite",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 24,
+      "name": "attention_state_lifetime_seconds",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "attention_recruitment",
+      "as3Type": "Object",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "attention_log_interval_seconds",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "attention_animation_time_seconds",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

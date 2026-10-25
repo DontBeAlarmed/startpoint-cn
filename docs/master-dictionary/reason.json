@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "reason",
+  "domain": "mail",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ReasonValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/mail/reason.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "subject",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "description",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    }
+  ]
+}
