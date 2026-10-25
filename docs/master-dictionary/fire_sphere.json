@@ -1,0 +1,4490 @@
+{
+  "version": 1,
+  "table": "fire_sphere",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/FireSphereValues.as",
+    "clientMaxColumn": 379,
+    "dataRows": 1
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/fire_sphere.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "BossElementKind"
+  ],
+  "columns": [
+    {
+      "index": 28,
+      "name": "wince_state_frames_phase3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 360,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 27,
+      "name": "wince_state_frames_phase2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 33,
+      "name": "time_extension_seconds_phase4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 32,
+      "name": "time_extension_seconds_phase3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 31,
+      "name": "time_extension_seconds_phase2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 21,
+      "name": "suppress_bent_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 14,
+      "name": "super_fore_character_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 26,
+      "name": "stun_state_frames_phase3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 25,
+      "name": "stun_state_frames_phase2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 16,
+      "name": "speciality_type",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 12,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 16,
+      "name": "race",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 361,
+      "name": "phase4_normal_state_frames_refloat",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 360,
+      "name": "phase4_normal_state_frames_fall",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 379,
+      "name": "phase4_micronucleus4_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 404,
+        "intMax": 404
+      }
+    },
+    {
+      "index": 378,
+      "name": "phase4_micronucleus3_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 403,
+        "intMax": 403
+      }
+    },
+    {
+      "index": 377,
+      "name": "phase4_micronucleus2_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 402,
+        "intMax": 402
+      }
+    },
+    {
+      "index": 376,
+      "name": "phase4_micronucleus1_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 401,
+        "intMax": 401
+      }
+    },
+    {
+      "index": 375,
+      "name": "phase4_fade_out_bgm_second",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 370,
+      "name": "phase4_execute_action_in_charge_revive",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 368,
+      "name": "phase4_enemy_action_revive",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 369,
+      "name": "phase4_enemy_action_refloat",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 366,
+      "name": "phase4_enemy_action_neutral",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 367,
+      "name": "phase4_enemy_action_fall",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 372,
+      "name": "phase4_cutin_revive",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 373,
+      "name": "phase4_cutin_refloat",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 351,
+      "name": "phase4_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": -10,
+        "intMax": -10
+      }
+    },
+    {
+      "index": 350,
+      "name": "phase4_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 357,
+      "name": "phase4_cutin_offset_revive_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 356,
+      "name": "phase4_cutin_offset_revive_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 359,
+      "name": "phase4_cutin_offset_refloat_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 400,
+        "intMax": 400
+      }
+    },
+    {
+      "index": 358,
+      "name": "phase4_cutin_offset_refloat_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 353,
+      "name": "phase4_cutin_offset_neutral_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": -350,
+        "intMax": -350
+      }
+    },
+    {
+      "index": 352,
+      "name": "phase4_cutin_offset_neutral_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 355,
+      "name": "phase4_cutin_offset_fall_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": -350,
+        "intMax": -350
+      }
+    },
+    {
+      "index": 354,
+      "name": "phase4_cutin_offset_fall_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 370,
+      "name": "phase4_cutin_neutral",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 374,
+      "name": "phase4_cutin_interval_neutral",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 600,
+        "intMax": 600
+      }
+    },
+    {
+      "index": 371,
+      "name": "phase4_cutin_fall",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 363,
+      "name": "phase4_attack_state_frames_revive_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 362,
+      "name": "phase4_attack_state_frames_revive_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 364,
+      "name": "phase4_action_execution_interval_revive",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 215,
+      "name": "phase3_normal_state_frames_stun3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 213,
+      "name": "phase3_normal_state_frames_stun2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 211,
+      "name": "phase3_normal_state_frames_stun",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 216,
+      "name": "phase3_normal_state_frames_crack_neutral3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 214,
+      "name": "phase3_normal_state_frames_crack_neutral2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 212,
+      "name": "phase3_normal_state_frames_crack_neutral",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 195,
+      "name": "phase3_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 209,
+      "name": "phase3_idle_state_frames_summon_bits6",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 206,
+      "name": "phase3_idle_state_frames_summon_bits5",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 204,
+      "name": "phase3_idle_state_frames_summon_bits4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 201,
+      "name": "phase3_idle_state_frames_summon_bits3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 199,
+      "name": "phase3_idle_state_frames_summon_bits2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 196,
+      "name": "phase3_idle_state_frames_summon_bits1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 208,
+      "name": "phase3_idle_state_frames_solo_attack6",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 207,
+      "name": "phase3_idle_state_frames_solo_attack5",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 203,
+      "name": "phase3_idle_state_frames_solo_attack4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 202,
+      "name": "phase3_idle_state_frames_solo_attack3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 198,
+      "name": "phase3_idle_state_frames_solo_attack2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 197,
+      "name": "phase3_idle_state_frames_solo_attack1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 210,
+      "name": "phase3_idle_state_frames_skill3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 205,
+      "name": "phase3_idle_state_frames_skill2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 200,
+      "name": "phase3_idle_state_frames_skill1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 320,
+      "name": "phase3_execute_action_in_charge_summon_m_bits4",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 314,
+      "name": "phase3_execute_action_in_charge_summon_m_bits3",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 308,
+      "name": "phase3_execute_action_in_charge_summon_m_bits2",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 302,
+      "name": "phase3_execute_action_in_charge_summon_m_bits1",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 318,
+      "name": "phase3_execute_action_in_charge_summon_bits6",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 315,
+      "name": "phase3_execute_action_in_charge_summon_bits5",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 312,
+      "name": "phase3_execute_action_in_charge_summon_bits4",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 309,
+      "name": "phase3_execute_action_in_charge_summon_bits3",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 306,
+      "name": "phase3_execute_action_in_charge_summon_bits2",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 303,
+      "name": "phase3_execute_action_in_charge_summon_bits1",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 317,
+      "name": "phase3_execute_action_in_charge_solo_attack6",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 316,
+      "name": "phase3_execute_action_in_charge_solo_attack5",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 311,
+      "name": "phase3_execute_action_in_charge_solo_attack4",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 310,
+      "name": "phase3_execute_action_in_charge_solo_attack3",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 305,
+      "name": "phase3_execute_action_in_charge_solo_attack2",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 304,
+      "name": "phase3_execute_action_in_charge_solo_attack1",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 319,
+      "name": "phase3_execute_action_in_charge_skill3",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 313,
+      "name": "phase3_execute_action_in_charge_skill2",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 307,
+      "name": "phase3_execute_action_in_charge_skill1",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 301,
+      "name": "phase3_enemy_action_summon_m_bits4",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 293,
+      "name": "phase3_enemy_action_summon_m_bits3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 285,
+      "name": "phase3_enemy_action_summon_m_bits2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 276,
+      "name": "phase3_enemy_action_summon_m_bits1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 297,
+      "name": "phase3_enemy_action_summon_bits6",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 294,
+      "name": "phase3_enemy_action_summon_bits5",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 289,
+      "name": "phase3_enemy_action_summon_bits4",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 286,
+      "name": "phase3_enemy_action_summon_bits3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 280,
+      "name": "phase3_enemy_action_summon_bits2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 277,
+      "name": "phase3_enemy_action_summon_bits1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 299,
+      "name": "phase3_enemy_action_stun3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 291,
+      "name": "phase3_enemy_action_stun2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 282,
+      "name": "phase3_enemy_action_stun",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 296,
+      "name": "phase3_enemy_action_solo_attack6",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 295,
+      "name": "phase3_enemy_action_solo_attack5",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 288,
+      "name": "phase3_enemy_action_solo_attack4",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 287,
+      "name": "phase3_enemy_action_solo_attack3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 279,
+      "name": "phase3_enemy_action_solo_attack2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 278,
+      "name": "phase3_enemy_action_solo_attack1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 298,
+      "name": "phase3_enemy_action_skill3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 290,
+      "name": "phase3_enemy_action_skill2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 281,
+      "name": "phase3_enemy_action_skill1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 300,
+      "name": "phase3_enemy_action_crack_neutral3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 292,
+      "name": "phase3_enemy_action_crack_neutral2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 284,
+      "name": "phase3_enemy_action_crack_neutral",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 283,
+      "name": "phase3_enemy_action_crack",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 275,
+      "name": "phase3_enemy_action_awakening1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 346,
+      "name": "phase3_cutin_summon_m_bits4",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 338,
+      "name": "phase3_cutin_summon_m_bits3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 330,
+      "name": "phase3_cutin_summon_m_bits2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 321,
+      "name": "phase3_cutin_summon_m_bits1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 342,
+      "name": "phase3_cutin_summon_bits6",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 339,
+      "name": "phase3_cutin_summon_bits5",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 334,
+      "name": "phase3_cutin_summon_bits4",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 331,
+      "name": "phase3_cutin_summon_bits3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 325,
+      "name": "phase3_cutin_summon_bits2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 322,
+      "name": "phase3_cutin_summon_bits1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 344,
+      "name": "phase3_cutin_stun3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 336,
+      "name": "phase3_cutin_stun2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 327,
+      "name": "phase3_cutin_stun",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 341,
+      "name": "phase3_cutin_solo_attack6",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 340,
+      "name": "phase3_cutin_solo_attack5",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 333,
+      "name": "phase3_cutin_solo_attack4",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 332,
+      "name": "phase3_cutin_solo_attack3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 324,
+      "name": "phase3_cutin_solo_attack2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 323,
+      "name": "phase3_cutin_solo_attack1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 343,
+      "name": "phase3_cutin_skill3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 335,
+      "name": "phase3_cutin_skill2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 326,
+      "name": "phase3_cutin_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 140,
+      "name": "phase3_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 139,
+      "name": "phase3_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 194,
+      "name": "phase3_cutin_offset_summon_m_bits4_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 193,
+      "name": "phase3_cutin_offset_summon_m_bits4_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 178,
+      "name": "phase3_cutin_offset_summon_m_bits3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 177,
+      "name": "phase3_cutin_offset_summon_m_bits3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 162,
+      "name": "phase3_cutin_offset_summon_m_bits2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 161,
+      "name": "phase3_cutin_offset_summon_m_bits2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 144,
+      "name": "phase3_cutin_offset_summon_m_bits1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": -45,
+        "intMax": -45
+      }
+    },
+    {
+      "index": 143,
+      "name": "phase3_cutin_offset_summon_m_bits1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 186,
+      "name": "phase3_cutin_offset_summon_bits6_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 185,
+      "name": "phase3_cutin_offset_summon_bits6_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 180,
+      "name": "phase3_cutin_offset_summon_bits5_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 179,
+      "name": "phase3_cutin_offset_summon_bits5_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 170,
+      "name": "phase3_cutin_offset_summon_bits4_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 169,
+      "name": "phase3_cutin_offset_summon_bits4_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 164,
+      "name": "phase3_cutin_offset_summon_bits3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 163,
+      "name": "phase3_cutin_offset_summon_bits3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 152,
+      "name": "phase3_cutin_offset_summon_bits2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 151,
+      "name": "phase3_cutin_offset_summon_bits2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 146,
+      "name": "phase3_cutin_offset_summon_bits1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 145,
+      "name": "phase3_cutin_offset_summon_bits1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 156,
+      "name": "phase3_cutin_offset_stun_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 155,
+      "name": "phase3_cutin_offset_stun_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 190,
+      "name": "phase3_cutin_offset_stun3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 189,
+      "name": "phase3_cutin_offset_stun3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 174,
+      "name": "phase3_cutin_offset_stun2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 173,
+      "name": "phase3_cutin_offset_stun2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 184,
+      "name": "phase3_cutin_offset_solo_attack6_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 183,
+      "name": "phase3_cutin_offset_solo_attack6_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 182,
+      "name": "phase3_cutin_offset_solo_attack5_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 181,
+      "name": "phase3_cutin_offset_solo_attack5_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 168,
+      "name": "phase3_cutin_offset_solo_attack4_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 167,
+      "name": "phase3_cutin_offset_solo_attack4_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 166,
+      "name": "phase3_cutin_offset_solo_attack3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 165,
+      "name": "phase3_cutin_offset_solo_attack3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 150,
+      "name": "phase3_cutin_offset_solo_attack2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 149,
+      "name": "phase3_cutin_offset_solo_attack2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 148,
+      "name": "phase3_cutin_offset_solo_attack1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 147,
+      "name": "phase3_cutin_offset_solo_attack1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 188,
+      "name": "phase3_cutin_offset_skill3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 187,
+      "name": "phase3_cutin_offset_skill3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 172,
+      "name": "phase3_cutin_offset_skill2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 171,
+      "name": "phase3_cutin_offset_skill2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 154,
+      "name": "phase3_cutin_offset_skill1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 153,
+      "name": "phase3_cutin_offset_skill1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 158,
+      "name": "phase3_cutin_offset_crack_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 157,
+      "name": "phase3_cutin_offset_crack_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 160,
+      "name": "phase3_cutin_offset_crack_neutral_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 159,
+      "name": "phase3_cutin_offset_crack_neutral_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 192,
+      "name": "phase3_cutin_offset_crack_neutral3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 191,
+      "name": "phase3_cutin_offset_crack_neutral3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 176,
+      "name": "phase3_cutin_offset_crack_neutral2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 175,
+      "name": "phase3_cutin_offset_crack_neutral2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 142,
+      "name": "phase3_cutin_offset_awakening1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": -350,
+        "intMax": -350
+      }
+    },
+    {
+      "index": 141,
+      "name": "phase3_cutin_offset_awakening1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 345,
+      "name": "phase3_cutin_crack_neutral3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 337,
+      "name": "phase3_cutin_crack_neutral2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 329,
+      "name": "phase3_cutin_crack_neutral",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 328,
+      "name": "phase3_cutin_crack",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 320,
+      "name": "phase3_cutin_awakening1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 350,
+      "name": "phase3_crack_conditional_funnel3_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 349,
+      "name": "phase3_crack_conditional_funnel2_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 348,
+      "name": "phase3_crack_conditional_funnel1_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 254,
+      "name": "phase3_attack_state_frames_summon_m_bits4_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 253,
+      "name": "phase3_attack_state_frames_summon_m_bits4_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 242,
+      "name": "phase3_attack_state_frames_summon_m_bits3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 241,
+      "name": "phase3_attack_state_frames_summon_m_bits3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 230,
+      "name": "phase3_attack_state_frames_summon_m_bits2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 229,
+      "name": "phase3_attack_state_frames_summon_m_bits2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 218,
+      "name": "phase3_attack_state_frames_summon_m_bits1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 217,
+      "name": "phase3_attack_state_frames_summon_m_bits1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 250,
+      "name": "phase3_attack_state_frames_summon_bits6_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 249,
+      "name": "phase3_attack_state_frames_summon_bits6_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 244,
+      "name": "phase3_attack_state_frames_summon_bits5_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 243,
+      "name": "phase3_attack_state_frames_summon_bits5_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 238,
+      "name": "phase3_attack_state_frames_summon_bits4_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 237,
+      "name": "phase3_attack_state_frames_summon_bits4_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 232,
+      "name": "phase3_attack_state_frames_summon_bits3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 231,
+      "name": "phase3_attack_state_frames_summon_bits3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 226,
+      "name": "phase3_attack_state_frames_summon_bits2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 225,
+      "name": "phase3_attack_state_frames_summon_bits2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 220,
+      "name": "phase3_attack_state_frames_summon_bits1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 219,
+      "name": "phase3_attack_state_frames_summon_bits1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 248,
+      "name": "phase3_attack_state_frames_solo_attack6_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 247,
+      "name": "phase3_attack_state_frames_solo_attack6_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 246,
+      "name": "phase3_attack_state_frames_solo_attack5_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 245,
+      "name": "phase3_attack_state_frames_solo_attack5_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 236,
+      "name": "phase3_attack_state_frames_solo_attack4_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 235,
+      "name": "phase3_attack_state_frames_solo_attack4_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 234,
+      "name": "phase3_attack_state_frames_solo_attack3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 233,
+      "name": "phase3_attack_state_frames_solo_attack3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 224,
+      "name": "phase3_attack_state_frames_solo_attack2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 223,
+      "name": "phase3_attack_state_frames_solo_attack2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 222,
+      "name": "phase3_attack_state_frames_solo_attack1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 221,
+      "name": "phase3_attack_state_frames_solo_attack1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 252,
+      "name": "phase3_attack_state_frames_skill3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 251,
+      "name": "phase3_attack_state_frames_skill3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 360,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 240,
+      "name": "phase3_attack_state_frames_skill2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 239,
+      "name": "phase3_attack_state_frames_skill2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 360,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 228,
+      "name": "phase3_attack_state_frames_skill1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 227,
+      "name": "phase3_attack_state_frames_skill1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 360,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 35,
+      "name": "phase3_attack_point_correction_factor",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1.1,
+        "intMax": 1.1
+      }
+    },
+    {
+      "index": 273,
+      "name": "phase3_action_execution_interval_summon_m_bits4",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 267,
+      "name": "phase3_action_execution_interval_summon_m_bits3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 261,
+      "name": "phase3_action_execution_interval_summon_m_bits2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 255,
+      "name": "phase3_action_execution_interval_summon_m_bits1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 271,
+      "name": "phase3_action_execution_interval_summon_bits6",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 268,
+      "name": "phase3_action_execution_interval_summon_bits5",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 265,
+      "name": "phase3_action_execution_interval_summon_bits4",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 262,
+      "name": "phase3_action_execution_interval_summon_bits3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 259,
+      "name": "phase3_action_execution_interval_summon_bits2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 256,
+      "name": "phase3_action_execution_interval_summon_bits1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 270,
+      "name": "phase3_action_execution_interval_solo_attack6",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 269,
+      "name": "phase3_action_execution_interval_solo_attack5",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 264,
+      "name": "phase3_action_execution_interval_solo_attack4",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 263,
+      "name": "phase3_action_execution_interval_solo_attack3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 258,
+      "name": "phase3_action_execution_interval_solo_attack2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 257,
+      "name": "phase3_action_execution_interval_solo_attack1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 272,
+      "name": "phase3_action_execution_interval_skill3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 266,
+      "name": "phase3_action_execution_interval_skill2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 260,
+      "name": "phase3_action_execution_interval_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 138,
+      "name": "phase2_movement_speed_move3",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 10,
+        "intMax": 10
+      }
+    },
+    {
+      "index": 137,
+      "name": "phase2_movement_speed_move2",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 10,
+        "intMax": 10
+      }
+    },
+    {
+      "index": 136,
+      "name": "phase2_movement_speed_move1",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 10,
+        "intMax": 10
+      }
+    },
+    {
+      "index": 81,
+      "name": "phase2_idle_state_frames_summon_bits3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 78,
+      "name": "phase2_idle_state_frames_summon_bits2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 74,
+      "name": "phase2_idle_state_frames_summon_bits1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 82,
+      "name": "phase2_idle_state_frames_solo_attack4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 79,
+      "name": "phase2_idle_state_frames_solo_attack3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 76,
+      "name": "phase2_idle_state_frames_solo_attack2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 75,
+      "name": "phase2_idle_state_frames_solo_attack1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 83,
+      "name": "phase2_idle_state_frames_skill1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 84,
+      "name": "phase2_idle_state_frames_move3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 80,
+      "name": "phase2_idle_state_frames_move2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 77,
+      "name": "phase2_idle_state_frames_move1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 123,
+      "name": "phase2_execute_action_in_charge_summon_bits3",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 121,
+      "name": "phase2_execute_action_in_charge_summon_bits2",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 118,
+      "name": "phase2_execute_action_in_charge_summon_bits1",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 124,
+      "name": "phase2_execute_action_in_charge_solo_attack4",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 122,
+      "name": "phase2_execute_action_in_charge_solo_attack3",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 120,
+      "name": "phase2_execute_action_in_charge_solo_attack2",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 119,
+      "name": "phase2_execute_action_in_charge_solo_attack1",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 125,
+      "name": "phase2_execute_action_in_charge_skill1",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 115,
+      "name": "phase2_enemy_action_summon_bits3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 113,
+      "name": "phase2_enemy_action_summon_bits2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 110,
+      "name": "phase2_enemy_action_summon_bits1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 116,
+      "name": "phase2_enemy_action_solo_attack4",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 114,
+      "name": "phase2_enemy_action_solo_attack3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 112,
+      "name": "phase2_enemy_action_solo_attack2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 111,
+      "name": "phase2_enemy_action_solo_attack1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 117,
+      "name": "phase2_enemy_action_skill1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 135,
+      "name": "phase2_destination_move3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 134,
+      "name": "phase2_destination_move2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 133,
+      "name": "phase2_destination_move1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 130,
+      "name": "phase2_cutin_summon_bits3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 128,
+      "name": "phase2_cutin_summon_bits2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 125,
+      "name": "phase2_cutin_summon_bits1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 131,
+      "name": "phase2_cutin_solo_attack4",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 129,
+      "name": "phase2_cutin_solo_attack3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 127,
+      "name": "phase2_cutin_solo_attack2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 126,
+      "name": "phase2_cutin_solo_attack1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 132,
+      "name": "phase2_cutin_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 57,
+      "name": "phase2_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 56,
+      "name": "phase2_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 69,
+      "name": "phase2_cutin_offset_summon_bits3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 68,
+      "name": "phase2_cutin_offset_summon_bits3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 65,
+      "name": "phase2_cutin_offset_summon_bits2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 64,
+      "name": "phase2_cutin_offset_summon_bits2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 59,
+      "name": "phase2_cutin_offset_summon_bits1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 58,
+      "name": "phase2_cutin_offset_summon_bits1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 71,
+      "name": "phase2_cutin_offset_solo_attack4_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 70,
+      "name": "phase2_cutin_offset_solo_attack4_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 67,
+      "name": "phase2_cutin_offset_solo_attack3_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 66,
+      "name": "phase2_cutin_offset_solo_attack3_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 63,
+      "name": "phase2_cutin_offset_solo_attack2_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 62,
+      "name": "phase2_cutin_offset_solo_attack2_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 61,
+      "name": "phase2_cutin_offset_solo_attack1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 60,
+      "name": "phase2_cutin_offset_solo_attack1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 73,
+      "name": "phase2_cutin_offset_skill1_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 72,
+      "name": "phase2_cutin_offset_skill1_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 96,
+      "name": "phase2_attack_state_frames_summon_bits3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 95,
+      "name": "phase2_attack_state_frames_summon_bits3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 92,
+      "name": "phase2_attack_state_frames_summon_bits2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 91,
+      "name": "phase2_attack_state_frames_summon_bits2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 86,
+      "name": "phase2_attack_state_frames_summon_bits1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 85,
+      "name": "phase2_attack_state_frames_summon_bits1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 98,
+      "name": "phase2_attack_state_frames_solo_attack4_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 97,
+      "name": "phase2_attack_state_frames_solo_attack4_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 94,
+      "name": "phase2_attack_state_frames_solo_attack3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 93,
+      "name": "phase2_attack_state_frames_solo_attack3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 200,
+        "intMax": 200
+      }
+    },
+    {
+      "index": 90,
+      "name": "phase2_attack_state_frames_solo_attack2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 89,
+      "name": "phase2_attack_state_frames_solo_attack2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 88,
+      "name": "phase2_attack_state_frames_solo_attack1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 87,
+      "name": "phase2_attack_state_frames_solo_attack1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 100,
+      "name": "phase2_attack_state_frames_skill1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 99,
+      "name": "phase2_attack_state_frames_skill1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 360,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 34,
+      "name": "phase2_attack_point_correction_factor",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 106,
+      "name": "phase2_action_execution_interval_summon_bits3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 104,
+      "name": "phase2_action_execution_interval_summon_bits2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 101,
+      "name": "phase2_action_execution_interval_summon_bits1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 107,
+      "name": "phase2_action_execution_interval_solo_attack4",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 20,
+        "intMax": 20
+      }
+    },
+    {
+      "index": 105,
+      "name": "phase2_action_execution_interval_solo_attack3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 103,
+      "name": "phase2_action_execution_interval_solo_attack2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 102,
+      "name": "phase2_action_execution_interval_solo_attack1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 108,
+      "name": "phase2_action_execution_interval_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 47,
+      "name": "phase1_normal_state_frames_stun",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 150,
+        "intMax": 150
+      }
+    },
+    {
+      "index": 46,
+      "name": "phase1_normal_state_frames_crystal_move_order4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 45,
+      "name": "phase1_normal_state_frames_crystal_move_order3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 44,
+      "name": "phase1_normal_state_frames_crystal_move_order2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 43,
+      "name": "phase1_normal_state_frames_crystal_move_order1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 48,
+      "name": "phase1_normal_state_frames_crack_neutral",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 38,
+      "name": "phase1_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 42,
+      "name": "phase1_idle_state_frames_crystal_move_order4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 41,
+      "name": "phase1_idle_state_frames_crystal_move_order3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 40,
+      "name": "phase1_idle_state_frames_crystal_move_order2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 39,
+      "name": "phase1_idle_state_frames_crystal_move_order1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 37,
+      "name": "phase1_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": -10,
+        "intMax": -10
+      }
+    },
+    {
+      "index": 36,
+      "name": "phase1_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 55,
+      "name": "phase1_crystal3_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 103,
+        "intMax": 103
+      }
+    },
+    {
+      "index": 54,
+      "name": "phase1_crystal2_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 102,
+        "intMax": 102
+      }
+    },
+    {
+      "index": 53,
+      "name": "phase1_crystal1_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 101,
+        "intMax": 101
+      }
+    },
+    {
+      "index": 52,
+      "name": "phase1_contemporizing_timeout_frames_crystal_move_order4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 3000,
+        "intMax": 3000
+      }
+    },
+    {
+      "index": 51,
+      "name": "phase1_contemporizing_timeout_frames_crystal_move_order3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 3000,
+        "intMax": 3000
+      }
+    },
+    {
+      "index": 50,
+      "name": "phase1_contemporizing_timeout_frames_crystal_move_order2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 3000,
+        "intMax": 3000
+      }
+    },
+    {
+      "index": 49,
+      "name": "phase1_contemporizing_timeout_frames_crystal_move_order1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 3000,
+        "intMax": 3000
+      }
+    },
+    {
+      "index": 19,
+      "name": "num_wince_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 240,
+        "intMax": 240
+      }
+    },
+    {
+      "index": 18,
+      "name": "num_stun_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 10,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 8,
+      "name": "marker_set",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 30,
+      "name": "health_point_threshold_phase4",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0.55,
+        "intMax": 0.55
+      }
+    },
+    {
+      "index": 29,
+      "name": "health_point_threshold_phase3",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0.85,
+        "intMax": 0.85
+      }
+    },
+    {
+      "index": 4,
+      "name": "gender",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 15,
+      "name": "element",
+      "as3Type": "BossElementKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

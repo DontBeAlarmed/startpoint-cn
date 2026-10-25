@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "table": "tp_basic_curve",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TpBasicCurveValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 5
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/enemy/tp/tp_basic_curve.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/enemy/tp/tp_basic_curve_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "tp_multiplier",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 3
+      }
+    }
+  ]
+}

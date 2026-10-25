@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "table": "general_enemy_watch",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GeneralEnemyWatchValues.as",
+    "clientMaxColumn": 22,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/general_enemy_watch.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "GeneralEnemyWatchStateKind",
+    "GeneralEnemyWatchKind"
+  ],
+  "columns": [
+    {
+      "index": 9,
+      "name": "watch_kind",
+      "as3Type": "GeneralEnemyWatchKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "self_subroutine_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "self_state",
+      "as3Type": "GeneralEnemyWatchStateKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "priority",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "partner_subroutine_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "partner_state",
+      "as3Type": "GeneralEnemyWatchStateKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "partner_group",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "match_even_if_winced_self",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "match_even_if_suspended_self",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "match_even_if_stunned_self",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "interrupt_kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "action_content",
+      "as3Type": "GeneralEnemyWatchActionContent",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

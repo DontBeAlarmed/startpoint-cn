@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "table": "switched_action_skill",
+  "domain": "skill",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/SwitchedActionSkillValues.as",
+    "clientMaxColumn": 16,
+    "dataRows": 12
+  },
+  "sources": [
+    {
+      "logicalPath": "master/skill/switched_action_skill.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "AutoplayAutoInvocationConditionKind",
+    "AutoplayActionSkillAreaShapeKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "program_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 11,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 2,
+      "name": "autoplay_auto_invocation_condition_changed_by_skill_flag",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 8,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 2,
+      "name": "autoplay_auto_invocation_condition",
+      "as3Type": "AutoplayAutoInvocationConditionKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 8,
+        "intMin": 2,
+        "intMax": 2
+      }
+    }
+  ]
+}

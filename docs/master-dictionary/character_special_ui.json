@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "character_special_ui",
+  "domain": "character_ui",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterSpecialUiValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/character_ui/character_special_ui.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "use_balloon_arrow",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

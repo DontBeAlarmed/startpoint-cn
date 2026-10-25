@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "table": "talky_yakumono_speech_group",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TalkyYakumonoSpeechGroupValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": 185
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/yakumono/talky_yakumono_speech_group.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/yakumono/talky_yakumono_speech_group_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "text",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 184,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "balloon_position",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    }
+  ]
+}

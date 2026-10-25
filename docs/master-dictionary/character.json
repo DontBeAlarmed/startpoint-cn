@@ -1,0 +1,230 @@
+{
+  "version": 1,
+  "table": "character",
+  "domain": "character",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterValues.as",
+    "clientMaxColumn": 36,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/character/character.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/character/character_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/character.ts",
+      "src/content/converters/character.type-test.ts",
+      "src/content/runtime/multi-battle-digest.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/character-content.ts",
+      "src/lib/gacha-catalog/catalog.ts",
+      "src/lib/mission/computer-event-safe.ts",
+      "src/lib/mission/degree-content-tables.ts",
+      "src/lib/mission/regular-session-context.ts"
+    ]
+  },
+  "enumRefs": [
+    "SkillSwitchingConditionalKind",
+    "ConditionMasterKind",
+    "CharacterManaNodeAutoKind"
+  ],
+  "columns": [
+    {
+      "index": 10,
+      "name": "web_site_publish",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 26,
+      "name": "stance",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "speciality_type",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "rarity",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "server-used"
+    },
+    {
+      "index": 5,
+      "name": "race",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 28,
+      "name": "pedestal_image",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "omit_character_quest",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 32,
+      "name": "obtain_source",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "max_evolution_level",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "max_ability_powers",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "mana_node_auto_mode",
+      "as3Type": "CharacterManaNodeAutoMode",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "mana_board_kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "leader_ability",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "identity_character_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "gender",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "gacha_odds_weight",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "element",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 6,
+      "name": "character_tag",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "action_skill_switching",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "action_skill",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 24,
+      "name": "ability_6",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 23,
+      "name": "ability_5",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "ability_4",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 21,
+      "name": "ability_3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 20,
+      "name": "ability_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "ability_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    }
+  ]
+}

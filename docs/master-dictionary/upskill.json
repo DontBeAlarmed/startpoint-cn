@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "table": "upskill",
+  "domain": "mana_board",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/UpskillValues.as",
+    "clientMaxColumn": 11,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/mana_board/upskill.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/mana_board/upskill_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "skilllevel",
+      "as3Type": "Object",
+      "parseRule": "enum-ref-or-composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 6,
+      "name": "skillevolution",
+      "as3Type": "Object",
+      "parseRule": "enum-ref-or-composite",
+      "status": "client-only"
+    }
+  ]
+}

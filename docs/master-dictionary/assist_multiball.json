@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "table": "assist_multiball",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AssistMultiballValues.as",
+    "clientMaxColumn": 20,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/assist/assist_multiball.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/assist/assist_multiball_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "AutoplayAutoInvocationConditionKind",
+    "AutoplayActionSkillAreaShapeKind"
+  ],
+  "columns": [
+    {
+      "index": 5,
+      "name": "zone_crossable",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "support_skill3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "support_skill2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "support_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "skill_voice_paths",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "skill_cutin_image_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "scale",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "is_invincible",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "character_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "action",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

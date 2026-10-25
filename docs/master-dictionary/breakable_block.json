@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "table": "breakable_block",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BreakableBlockValues.as",
+    "clientMaxColumn": 32,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/yakumono/breakable_block.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "EnemyElementKind"
+  ],
+  "columns": [
+    {
+      "index": 21,
+      "name": "subroutine_change_threshold4",
+      "as3Type": "Option",
+      "parseRule": "option-float",
+      "status": "client-only"
+    },
+    {
+      "index": 20,
+      "name": "subroutine_change_threshold3",
+      "as3Type": "Option",
+      "parseRule": "option-float",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "subroutine_change_threshold2",
+      "as3Type": "Option",
+      "parseRule": "option-float",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "routine_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "race",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "is_enemy",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "initial_state_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "hit_count_check_fore_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "hit_count_check_back_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "gender",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "enemy_action110",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 32,
+      "name": "enemy_action109",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 31,
+      "name": "enemy_action108",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 30,
+      "name": "enemy_action107",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 29,
+      "name": "enemy_action106",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 28,
+      "name": "enemy_action105",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "enemy_action104",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 26,
+      "name": "enemy_action103",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "enemy_action102",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 24,
+      "name": "enemy_action101",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "element",
+      "as3Type": "EnemyElementKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "damage_check_fore_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "damage_check_back_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 23,
+      "name": "contains_touch_state",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

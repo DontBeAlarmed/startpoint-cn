@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "table": "character_gacha_sound",
+  "domain": "character",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterGachaSoundValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 1842
+  },
+  "sources": [
+    {
+      "logicalPath": "master/character/character_gacha_sound.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "sound",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 346,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

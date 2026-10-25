@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "table": "instant_item_odds",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/InstantItemOddsValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/item/instant_item_odds.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "InstantItemKind"
+  ],
+  "columns": [
+    {
+      "index": 1,
+      "name": "odds_drop_or_not",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "item",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 0,
+      "name": "drawing_interval",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

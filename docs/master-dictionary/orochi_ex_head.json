@@ -1,0 +1,539 @@
+{
+  "version": 1,
+  "table": "orochi_ex_head",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/OrochiExHeadValues.as",
+    "clientMaxColumn": 178,
+    "dataRows": 9
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/orochi_ex_head.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "BossElementKind",
+    "StateLengthKind",
+    "TrialKind"
+  ],
+  "columns": [
+    {
+      "index": 27,
+      "name": "trial_stun_cutin",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 26,
+      "name": "trial_stun_animation",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 29,
+      "name": "trial_stun2_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 28,
+      "name": "trial_stun1_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 25,
+      "name": "trial_gauge_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": -100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 24,
+      "name": "trial_gauge_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": -50,
+        "intMax": 50
+      }
+    },
+    {
+      "index": 21,
+      "name": "suppress_bent_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 16,
+      "name": "speciality_type",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 4,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 12,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 9
+      }
+    },
+    {
+      "index": 16,
+      "name": "race",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 4,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 170,
+      "name": "phase1_trial2_kind",
+      "as3Type": "TrialKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 168,
+      "name": "phase1_trial2",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 159,
+      "name": "phase1_trial1_kind",
+      "as3Type": "TrialKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 157,
+      "name": "phase1_trial1",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 138,
+      "name": "phase1_group1_d_attack3_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 560
+      }
+    },
+    {
+      "index": 139,
+      "name": "phase1_group1_d_attack3",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 128,
+      "name": "phase1_group1_d_attack2_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 230
+      }
+    },
+    {
+      "index": 129,
+      "name": "phase1_group1_d_attack2",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 119,
+      "name": "phase1_group1_d_attack1",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 109,
+      "name": "phase1_group1_c_attack3_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 380
+      }
+    },
+    {
+      "index": 110,
+      "name": "phase1_group1_c_attack3",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 99,
+      "name": "phase1_group1_c_attack2_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 250
+      }
+    },
+    {
+      "index": 100,
+      "name": "phase1_group1_c_attack2",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 90,
+      "name": "phase1_group1_c_attack1",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 80,
+      "name": "phase1_group1_b_attack3_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 81,
+      "name": "phase1_group1_b_attack3",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 70,
+      "name": "phase1_group1_b_attack2_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 71,
+      "name": "phase1_group1_b_attack2",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 61,
+      "name": "phase1_group1_b_attack1",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 51,
+      "name": "phase1_group1_a_attack3_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 480
+      }
+    },
+    {
+      "index": 52,
+      "name": "phase1_group1_a_attack3",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 41,
+      "name": "phase1_group1_a_attack2_idle_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 230
+      }
+    },
+    {
+      "index": 42,
+      "name": "phase1_group1_a_attack2",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 14,
+      "name": "phase1_group1_a_attack1",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 9
+      }
+    },
+    {
+      "index": 148,
+      "name": "phase1_attack_e",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 19,
+      "name": "num_wince_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 18,
+      "name": "num_stun_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 10,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 9
+      }
+    },
+    {
+      "index": 8,
+      "name": "marker_set",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 9
+      }
+    },
+    {
+      "index": 4,
+      "name": "gender",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 9
+      }
+    },
+    {
+      "index": 15,
+      "name": "element",
+      "as3Type": "BossElementKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 31,
+      "name": "cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 30,
+      "name": "cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": -65,
+        "intMax": 70
+      }
+    }
+  ]
+}

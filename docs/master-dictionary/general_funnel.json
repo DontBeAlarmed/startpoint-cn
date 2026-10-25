@@ -1,0 +1,1359 @@
+{
+  "version": 1,
+  "table": "general_funnel",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GeneralFunnelValues.as",
+    "clientMaxColumn": 139,
+    "dataRows": 1114
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/funnel/general_funnel.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/boss/funnel/general_funnel_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "EnemyElementKind",
+    "FunnelMetalKind",
+    "GeneralEnemyLifeCycleKind"
+  ],
+  "columns": [
+    {
+      "index": 59,
+      "name": "suppress_disappear_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 62,
+        "noneOrEmpty": 854
+      }
+    },
+    {
+      "index": 58,
+      "name": "suppress_blown_off_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 57,
+      "name": "suppress_bent_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 53,
+      "name": "subroutine_change4",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1051,
+        "intMin": 1,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 49,
+      "name": "subroutine_change3",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 45,
+      "name": "subroutine_change2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 24,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 193,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 34,
+      "name": "routine_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1104
+      }
+    },
+    {
+      "index": 30,
+      "name": "resist_element_resistance",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 9,
+      "name": "race",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 51,
+      "name": "num_wince_state_frames",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 47,
+      "name": "num_stun_state_frames",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 23,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 223,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 22,
+      "name": "marker_set",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 737
+      }
+    },
+    {
+      "index": 36,
+      "name": "life_cycle_kind",
+      "as3Type": "GeneralEnemyLifeCycleKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 21,
+      "name": "leave_on_continue",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 35,
+      "name": "initial_state_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1104
+      }
+    },
+    {
+      "index": 33,
+      "name": "initial_position_name",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 28,
+      "name": "hit_count_check_fore_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 27,
+      "name": "hit_count_check_back_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 17,
+      "name": "high_priority_target",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 2,
+      "name": "gender",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 30,
+        "noneOrEmpty": 933
+      }
+    },
+    {
+      "index": 16,
+      "name": "funnel_metal",
+      "as3Type": "FunnelMetalKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 32,
+      "name": "enhance_toughness",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 35,
+        "noneOrEmpty": 997
+      }
+    },
+    {
+      "index": 31,
+      "name": "enhance_debuff_decreasing_rate",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 13,
+      "name": "enemy_action150",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    },
+    {
+      "index": 13,
+      "name": "enemy_action149",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    },
+    {
+      "index": 13,
+      "name": "enemy_action148",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    },
+    {
+      "index": 13,
+      "name": "enemy_action147",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    },
+    {
+      "index": 13,
+      "name": "enemy_action146",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    },
+    {
+      "index": 13,
+      "name": "enemy_action145",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    },
+    {
+      "index": 133,
+      "name": "enemy_action144",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 132,
+      "name": "enemy_action143",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 131,
+      "name": "enemy_action142",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 130,
+      "name": "enemy_action141",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 129,
+      "name": "enemy_action140",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 128,
+      "name": "enemy_action139",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 127,
+      "name": "enemy_action138",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 126,
+      "name": "enemy_action137",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 125,
+      "name": "enemy_action136",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 124,
+      "name": "enemy_action135",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 123,
+      "name": "enemy_action134",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 122,
+      "name": "enemy_action133",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 121,
+      "name": "enemy_action132",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 120,
+      "name": "enemy_action131",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 119,
+      "name": "enemy_action130",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 118,
+      "name": "enemy_action129",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 117,
+      "name": "enemy_action128",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1105
+      }
+    },
+    {
+      "index": 116,
+      "name": "enemy_action127",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1105
+      }
+    },
+    {
+      "index": 115,
+      "name": "enemy_action126",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1107
+      }
+    },
+    {
+      "index": 114,
+      "name": "enemy_action125",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1111
+      }
+    },
+    {
+      "index": 113,
+      "name": "enemy_action124",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1111
+      }
+    },
+    {
+      "index": 112,
+      "name": "enemy_action123",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1111
+      }
+    },
+    {
+      "index": 111,
+      "name": "enemy_action122",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 110,
+      "name": "enemy_action121",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1113
+      }
+    },
+    {
+      "index": 109,
+      "name": "enemy_action120",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1109
+      }
+    },
+    {
+      "index": 108,
+      "name": "enemy_action119",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1105
+      }
+    },
+    {
+      "index": 107,
+      "name": "enemy_action118",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 1103
+      }
+    },
+    {
+      "index": 106,
+      "name": "enemy_action117",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1105
+      }
+    },
+    {
+      "index": 105,
+      "name": "enemy_action116",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1107
+      }
+    },
+    {
+      "index": 104,
+      "name": "enemy_action115",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1107
+      }
+    },
+    {
+      "index": 103,
+      "name": "enemy_action114",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1107
+      }
+    },
+    {
+      "index": 102,
+      "name": "enemy_action113",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 1101
+      }
+    },
+    {
+      "index": 101,
+      "name": "enemy_action112",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 1098
+      }
+    },
+    {
+      "index": 100,
+      "name": "enemy_action111",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 1096
+      }
+    },
+    {
+      "index": 99,
+      "name": "enemy_action110",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 1095
+      }
+    },
+    {
+      "index": 98,
+      "name": "enemy_action109",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 67,
+        "noneOrEmpty": 844
+      }
+    },
+    {
+      "index": 97,
+      "name": "enemy_action108",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 27,
+        "noneOrEmpty": 957
+      }
+    },
+    {
+      "index": 96,
+      "name": "enemy_action107",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 32,
+        "noneOrEmpty": 882
+      }
+    },
+    {
+      "index": 95,
+      "name": "enemy_action106",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 32,
+        "noneOrEmpty": 871
+      }
+    },
+    {
+      "index": 94,
+      "name": "enemy_action105",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 32,
+        "noneOrEmpty": 853
+      }
+    },
+    {
+      "index": 93,
+      "name": "enemy_action104",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 33,
+        "noneOrEmpty": 875
+      }
+    },
+    {
+      "index": 92,
+      "name": "enemy_action103",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 47,
+        "noneOrEmpty": 863
+      }
+    },
+    {
+      "index": 91,
+      "name": "enemy_action102",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 69,
+        "noneOrEmpty": 805
+      }
+    },
+    {
+      "index": 90,
+      "name": "enemy_action101",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 112,
+        "noneOrEmpty": 629
+      }
+    },
+    {
+      "index": 13,
+      "name": "element",
+      "as3Type": "EnemyElementKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    },
+    {
+      "index": 12,
+      "name": "dont_apply_impact",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 56,
+      "name": "display_hp_gauge",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 20,
+      "name": "die_when_hit_count_check_prevented",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 19,
+      "name": "die_when_damage_check_prevented",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 18,
+      "name": "die_when_all_weak_points_are_broken",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 32,
+      "name": "damage_share_target_boss_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 35,
+        "noneOrEmpty": 997
+      }
+    },
+    {
+      "index": 26,
+      "name": "damage_check_fore_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 25,
+      "name": "damage_check_back_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 88,
+      "name": "cutin030",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 87,
+      "name": "cutin029",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 86,
+      "name": "cutin028",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 85,
+      "name": "cutin027",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 84,
+      "name": "cutin026",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1114
+      }
+    },
+    {
+      "index": 83,
+      "name": "cutin025",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 82,
+      "name": "cutin024",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 81,
+      "name": "cutin023",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 80,
+      "name": "cutin022",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 79,
+      "name": "cutin021",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 78,
+      "name": "cutin020",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 77,
+      "name": "cutin019",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 76,
+      "name": "cutin018",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 75,
+      "name": "cutin017",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1112
+      }
+    },
+    {
+      "index": 74,
+      "name": "cutin016",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1108
+      }
+    },
+    {
+      "index": 73,
+      "name": "cutin015",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1070
+      }
+    },
+    {
+      "index": 72,
+      "name": "cutin014",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1066
+      }
+    },
+    {
+      "index": 71,
+      "name": "cutin013",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1041
+      }
+    },
+    {
+      "index": 70,
+      "name": "cutin012",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1047
+      }
+    },
+    {
+      "index": 69,
+      "name": "cutin011",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1027
+      }
+    },
+    {
+      "index": 68,
+      "name": "cutin010",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 1065
+      }
+    },
+    {
+      "index": 67,
+      "name": "cutin009",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 1021
+      }
+    },
+    {
+      "index": 66,
+      "name": "cutin008",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 1021
+      }
+    },
+    {
+      "index": 65,
+      "name": "cutin007",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1063
+      }
+    },
+    {
+      "index": 64,
+      "name": "cutin006",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 18,
+        "noneOrEmpty": 953,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 63,
+      "name": "cutin005",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 19,
+        "noneOrEmpty": 965,
+        "intMin": 1,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 62,
+      "name": "cutin004",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 19,
+        "noneOrEmpty": 946,
+        "intMin": 2,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 61,
+      "name": "cutin003",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 21,
+        "noneOrEmpty": 927,
+        "intMin": 3,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 60,
+      "name": "cutin002",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 32,
+        "noneOrEmpty": 866,
+        "intMin": 4,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 59,
+      "name": "cutin001",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 62,
+        "noneOrEmpty": 854
+      }
+    },
+    {
+      "index": 11,
+      "name": "copies_parent_conditions",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 39,
+      "name": "continue_initial_state_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 1071
+      }
+    },
+    {
+      "index": 40,
+      "name": "continue_initial_position_name",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1103
+      }
+    },
+    {
+      "index": 21,
+      "name": "condition_icon_position",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 13,
+      "name": "ability_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 1049
+      }
+    }
+  ]
+}

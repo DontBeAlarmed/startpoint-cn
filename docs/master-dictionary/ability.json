@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "table": "ability",
+  "domain": "ability",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AbilityValues.as",
+    "clientMaxColumn": 125,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/ability/ability.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "AbilityAwakeKind"
+  ],
+  "columns": [
+    {
+      "index": 83,
+      "name": "unisonable",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "trigger",
+      "as3Type": "AbilityTriggerMasterValue",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "statue_group_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "awake_kind",
+      "as3Type": "AbilityAwakeKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

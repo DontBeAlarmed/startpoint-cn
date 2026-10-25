@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "table": "zone_action",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ZoneActionValues.as",
+    "clientMaxColumn": 7,
+    "dataRows": 41
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/zone_action.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/zone_action_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "ZoneActionTriggerKind",
+    "ZoneActionKind"
+  ],
+  "columns": [
+    {
+      "index": 1,
+      "name": "trigger",
+      "as3Type": "ZoneActionTriggerKind",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 41
+      }
+    },
+    {
+      "index": 3,
+      "name": "delay",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 168
+      }
+    },
+    {
+      "index": 1,
+      "name": "action",
+      "as3Type": "ZoneActionKind",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 41
+      }
+    }
+  ]
+}

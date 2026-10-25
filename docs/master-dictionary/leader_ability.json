@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "table": "leader_ability",
+  "domain": "ability",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/LeaderAbilityValues.as",
+    "clientMaxColumn": 123,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/ability/leader_ability.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/ability/leader_ability_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "AbilityAwakeKind"
+  ],
+  "columns": [
+    {
+      "index": 2,
+      "name": "trigger",
+      "as3Type": "AbilityTriggerMasterValue",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "awake_kind",
+      "as3Type": "AbilityAwakeKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

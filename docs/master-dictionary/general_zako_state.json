@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "table": "general_zako_state",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GeneralZakoStateValues.as",
+    "clientMaxColumn": 52,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/zako/general_zako_state.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/zako/general_zako_state_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "TrialKind",
+    "GeneralEnemyForceChangeStateKind",
+    "GeneralEnemyMovementKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "state",
+      "as3Type": "Object",
+      "parseRule": "enum-ref-or-composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

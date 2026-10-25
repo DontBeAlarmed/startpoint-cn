@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "table": "standard_funnel",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/StandardFunnelValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 515
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/funnel/standard_funnel.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 498,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

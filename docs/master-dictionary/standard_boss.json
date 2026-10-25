@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "table": "standard_boss",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/StandardBossValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": 257
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/standard_boss.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 254,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 37,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

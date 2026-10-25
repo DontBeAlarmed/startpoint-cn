@@ -1,0 +1,4387 @@
+{
+  "version": 1,
+  "table": "water_sphere",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/WaterSphereValues.as",
+    "clientMaxColumn": 372,
+    "dataRows": 1
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/water_sphere.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "BossElementKind"
+  ],
+  "columns": [
+    {
+      "index": 28,
+      "name": "wince_state_frames_phase4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 27,
+      "name": "wince_state_frames_phase2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 33,
+      "name": "time_extension_seconds_phase4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 32,
+      "name": "time_extension_seconds_phase3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 31,
+      "name": "time_extension_seconds_phase2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 21,
+      "name": "suppress_bent_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 14,
+      "name": "super_fore_character_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 26,
+      "name": "stun_state_frames_phase4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 25,
+      "name": "stun_state_frames_phase2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 16,
+      "name": "speciality_type",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 12,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 16,
+      "name": "race",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 317,
+      "name": "phase4_idle_state_frames_tornado_x2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 420,
+        "intMax": 420
+      }
+    },
+    {
+      "index": 312,
+      "name": "phase4_idle_state_frames_tornado_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 313,
+      "name": "phase4_idle_state_frames_target_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 420,
+        "intMax": 420
+      }
+    },
+    {
+      "index": 319,
+      "name": "phase4_idle_state_frames_skill_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 321,
+      "name": "phase4_idle_state_frames_skill2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 320,
+      "name": "phase4_idle_state_frames_funnel_x3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 316,
+      "name": "phase4_idle_state_frames_funnel_x2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 314,
+      "name": "phase4_idle_state_frames_funnel_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 318,
+      "name": "phase4_idle_state_frames_attack_x21",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 315,
+      "name": "phase4_idle_state_frames_attack_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 372,
+      "name": "phase4_fade_out_bgm_second",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 357,
+      "name": "phase4_enemy_action_tornado_x2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 352,
+      "name": "phase4_enemy_action_tornado_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 353,
+      "name": "phase4_enemy_action_target_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 361,
+      "name": "phase4_enemy_action_skill2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 360,
+      "name": "phase4_enemy_action_skill1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 359,
+      "name": "phase4_enemy_action_funnel_x3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 356,
+      "name": "phase4_enemy_action_funnel_x2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 354,
+      "name": "phase4_enemy_action_funnel_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 351,
+      "name": "phase4_enemy_action_funnel0",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 358,
+      "name": "phase4_enemy_action_attack_x21",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 355,
+      "name": "phase4_enemy_action_attack_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 367,
+      "name": "phase4_cutin_tornado_x2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 362,
+      "name": "phase4_cutin_tornado_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 363,
+      "name": "phase4_cutin_target_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 371,
+      "name": "phase4_cutin_skill2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 370,
+      "name": "phase4_cutin_skill1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 311,
+      "name": "phase4_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 310,
+      "name": "phase4_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 369,
+      "name": "phase4_cutin_funnel_x3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 366,
+      "name": "phase4_cutin_funnel_x2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 364,
+      "name": "phase4_cutin_funnel_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 361,
+      "name": "phase4_cutin_funnel0",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 368,
+      "name": "phase4_cutin_attack_x21",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 365,
+      "name": "phase4_cutin_attack_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 335,
+      "name": "phase4_attack_state_frames_tornado_x2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 334,
+      "name": "phase4_attack_state_frames_tornado_x2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 325,
+      "name": "phase4_attack_state_frames_tornado_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 324,
+      "name": "phase4_attack_state_frames_tornado_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 327,
+      "name": "phase4_attack_state_frames_target_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 326,
+      "name": "phase4_attack_state_frames_target_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 339,
+      "name": "phase4_attack_state_frames_skill_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 338,
+      "name": "phase4_attack_state_frames_skill_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 360,
+        "intMax": 360
+      }
+    },
+    {
+      "index": 343,
+      "name": "phase4_attack_state_frames_skill2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 342,
+      "name": "phase4_attack_state_frames_skill2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 420,
+        "intMax": 420
+      }
+    },
+    {
+      "index": 341,
+      "name": "phase4_attack_state_frames_funnel_x3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 340,
+      "name": "phase4_attack_state_frames_funnel_x3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 333,
+      "name": "phase4_attack_state_frames_funnel_x2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 332,
+      "name": "phase4_attack_state_frames_funnel_x2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 329,
+      "name": "phase4_attack_state_frames_funnel_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 328,
+      "name": "phase4_attack_state_frames_funnel_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 323,
+      "name": "phase4_attack_state_frames_funnel0_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 322,
+      "name": "phase4_attack_state_frames_funnel0_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 337,
+      "name": "phase4_attack_state_frames_attack_x21_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 580,
+        "intMax": 580
+      }
+    },
+    {
+      "index": 336,
+      "name": "phase4_attack_state_frames_attack_x21_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 331,
+      "name": "phase4_attack_state_frames_attack_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 600,
+        "intMax": 600
+      }
+    },
+    {
+      "index": 330,
+      "name": "phase4_attack_state_frames_attack_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 36,
+      "name": "phase4_attack_point_correction_factor",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1.15,
+        "intMax": 1.15
+      }
+    },
+    {
+      "index": 346,
+      "name": "phase4_action_execution_interval_tornado_x2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 344,
+      "name": "phase4_action_execution_interval_tornado_x1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 348,
+      "name": "phase4_action_execution_interval_skill_x1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 349,
+      "name": "phase4_action_execution_interval_skill2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 347,
+      "name": "phase4_action_execution_interval_attack_x21",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 345,
+      "name": "phase4_action_execution_interval_attack_x1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 293,
+      "name": "phase3_normal_state_frames_special_move1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 292,
+      "name": "phase3_normal_state_frames_coop_attack_x5",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 291,
+      "name": "phase3_normal_state_frames_coop_attack_x4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 290,
+      "name": "phase3_normal_state_frames_coop_attack_x3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 289,
+      "name": "phase3_normal_state_frames_coop_attack_x2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 288,
+      "name": "phase3_normal_state_frames_coop_attack_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 297,
+      "name": "phase3_micronucleus_super_fore_character_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 296,
+      "name": "phase3_micronucleus_shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 295,
+      "name": "phase3_micronucleus_marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 298,
+      "name": "phase3_micronucleus_level",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 300,
+      "name": "phase3_micronucleus_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 299,
+      "name": "phase3_micronucleus_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 294,
+      "name": "phase3_micronucleus_character_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 305,
+      "name": "phase3_micronucleus4_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 309,
+      "name": "phase3_micronucleus4_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 4,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 304,
+      "name": "phase3_micronucleus3_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 308,
+      "name": "phase3_micronucleus3_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 3,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 303,
+      "name": "phase3_micronucleus2_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 307,
+      "name": "phase3_micronucleus2_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 302,
+      "name": "phase3_micronucleus1_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 306,
+      "name": "phase3_micronucleus1_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 301,
+      "name": "phase3_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 287,
+      "name": "phase3_idle_state_frames_special_move1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 900,
+        "intMax": 900
+      }
+    },
+    {
+      "index": 286,
+      "name": "phase3_idle_state_frames_coop_attack_x5",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 900,
+        "intMax": 900
+      }
+    },
+    {
+      "index": 285,
+      "name": "phase3_idle_state_frames_coop_attack_x4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 900,
+        "intMax": 900
+      }
+    },
+    {
+      "index": 284,
+      "name": "phase3_idle_state_frames_coop_attack_x3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 900,
+        "intMax": 900
+      }
+    },
+    {
+      "index": 283,
+      "name": "phase3_idle_state_frames_coop_attack_x2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 900,
+        "intMax": 900
+      }
+    },
+    {
+      "index": 282,
+      "name": "phase3_idle_state_frames_coop_attack_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 900,
+        "intMax": 900
+      }
+    },
+    {
+      "index": 226,
+      "name": "phase2_idle_state_frames_summon_bits_x3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 223,
+      "name": "phase2_idle_state_frames_summon_bits_x2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 150,
+        "intMax": 150
+      }
+    },
+    {
+      "index": 220,
+      "name": "phase2_idle_state_frames_summon_bits_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 229,
+      "name": "phase2_idle_state_frames_special_move1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 227,
+      "name": "phase2_idle_state_frames_solo_attack_x9",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 150,
+        "intMax": 150
+      }
+    },
+    {
+      "index": 224,
+      "name": "phase2_idle_state_frames_solo_attack_x8",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 150,
+        "intMax": 150
+      }
+    },
+    {
+      "index": 228,
+      "name": "phase2_idle_state_frames_solo_attack_x7",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 225,
+      "name": "phase2_idle_state_frames_solo_attack_x6",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 222,
+      "name": "phase2_idle_state_frames_solo_attack_x4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 221,
+      "name": "phase2_idle_state_frames_solo_attack_x3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 220,
+        "intMax": 220
+      }
+    },
+    {
+      "index": 219,
+      "name": "phase2_idle_state_frames_solo_attack_x2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 140,
+        "intMax": 140
+      }
+    },
+    {
+      "index": 218,
+      "name": "phase2_idle_state_frames_solo_attack_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 268,
+      "name": "phase2_enemy_action_target5",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 265,
+      "name": "phase2_enemy_action_target4",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 266,
+      "name": "phase2_enemy_action_target3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 263,
+      "name": "phase2_enemy_action_target2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 260,
+      "name": "phase2_enemy_action_target1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 270,
+      "name": "phase2_enemy_action_skill1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 269,
+      "name": "phase2_enemy_action_gravity3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 259,
+      "name": "phase2_enemy_action_gravity1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 267,
+      "name": "phase2_enemy_action_funnel3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 264,
+      "name": "phase2_enemy_action_funnel2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 261,
+      "name": "phase2_enemy_action_funnel1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 262,
+      "name": "phase2_enemy_action_attack1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 279,
+      "name": "phase2_cutin_target5",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 276,
+      "name": "phase2_cutin_target4",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 277,
+      "name": "phase2_cutin_target3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 274,
+      "name": "phase2_cutin_target2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 271,
+      "name": "phase2_cutin_target1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 281,
+      "name": "phase2_cutin_skill1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 217,
+      "name": "phase2_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 216,
+      "name": "phase2_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 280,
+      "name": "phase2_cutin_gravity3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 270,
+      "name": "phase2_cutin_gravity1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 278,
+      "name": "phase2_cutin_funnel3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 275,
+      "name": "phase2_cutin_funnel2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 272,
+      "name": "phase2_cutin_funnel1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 273,
+      "name": "phase2_cutin_attack1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 247,
+      "name": "phase2_attack_state_frames_summon_bits_x3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 246,
+      "name": "phase2_attack_state_frames_summon_bits_x3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 80,
+        "intMax": 80
+      }
+    },
+    {
+      "index": 241,
+      "name": "phase2_attack_state_frames_summon_bits_x2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 240,
+      "name": "phase2_attack_state_frames_summon_bits_x2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 235,
+      "name": "phase2_attack_state_frames_summon_bits_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 234,
+      "name": "phase2_attack_state_frames_summon_bits_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 253,
+      "name": "phase2_attack_state_frames_special_move1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 252,
+      "name": "phase2_attack_state_frames_special_move1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 420,
+        "intMax": 420
+      }
+    },
+    {
+      "index": 251,
+      "name": "phase2_attack_state_frames_solo_attack_x9_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 250,
+      "name": "phase2_attack_state_frames_solo_attack_x9_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 243,
+      "name": "phase2_attack_state_frames_solo_attack_x8_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 242,
+      "name": "phase2_attack_state_frames_solo_attack_x8_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 160,
+        "intMax": 160
+      }
+    },
+    {
+      "index": 249,
+      "name": "phase2_attack_state_frames_solo_attack_x7_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 248,
+      "name": "phase2_attack_state_frames_solo_attack_x7_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 245,
+      "name": "phase2_attack_state_frames_solo_attack_x6_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 244,
+      "name": "phase2_attack_state_frames_solo_attack_x6_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 239,
+      "name": "phase2_attack_state_frames_solo_attack_x4_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 238,
+      "name": "phase2_attack_state_frames_solo_attack_x4_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 237,
+      "name": "phase2_attack_state_frames_solo_attack_x3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 236,
+      "name": "phase2_attack_state_frames_solo_attack_x3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 233,
+      "name": "phase2_attack_state_frames_solo_attack_x2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 232,
+      "name": "phase2_attack_state_frames_solo_attack_x2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 231,
+      "name": "phase2_attack_state_frames_solo_attack_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 230,
+      "name": "phase2_attack_state_frames_solo_attack_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 35,
+      "name": "phase2_attack_point_correction_factor",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0.4,
+        "intMax": 0.4
+      }
+    },
+    {
+      "index": 257,
+      "name": "phase2_action_execution_interval_special_move1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 256,
+      "name": "phase2_action_execution_interval_solo_attack_x7",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 255,
+      "name": "phase2_action_execution_interval_solo_attack_x3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 254,
+      "name": "phase2_action_execution_interval_solo_attack_x1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 158,
+      "name": "phase1_teleportation_move_to_y32",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 157,
+      "name": "phase1_teleportation_move_to_y22",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 156,
+      "name": "phase1_teleportation_move_to_y12",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 159,
+      "name": "phase1_teleportation_morph_into_z2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 155,
+      "name": "phase1_teleportation_morph_into_y2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 160,
+      "name": "phase1_teleportation_morph_into_x2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 75,
+      "name": "phase1_normal_state_frames_move_to_y30",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 74,
+      "name": "phase1_normal_state_frames_move_to_y20",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 73,
+      "name": "phase1_normal_state_frames_move_to_y10",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 76,
+      "name": "phase1_normal_state_frames_morph_into_z0",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 72,
+      "name": "phase1_normal_state_frames_morph_into_y0",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 77,
+      "name": "phase1_normal_state_frames_morph_into_x0",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 71,
+      "name": "phase1_normal_state_frames_coop_attack_z1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 70,
+      "name": "phase1_normal_state_frames_coop_attack_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 154,
+      "name": "phase1_movement_speed_move_to_z3",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 153,
+      "name": "phase1_movement_speed_move_to_z2",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 152,
+      "name": "phase1_movement_speed_move_to_z1",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 37,
+      "name": "phase1_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 66,
+      "name": "phase1_idle_state_frames_summon_bits_z3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 63,
+      "name": "phase1_idle_state_frames_summon_bits_z2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 60,
+      "name": "phase1_idle_state_frames_summon_bits_z1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 54,
+      "name": "phase1_idle_state_frames_summon_bits_y3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 51,
+      "name": "phase1_idle_state_frames_summon_bits_y2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 48,
+      "name": "phase1_idle_state_frames_summon_bits_y1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 43,
+      "name": "phase1_idle_state_frames_summon_bits_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 68,
+      "name": "phase1_idle_state_frames_special_move3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 56,
+      "name": "phase1_idle_state_frames_special_move2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 45,
+      "name": "phase1_idle_state_frames_special_move1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 58,
+      "name": "phase1_idle_state_frames_solo_attack_z1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 40,
+      "name": "phase1_idle_state_frames_solo_attack_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 67,
+      "name": "phase1_idle_state_frames_move_to_z3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 64,
+      "name": "phase1_idle_state_frames_move_to_z2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 61,
+      "name": "phase1_idle_state_frames_move_to_z1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 55,
+      "name": "phase1_idle_state_frames_move_to_y30",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 52,
+      "name": "phase1_idle_state_frames_move_to_y20",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 49,
+      "name": "phase1_idle_state_frames_move_to_y10",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 57,
+      "name": "phase1_idle_state_frames_morph_into_z0",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 46,
+      "name": "phase1_idle_state_frames_morph_into_y0",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 69,
+      "name": "phase1_idle_state_frames_morph_into_x0",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 65,
+      "name": "phase1_idle_state_frames_coop_attack_z3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 62,
+      "name": "phase1_idle_state_frames_coop_attack_z2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 59,
+      "name": "phase1_idle_state_frames_coop_attack_z1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 53,
+      "name": "phase1_idle_state_frames_coop_attack_y3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 50,
+      "name": "phase1_idle_state_frames_coop_attack_y2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 47,
+      "name": "phase1_idle_state_frames_coop_attack_y1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 44,
+      "name": "phase1_idle_state_frames_coop_attack_x3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 42,
+      "name": "phase1_idle_state_frames_coop_attack_x2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 41,
+      "name": "phase1_idle_state_frames_coop_attack_x1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 135,
+      "name": "phase1_enemy_action_skill_z1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 130,
+      "name": "phase1_enemy_action_skill_y1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 125,
+      "name": "phase1_enemy_action_skill_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 134,
+      "name": "phase1_enemy_action_funnel_z3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 133,
+      "name": "phase1_enemy_action_funnel_z2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 132,
+      "name": "phase1_enemy_action_funnel_z1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 129,
+      "name": "phase1_enemy_action_funnel_y3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 128,
+      "name": "phase1_enemy_action_funnel_y2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 127,
+      "name": "phase1_enemy_action_funnel_y1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 124,
+      "name": "phase1_enemy_action_funnel_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 131,
+      "name": "phase1_enemy_action_attack_z1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 126,
+      "name": "phase1_enemy_action_attack_y1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 123,
+      "name": "phase1_enemy_action_attack_x2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 122,
+      "name": "phase1_enemy_action_attack_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 151,
+      "name": "phase1_destination_move_to_z3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 150,
+      "name": "phase1_destination_move_to_z2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 149,
+      "name": "phase1_destination_move_to_z1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 148,
+      "name": "phase1_cutin_skill_z1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 143,
+      "name": "phase1_cutin_skill_y1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 138,
+      "name": "phase1_cutin_skill_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 39,
+      "name": "phase1_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": -10,
+        "intMax": -10
+      }
+    },
+    {
+      "index": 38,
+      "name": "phase1_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 162,
+      "name": "phase1_cutin_morph_into_z0",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 161,
+      "name": "phase1_cutin_morph_into_y0",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 163,
+      "name": "phase1_cutin_morph_into_x0",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 147,
+      "name": "phase1_cutin_funnel_z3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 146,
+      "name": "phase1_cutin_funnel_z2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 145,
+      "name": "phase1_cutin_funnel_z1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 142,
+      "name": "phase1_cutin_funnel_y3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 141,
+      "name": "phase1_cutin_funnel_y2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 140,
+      "name": "phase1_cutin_funnel_y1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 137,
+      "name": "phase1_cutin_funnel_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 144,
+      "name": "phase1_cutin_attack_z1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 139,
+      "name": "phase1_cutin_attack_y1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 136,
+      "name": "phase1_cutin_attack_x2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 135,
+      "name": "phase1_cutin_attack_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 166,
+      "name": "phase1_crystal_shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 169,
+      "name": "phase1_crystal_num_wince_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 168,
+      "name": "phase1_crystal_num_stun_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 165,
+      "name": "phase1_crystal_marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 167,
+      "name": "phase1_crystal_level",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 198,
+      "name": "phase1_crystal_enemy_action_skill_z1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 197,
+      "name": "phase1_crystal_enemy_action_skill_y1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 196,
+      "name": "phase1_crystal_enemy_action_skill_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 195,
+      "name": "phase1_crystal_enemy_action_attack_z1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 194,
+      "name": "phase1_crystal_enemy_action_attack_y1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 193,
+      "name": "phase1_crystal_enemy_action_attack_x1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 203,
+      "name": "phase1_crystal_cutin_skill_z1_start",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 202,
+      "name": "phase1_crystal_cutin_skill_y1_start",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 201,
+      "name": "phase1_crystal_cutin_skill_x1_start",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 173,
+      "name": "phase1_crystal_cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 172,
+      "name": "phase1_crystal_cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 200,
+      "name": "phase1_crystal_cutin_attack_z1_start",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 199,
+      "name": "phase1_crystal_cutin_attack_y1_start",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 198,
+      "name": "phase1_crystal_cutin_attack_x1_start",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 164,
+      "name": "phase1_crystal_character_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 185,
+      "name": "phase1_crystal_attack_state_frames_skill_z1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 184,
+      "name": "phase1_crystal_attack_state_frames_skill_z1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 240,
+        "intMax": 240
+      }
+    },
+    {
+      "index": 181,
+      "name": "phase1_crystal_attack_state_frames_skill_y1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 180,
+      "name": "phase1_crystal_attack_state_frames_skill_y1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 240,
+        "intMax": 240
+      }
+    },
+    {
+      "index": 177,
+      "name": "phase1_crystal_attack_state_frames_skill_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 176,
+      "name": "phase1_crystal_attack_state_frames_skill_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 240,
+        "intMax": 240
+      }
+    },
+    {
+      "index": 183,
+      "name": "phase1_crystal_attack_state_frames_attack_z1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 182,
+      "name": "phase1_crystal_attack_state_frames_attack_z1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 179,
+      "name": "phase1_crystal_attack_state_frames_attack_y1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 40,
+        "intMax": 40
+      }
+    },
+    {
+      "index": 178,
+      "name": "phase1_crystal_attack_state_frames_attack_y1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 175,
+      "name": "phase1_crystal_attack_state_frames_attack_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 174,
+      "name": "phase1_crystal_attack_state_frames_attack_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 40,
+        "intMax": 40
+      }
+    },
+    {
+      "index": 191,
+      "name": "phase1_crystal_action_execution_interval_skill_z1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 190,
+      "name": "phase1_crystal_action_execution_interval_skill_y1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 20,
+        "intMax": 20
+      }
+    },
+    {
+      "index": 189,
+      "name": "phase1_crystal_action_execution_interval_skill_x1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 188,
+      "name": "phase1_crystal_action_execution_interval_attack_z1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 187,
+      "name": "phase1_crystal_action_execution_interval_attack_y1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 186,
+      "name": "phase1_crystal_action_execution_interval_attack_x1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 10,
+        "intMax": 10
+      }
+    },
+    {
+      "index": 211,
+      "name": "phase1_crystal2_teleportation_move_to_y31",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 209,
+      "name": "phase1_crystal2_teleportation_move_to_y21",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 207,
+      "name": "phase1_crystal2_teleportation_move_to_y11",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 213,
+      "name": "phase1_crystal2_teleportation_morph_into_z1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 205,
+      "name": "phase1_crystal2_teleportation_morph_into_y1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 215,
+      "name": "phase1_crystal2_teleportation_morph_into_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 171,
+      "name": "phase1_crystal2_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 210,
+      "name": "phase1_crystal1_teleportation_move_to_y31",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 208,
+      "name": "phase1_crystal1_teleportation_move_to_y21",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 206,
+      "name": "phase1_crystal1_teleportation_move_to_y11",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 212,
+      "name": "phase1_crystal1_teleportation_morph_into_z1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 204,
+      "name": "phase1_crystal1_teleportation_morph_into_y1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 214,
+      "name": "phase1_crystal1_teleportation_morph_into_x1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 170,
+      "name": "phase1_crystal1_initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 107,
+      "name": "phase1_attack_state_frames_summon_bits_z3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 70,
+        "intMax": 70
+      }
+    },
+    {
+      "index": 104,
+      "name": "phase1_attack_state_frames_summon_bits_z2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 70,
+        "intMax": 70
+      }
+    },
+    {
+      "index": 101,
+      "name": "phase1_attack_state_frames_summon_bits_z1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 70,
+        "intMax": 70
+      }
+    },
+    {
+      "index": 96,
+      "name": "phase1_attack_state_frames_summon_bits_y3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 70,
+        "intMax": 70
+      }
+    },
+    {
+      "index": 93,
+      "name": "phase1_attack_state_frames_summon_bits_y2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 70,
+        "intMax": 70
+      }
+    },
+    {
+      "index": 90,
+      "name": "phase1_attack_state_frames_summon_bits_y1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 70,
+        "intMax": 70
+      }
+    },
+    {
+      "index": 83,
+      "name": "phase1_attack_state_frames_summon_bits_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 70,
+        "intMax": 70
+      }
+    },
+    {
+      "index": 78,
+      "name": "phase1_attack_state_frames_summon_bits_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 20,
+        "intMax": 20
+      }
+    },
+    {
+      "index": 109,
+      "name": "phase1_attack_state_frames_special_move3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 108,
+      "name": "phase1_attack_state_frames_special_move3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 280,
+        "intMax": 280
+      }
+    },
+    {
+      "index": 98,
+      "name": "phase1_attack_state_frames_special_move2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 97,
+      "name": "phase1_attack_state_frames_special_move2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 280,
+        "intMax": 280
+      }
+    },
+    {
+      "index": 87,
+      "name": "phase1_attack_state_frames_special_move1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 86,
+      "name": "phase1_attack_state_frames_special_move1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 280,
+        "intMax": 280
+      }
+    },
+    {
+      "index": 100,
+      "name": "phase1_attack_state_frames_solo_attack_z1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 99,
+      "name": "phase1_attack_state_frames_solo_attack_z1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 80,
+      "name": "phase1_attack_state_frames_solo_attack_x1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 79,
+      "name": "phase1_attack_state_frames_solo_attack_x1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 106,
+      "name": "phase1_attack_state_frames_coop_attack_z3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 105,
+      "name": "phase1_attack_state_frames_coop_attack_z3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 103,
+      "name": "phase1_attack_state_frames_coop_attack_z2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 102,
+      "name": "phase1_attack_state_frames_coop_attack_z2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 95,
+      "name": "phase1_attack_state_frames_coop_attack_y3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 94,
+      "name": "phase1_attack_state_frames_coop_attack_y3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 92,
+      "name": "phase1_attack_state_frames_coop_attack_y2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 91,
+      "name": "phase1_attack_state_frames_coop_attack_y2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 89,
+      "name": "phase1_attack_state_frames_coop_attack_y1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 88,
+      "name": "phase1_attack_state_frames_coop_attack_y1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 85,
+      "name": "phase1_attack_state_frames_coop_attack_x3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 84,
+      "name": "phase1_attack_state_frames_coop_attack_x3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 90,
+        "intMax": 90
+      }
+    },
+    {
+      "index": 82,
+      "name": "phase1_attack_state_frames_coop_attack_x2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 81,
+      "name": "phase1_attack_state_frames_coop_attack_x2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 34,
+      "name": "phase1_attack_point_correction_factor",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0.2,
+        "intMax": 0.2
+      }
+    },
+    {
+      "index": 120,
+      "name": "phase1_action_execution_interval_special_move3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 116,
+      "name": "phase1_action_execution_interval_special_move2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 15,
+        "intMax": 15
+      }
+    },
+    {
+      "index": 112,
+      "name": "phase1_action_execution_interval_special_move1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 25,
+        "intMax": 25
+      }
+    },
+    {
+      "index": 117,
+      "name": "phase1_action_execution_interval_solo_attack_z1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 110,
+      "name": "phase1_action_execution_interval_solo_attack_x1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 119,
+      "name": "phase1_action_execution_interval_coop_attack_z3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 118,
+      "name": "phase1_action_execution_interval_coop_attack_z2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 115,
+      "name": "phase1_action_execution_interval_coop_attack_y3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 15,
+        "intMax": 15
+      }
+    },
+    {
+      "index": 114,
+      "name": "phase1_action_execution_interval_coop_attack_y2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 25,
+        "intMax": 25
+      }
+    },
+    {
+      "index": 113,
+      "name": "phase1_action_execution_interval_coop_attack_y1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 25,
+        "intMax": 25
+      }
+    },
+    {
+      "index": 111,
+      "name": "phase1_action_execution_interval_coop_attack_x2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 19,
+      "name": "num_wince_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 120,
+        "intMax": 120
+      }
+    },
+    {
+      "index": 18,
+      "name": "num_stun_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 300,
+        "intMax": 300
+      }
+    },
+    {
+      "index": 10,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 8,
+      "name": "marker_set",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 30,
+      "name": "health_point_threshold_phase4",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0.5,
+        "intMax": 0.5
+      }
+    },
+    {
+      "index": 29,
+      "name": "health_point_threshold_phase3",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0.9,
+        "intMax": 0.9
+      }
+    },
+    {
+      "index": 4,
+      "name": "gender",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1
+      }
+    },
+    {
+      "index": 15,
+      "name": "element",
+      "as3Type": "BossElementKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "board_open_condition",
+  "domain": "mana_board",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BoardOpenConditionValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 3
+  },
+  "sources": [
+    {
+      "logicalPath": "master/mana_board/board_open_condition.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "required_over_limit_step",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

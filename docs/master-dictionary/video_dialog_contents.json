@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "table": "video_dialog_contents",
+  "domain": "tutorial",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/VideoDialogContentsValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/tutorial/video_dialog_contents.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/tutorial/video_dialog_contents_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "VideoDialogContentKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "kind",
+      "as3Type": "VideoDialogContentKind",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

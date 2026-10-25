@@ -1,0 +1,456 @@
+{
+  "version": 1,
+  "table": "water_sphere_micronucleus",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/WaterSphereMicronucleusValues.as",
+    "clientMaxColumn": 61,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/water_sphere_micronucleus.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "phase3_micronucleus_num_wince_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "phase3_micronucleus_num_stun_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "phase3_micronucleus_normal_state_frames_inactive",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "phase3_micronucleus_initial_state",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "phase3_micronucleus_idle_state_frames_solo_skill1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "phase3_micronucleus_idle_state_frames_solo_attack3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "phase3_micronucleus_idle_state_frames_solo_attack2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "phase3_micronucleus_idle_state_frames_solo_attack1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 42,
+      "name": "phase3_micronucleus_enemy_action_skill1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 48,
+      "name": "phase3_micronucleus_enemy_action_link_skill1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 47,
+      "name": "phase3_micronucleus_enemy_action_link_attack5",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 46,
+      "name": "phase3_micronucleus_enemy_action_link_attack4",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 45,
+      "name": "phase3_micronucleus_enemy_action_link_attack3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 44,
+      "name": "phase3_micronucleus_enemy_action_link_attack2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 43,
+      "name": "phase3_micronucleus_enemy_action_link_attack1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 41,
+      "name": "phase3_micronucleus_enemy_action_attack3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 40,
+      "name": "phase3_micronucleus_enemy_action_attack2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 39,
+      "name": "phase3_micronucleus_enemy_action_attack1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "phase3_micronucleus_attack_state_frames_solo_skill1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "phase3_micronucleus_attack_state_frames_solo_skill1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "phase3_micronucleus_attack_state_frames_solo_attack3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "phase3_micronucleus_attack_state_frames_solo_attack3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "phase3_micronucleus_attack_state_frames_solo_attack2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "phase3_micronucleus_attack_state_frames_solo_attack2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "phase3_micronucleus_attack_state_frames_solo_attack1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "phase3_micronucleus_attack_state_frames_solo_attack1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "phase3_micronucleus_attack_state_frames_coop_skill1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 26,
+      "name": "phase3_micronucleus_attack_state_frames_coop_skill1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_echo_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 24,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_echo_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 23,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_delta_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_delta_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 21,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_charlie_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 20,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_charlie_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_bravo_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_bravo_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_alpha_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "phase3_micronucleus_attack_state_frames_coop_attack_alpha_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 31,
+      "name": "phase3_micronucleus_action_execution_interval_solo_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 30,
+      "name": "phase3_micronucleus_action_execution_interval_solo_attack3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 29,
+      "name": "phase3_micronucleus_action_execution_interval_solo_attack2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 28,
+      "name": "phase3_micronucleus_action_execution_interval_solo_attack1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 37,
+      "name": "phase3_micronucleus_action_execution_interval_coop_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 36,
+      "name": "phase3_micronucleus_action_execution_interval_coop_attack_echo",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 35,
+      "name": "phase3_micronucleus_action_execution_interval_coop_attack_delta",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 34,
+      "name": "phase3_micronucleus_action_execution_interval_coop_attack_charlie",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 33,
+      "name": "phase3_micronucleus_action_execution_interval_coop_attack_bravo",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 32,
+      "name": "phase3_micronucleus_action_execution_interval_coop_attack_alpha",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 51,
+      "name": "phase3_cutin_skill1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 58,
+      "name": "phase3_cutin_revival",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 57,
+      "name": "phase3_cutin_link_skill1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 56,
+      "name": "phase3_cutin_link_attack5",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 55,
+      "name": "phase3_cutin_link_attack4",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 54,
+      "name": "phase3_cutin_link_attack3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 53,
+      "name": "phase3_cutin_link_attack2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 52,
+      "name": "phase3_cutin_link_attack1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 60,
+      "name": "phase3_cutin_inactive_8s",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 59,
+      "name": "phase3_cutin_inactive_4s",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 61,
+      "name": "phase3_cutin_inactive_12s",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 50,
+      "name": "phase3_cutin_attack3",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 49,
+      "name": "phase3_cutin_attack2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 48,
+      "name": "phase3_cutin_attack1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    }
+  ]
+}

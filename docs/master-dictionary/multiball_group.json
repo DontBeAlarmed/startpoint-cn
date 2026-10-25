@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "multiball_group",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/MultiballGroupValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/multiball/multiball_group.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "multiball_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

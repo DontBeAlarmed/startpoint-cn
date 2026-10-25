@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "table": "atk_correction_curve",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AtkCorrectionCurveValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 45
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/enemy/atk/atk_correction_curve.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/enemy/atk/atk_correction_curve_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "atk_correction_value",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 22,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 3.4848
+      }
+    }
+  ]
+}

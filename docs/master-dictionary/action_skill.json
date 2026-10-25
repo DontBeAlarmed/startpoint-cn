@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "table": "action_skill",
+  "domain": "skill",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ActionSkillValues.as",
+    "clientMaxColumn": 23,
+    "dataRows": 1098
+  },
+  "sources": [
+    {
+      "logicalPath": "master/skill/action_skill.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/skill/action_skill_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "AutoplayAutoInvocationConditionKind",
+    "AutoplayActionSkillAreaShapeKind"
+  ],
+  "columns": [
+    {
+      "index": 4,
+      "name": "unisonable",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 46,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 1600
+      }
+    },
+    {
+      "index": 6,
+      "name": "skill_chain_strength",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 5600
+      }
+    },
+    {
+      "index": 7,
+      "name": "program_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1055,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1040,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 4,
+      "name": "min_skill_weight",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 46,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 1600
+      }
+    },
+    {
+      "index": 5,
+      "name": "max_skill_weight",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 52,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 1600
+      }
+    },
+    {
+      "index": 2,
+      "name": "icon_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 28,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 1,
+      "name": "description",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 560,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 9,
+      "name": "autoplay_auto_invocation_condition_changed_by_skill_flag",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 316,
+        "intMin": 0,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 9,
+      "name": "autoplay_auto_invocation_condition",
+      "as3Type": "AutoplayAutoInvocationConditionKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 316,
+        "intMin": 0,
+        "intMax": 4
+      }
+    }
+  ]
+}

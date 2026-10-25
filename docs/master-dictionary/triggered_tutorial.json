@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "table": "triggered_tutorial",
+  "domain": "tutorial",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TriggeredTutorialValues.as",
+    "clientMaxColumn": 35,
+    "dataRows": 77
+  },
+  "sources": [
+    {
+      "logicalPath": "master/tutorial/triggered_tutorial.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "TriggeredTutorialContentsKind",
+    "TriggeredTutorialTriggerKind",
+    "EventIdKind"
+  ],
+  "columns": [
+    {
+      "index": 16,
+      "name": "trigger_kind",
+      "as3Type": "TriggeredTutorialTriggerKind",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 77
+      }
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 77,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 16,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 77
+      }
+    },
+    {
+      "index": 1,
+      "name": "specific_condition",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 66
+      }
+    },
+    {
+      "index": 16,
+      "name": "show_again",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 77
+      }
+    },
+    {
+      "index": 14,
+      "name": "priority",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 21
+      }
+    },
+    {
+      "index": 13,
+      "name": "multiplied_not_cleared_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 75,
+        "intMin": 1001001,
+        "intMax": 1001002
+      }
+    },
+    {
+      "index": 8,
+      "name": "multiplied_cleared_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 13,
+        "noneOrEmpty": 64,
+        "intMin": 1003,
+        "intMax": 100002001
+      }
+    },
+    {
+      "index": 16,
+      "name": "end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 77
+      }
+    },
+    {
+      "index": 16,
+      "name": "contents_kind",
+      "as3Type": "TriggeredTutorialContentsKind",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 77
+      }
+    },
+    {
+      "index": 3,
+      "name": "condition_other_tutorial_not_yet",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 18,
+        "noneOrEmpty": 49
+      }
+    },
+    {
+      "index": 13,
+      "name": "condition_not_cleared_quest_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 75,
+        "intMin": 1001001,
+        "intMax": 1001002
+      }
+    },
+    {
+      "index": 4,
+      "name": "condition_game_system_unlocked",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 64,
+        "intMin": 0,
+        "intMax": 6
+      }
+    },
+    {
+      "index": 8,
+      "name": "condition_cleared_quest_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 13,
+        "noneOrEmpty": 64,
+        "intMin": 1003,
+        "intMax": 100002001
+      }
+    }
+  ]
+}

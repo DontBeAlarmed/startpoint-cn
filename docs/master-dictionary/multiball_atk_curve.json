@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "table": "multiball_atk_curve",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/MultiballAtkCurveValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 145
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/multiball/multiball_atk_curve.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/multiball/multiball_atk_curve_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "atk_multiplier",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 0.1,
+        "intMax": 6.6
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "table": "ability_soul",
+  "domain": "ability",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AbilitySoulValues.as",
+    "clientMaxColumn": 122,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/ability/ability_soul.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 5,
+      "name": "trigger",
+      "as3Type": "AbilityTriggerMasterValue",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "slot",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "learn_level",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

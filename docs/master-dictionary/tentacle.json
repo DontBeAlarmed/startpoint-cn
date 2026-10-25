@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "table": "tentacle",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TentacleValues.as",
+    "clientMaxColumn": 12,
+    "dataRows": 12
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/funnel/tentacle.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "EnemyElementKind"
+  ],
+  "columns": [
+    {
+      "index": 2,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 11,
+      "name": "resist_element_resistance",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": null,
+      "name": "enhance_toughness",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 12,
+      "name": "enhance_debuff_decreasing_rate",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 8,
+      "name": "element",
+      "as3Type": "EnemyElementKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

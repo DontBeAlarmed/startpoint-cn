@@ -1,0 +1,306 @@
+{
+  "version": 1,
+  "table": "zone",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ZoneValues.as",
+    "clientMaxColumn": 40,
+    "dataRows": 1326
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/zone.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/zone_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "BossKind"
+  ],
+  "columns": [
+    {
+      "index": 22,
+      "name": "zako10",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 20,
+      "name": "zako09",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1326
+      }
+    },
+    {
+      "index": 18,
+      "name": "zako08",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 1326
+      }
+    },
+    {
+      "index": 16,
+      "name": "zako07",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 10,
+        "noneOrEmpty": 1275
+      }
+    },
+    {
+      "index": 14,
+      "name": "zako06",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1324
+      }
+    },
+    {
+      "index": 12,
+      "name": "zako05",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1321
+      }
+    },
+    {
+      "index": 10,
+      "name": "zako04",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 11,
+        "noneOrEmpty": 1295
+      }
+    },
+    {
+      "index": 8,
+      "name": "zako03",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 28,
+        "noneOrEmpty": 1148
+      }
+    },
+    {
+      "index": 6,
+      "name": "zako02",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 16,
+        "noneOrEmpty": 1297
+      }
+    },
+    {
+      "index": 4,
+      "name": "zako01",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 42,
+        "noneOrEmpty": 1183
+      }
+    },
+    {
+      "index": 37,
+      "name": "rotation_panel_animation",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 154,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 32,
+      "name": "outhole_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1322
+      }
+    },
+    {
+      "index": 2,
+      "name": "objective",
+      "as3Type": "ZoneObjective",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 61,
+        "noneOrEmpty": 966
+      }
+    },
+    {
+      "index": 38,
+      "name": "instant_item_odds_zako_and_funnel",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1325
+      }
+    },
+    {
+      "index": 40,
+      "name": "instant_item_odds_breakable_decoration",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 18,
+        "noneOrEmpty": 296
+      }
+    },
+    {
+      "index": 39,
+      "name": "instant_item_odds_breakable_block",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 12,
+        "noneOrEmpty": 412
+      }
+    },
+    {
+      "index": 34,
+      "name": "dash_panel_directory",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 1322
+      }
+    },
+    {
+      "index": 22,
+      "name": "boss_group_kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 35,
+      "name": "boss3_multi",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 210,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 33,
+      "name": "boss3",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1322,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 31,
+      "name": "boss2_multi",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 1322,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 29,
+      "name": "boss2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1289,
+        "intMin": 0,
+        "intMax": 8
+      }
+    },
+    {
+      "index": 27,
+      "name": "boss1_multi",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 1289,
+        "intMin": 0,
+        "intMax": 8
+      }
+    },
+    {
+      "index": 25,
+      "name": "boss1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 14,
+        "noneOrEmpty": 465,
+        "intMin": 0,
+        "intMax": 13
+      }
+    }
+  ]
+}

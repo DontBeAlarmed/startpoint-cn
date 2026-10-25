@@ -1,0 +1,995 @@
+{
+  "version": 1,
+  "table": "thunder_sphere_micronucleus",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ThunderSphereMicronucleusValues.as",
+    "clientMaxColumn": 138,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/boss/thunder_sphere_micronucleus.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 4,
+      "name": "super_fore_character_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "speciality_type",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 32,
+      "name": "phase2_normal_state_frames_move2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 30,
+      "name": "phase2_normal_state_frames_move1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 33,
+      "name": "phase2_normal_state_frames_link_move2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 31,
+      "name": "phase2_normal_state_frames_link_move1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 34,
+      "name": "phase2_normal_state_frames_dead2_4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 29,
+      "name": "phase2_normal_state_frames_awakening5",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 35,
+      "name": "phase2_normal_state_frames_alive4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 136,
+      "name": "phase2_movement_speed_skill2",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 131,
+      "name": "phase2_movement_speed_skill1",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 135,
+      "name": "phase2_movement_speed_move_attack2_2",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 134,
+      "name": "phase2_movement_speed_move_attack2_1",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 130,
+      "name": "phase2_movement_speed_move_attack1_2",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 129,
+      "name": "phase2_movement_speed_move_attack1_1",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 137,
+      "name": "phase2_movement_speed_move2",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 132,
+      "name": "phase2_movement_speed_move1",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 138,
+      "name": "phase2_movement_speed_link_move2",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 133,
+      "name": "phase2_movement_speed_link_move1",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 26,
+      "name": "phase2_idle_state_frames_summon_bits2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "phase2_idle_state_frames_summon_bits1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "phase2_idle_state_frames_solo_attack4",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "phase2_idle_state_frames_solo_attack3",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 28,
+      "name": "phase2_idle_state_frames_solo_attack2_2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "phase2_idle_state_frames_solo_attack2_1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "phase2_idle_state_frames_solo_attack2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "phase2_idle_state_frames_solo_attack1_2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "phase2_idle_state_frames_solo_attack1_1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "phase2_idle_state_frames_solo_attack1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "phase2_idle_state_frames_skill2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "phase2_idle_state_frames_skill1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "phase2_idle_state_frames_skill",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 24,
+      "name": "phase2_idle_state_frames_move_attack2_2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 23,
+      "name": "phase2_idle_state_frames_move_attack2_1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 21,
+      "name": "phase2_idle_state_frames_move_attack1_2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 20,
+      "name": "phase2_idle_state_frames_move_attack1_1",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 99,
+      "name": "phase2_enemy_action_summon_bits2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 92,
+      "name": "phase2_enemy_action_summon_bits1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 88,
+      "name": "phase2_enemy_action_solo_attack4",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 87,
+      "name": "phase2_enemy_action_solo_attack3",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 101,
+      "name": "phase2_enemy_action_solo_attack2_2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 100,
+      "name": "phase2_enemy_action_solo_attack2_1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 86,
+      "name": "phase2_enemy_action_solo_attack2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 91,
+      "name": "phase2_enemy_action_solo_attack1_2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 90,
+      "name": "phase2_enemy_action_solo_attack1_1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 85,
+      "name": "phase2_enemy_action_solo_attack1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 98,
+      "name": "phase2_enemy_action_skill2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 95,
+      "name": "phase2_enemy_action_skill1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 89,
+      "name": "phase2_enemy_action_skill",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 97,
+      "name": "phase2_enemy_action_move_attack2_2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 96,
+      "name": "phase2_enemy_action_move_attack2_1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 94,
+      "name": "phase2_enemy_action_move_attack1_2",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 93,
+      "name": "phase2_enemy_action_move_attack1_1",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 84,
+      "name": "phase2_enemy_action_awakening5",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 126,
+      "name": "phase2_destination_skill2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 121,
+      "name": "phase2_destination_skill1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 125,
+      "name": "phase2_destination_move_attack2_2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 124,
+      "name": "phase2_destination_move_attack2_1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 120,
+      "name": "phase2_destination_move_attack1_2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 119,
+      "name": "phase2_destination_move_attack1_1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 127,
+      "name": "phase2_destination_move2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 122,
+      "name": "phase2_destination_move1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 128,
+      "name": "phase2_destination_link_move2",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 123,
+      "name": "phase2_destination_link_move1",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 116,
+      "name": "phase2_cutin_summon_bits2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 109,
+      "name": "phase2_cutin_summon_bits1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 105,
+      "name": "phase2_cutin_solo_attack4",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 104,
+      "name": "phase2_cutin_solo_attack3",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 118,
+      "name": "phase2_cutin_solo_attack2_2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 117,
+      "name": "phase2_cutin_solo_attack2_1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 103,
+      "name": "phase2_cutin_solo_attack2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 108,
+      "name": "phase2_cutin_solo_attack1_2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 107,
+      "name": "phase2_cutin_solo_attack1_1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 102,
+      "name": "phase2_cutin_solo_attack1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 115,
+      "name": "phase2_cutin_skill2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 112,
+      "name": "phase2_cutin_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 106,
+      "name": "phase2_cutin_skill",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 114,
+      "name": "phase2_cutin_move_attack2_2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 113,
+      "name": "phase2_cutin_move_attack2_1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 111,
+      "name": "phase2_cutin_move_attack1_2",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 110,
+      "name": "phase2_cutin_move_attack1_1",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 101,
+      "name": "phase2_cutin_awakening5",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 65,
+      "name": "phase2_attack_state_frames_summon_bits2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 64,
+      "name": "phase2_attack_state_frames_summon_bits2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 51,
+      "name": "phase2_attack_state_frames_summon_bits1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 50,
+      "name": "phase2_attack_state_frames_summon_bits1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 43,
+      "name": "phase2_attack_state_frames_solo_attack4_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 42,
+      "name": "phase2_attack_state_frames_solo_attack4_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 41,
+      "name": "phase2_attack_state_frames_solo_attack3_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 40,
+      "name": "phase2_attack_state_frames_solo_attack3_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 39,
+      "name": "phase2_attack_state_frames_solo_attack2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 38,
+      "name": "phase2_attack_state_frames_solo_attack2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 69,
+      "name": "phase2_attack_state_frames_solo_attack2_2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 68,
+      "name": "phase2_attack_state_frames_solo_attack2_2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 67,
+      "name": "phase2_attack_state_frames_solo_attack2_1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 66,
+      "name": "phase2_attack_state_frames_solo_attack2_1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 37,
+      "name": "phase2_attack_state_frames_solo_attack1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 36,
+      "name": "phase2_attack_state_frames_solo_attack1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 49,
+      "name": "phase2_attack_state_frames_solo_attack1_2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 48,
+      "name": "phase2_attack_state_frames_solo_attack1_2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 47,
+      "name": "phase2_attack_state_frames_solo_attack1_1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 46,
+      "name": "phase2_attack_state_frames_solo_attack1_1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 45,
+      "name": "phase2_attack_state_frames_skill_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 44,
+      "name": "phase2_attack_state_frames_skill_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 63,
+      "name": "phase2_attack_state_frames_skill2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 62,
+      "name": "phase2_attack_state_frames_skill2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 57,
+      "name": "phase2_attack_state_frames_skill1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 56,
+      "name": "phase2_attack_state_frames_skill1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 61,
+      "name": "phase2_attack_state_frames_move_attack2_2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 60,
+      "name": "phase2_attack_state_frames_move_attack2_2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 59,
+      "name": "phase2_attack_state_frames_move_attack2_1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 58,
+      "name": "phase2_attack_state_frames_move_attack2_1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 55,
+      "name": "phase2_attack_state_frames_move_attack1_2_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 54,
+      "name": "phase2_attack_state_frames_move_attack1_2_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 53,
+      "name": "phase2_attack_state_frames_move_attack1_1_fire2",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 52,
+      "name": "phase2_attack_state_frames_move_attack1_1_charge",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 73,
+      "name": "phase2_action_execution_interval_solo_attack4",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 72,
+      "name": "phase2_action_execution_interval_solo_attack3",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 82,
+      "name": "phase2_action_execution_interval_solo_attack2_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 81,
+      "name": "phase2_action_execution_interval_solo_attack2_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 71,
+      "name": "phase2_action_execution_interval_solo_attack2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 76,
+      "name": "phase2_action_execution_interval_solo_attack1_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 75,
+      "name": "phase2_action_execution_interval_solo_attack1_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 70,
+      "name": "phase2_action_execution_interval_solo_attack1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 80,
+      "name": "phase2_action_execution_interval_skill2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 78,
+      "name": "phase2_action_execution_interval_skill1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 74,
+      "name": "phase2_action_execution_interval_skill",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 79,
+      "name": "phase2_action_execution_interval_move_attack2_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 77,
+      "name": "phase2_action_execution_interval_move_attack1_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "num_wince_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "num_stun_state_frames",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "marker_set",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "level",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "initial_position",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "cutin_offset_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "cutin_offset_x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "character_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

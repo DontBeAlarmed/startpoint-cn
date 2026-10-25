@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "table": "start_tutorial_shortened_step",
+  "domain": "tutorial",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/StartTutorialShortenedStepValues.as",
+    "clientMaxColumn": 6,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/tutorial/start_tutorial_shortened_step.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    },
+    {
+      "logicalPath": "master/tutorial/start_tutorial_shortened_step_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "StartTutorialStepKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "player",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "kind",
+      "as3Type": "StartTutorialStepKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

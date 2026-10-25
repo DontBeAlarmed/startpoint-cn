@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "table": "zako_level",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ZakoLevelValues.as",
+    "clientMaxColumn": 12,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/zako/zako_level.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/zako/zako_level_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "EnemyHpCurveKind"
+  ],
+  "columns": [
+    {
+      "index": 12,
+      "name": "tp_basic_value",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "tp_basic_curve_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "hp_curve",
+      "as3Type": "EnemyHpCurveKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "atk_num_hits",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "atk_correction_value",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "atk_correction_curve_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "atk_basic_curve_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

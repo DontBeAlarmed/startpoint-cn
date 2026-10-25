@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "table": "character_level",
+  "domain": "character",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterLevelValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 200
+  },
+  "sources": [
+    {
+      "logicalPath": "master/character/character_level.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/character/character_level_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/character-mana-admission.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/character-growth-content.ts"
+    ]
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "total_experience",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

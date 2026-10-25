@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "table": "ability_default_statue_group",
+  "domain": "ability",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AbilityDefaultStatueGroupValues.as",
+    "clientMaxColumn": 6,
+    "dataRows": 1140
+  },
+  "sources": [
+    {
+      "logicalPath": "master/ability/ability_default_statue_group.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 3,
+      "name": "yellow_statue_group",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 808
+      }
+    },
+    {
+      "index": 5,
+      "name": "white_statue_group",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 808
+      }
+    },
+    {
+      "index": 1,
+      "name": "red_statue_group",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 808
+      }
+    },
+    {
+      "index": 4,
+      "name": "green_statue_group",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 808
+      }
+    },
+    {
+      "index": 2,
+      "name": "blue_statue_group",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 808
+      }
+    },
+    {
+      "index": 6,
+      "name": "black_statue_group",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 808
+      }
+    },
+    {
+      "index": 0,
+      "name": "base_statue_group",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 20,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

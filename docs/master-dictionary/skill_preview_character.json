@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "table": "skill_preview_character",
+  "domain": "skill_preview",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/SkillPreviewCharacterValues.as",
+    "clientMaxColumn": 8,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/skill_preview/skill_preview_character.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 6,
+      "name": "log",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "clip",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "character_info_quest_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "character_info_enables_powerflip",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "character_info_enables_ability",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "character_detail_quest_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "character_detail_enables_powerflip",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "character_detail_enables_ability",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

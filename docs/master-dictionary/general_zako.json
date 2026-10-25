@@ -1,0 +1,365 @@
+{
+  "version": 1,
+  "table": "general_zako",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GeneralZakoValues.as",
+    "clientMaxColumn": 40,
+    "dataRows": 122
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/zako/general_zako.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/zako/general_zako_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "EnemyElementKind"
+  ],
+  "columns": [
+    {
+      "index": 29,
+      "name": "suppress_vanish_sweat_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 28,
+      "name": "suppress_vanish_sound_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 30,
+      "name": "suppress_disappear_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 88,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 27,
+      "name": "suppress_blown_off_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 26,
+      "name": "suppress_bent_effect",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 24,
+      "name": "subroutine_change4",
+      "as3Type": "Option",
+      "parseRule": "option-float",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 22,
+      "name": "subroutine_change3",
+      "as3Type": "Option",
+      "parseRule": "option-float",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 20,
+      "name": "subroutine_change2",
+      "as3Type": "Option",
+      "parseRule": "option-float",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 4,
+      "name": "shadow_animation_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 75,
+        "noneOrEmpty": 22
+      }
+    },
+    {
+      "index": 17,
+      "name": "routine_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 9,
+      "name": "race",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 3,
+      "name": "marker_timeline_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 74,
+        "noneOrEmpty": 22
+      }
+    },
+    {
+      "index": 18,
+      "name": "initial_state_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 16,
+      "name": "initial_position_name",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 15,
+      "name": "hit_count_check_fore_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 7,
+      "name": "hit_count_check_back_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 75,
+        "noneOrEmpty": 22
+      }
+    },
+    {
+      "index": 2,
+      "name": "gender",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 75,
+        "noneOrEmpty": 22
+      }
+    },
+    {
+      "index": 40,
+      "name": "enemy_action110",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 39,
+      "name": "enemy_action109",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 38,
+      "name": "enemy_action108",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 37,
+      "name": "enemy_action107",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 36,
+      "name": "enemy_action106",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 35,
+      "name": "enemy_action105",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 34,
+      "name": "enemy_action104",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 122
+      }
+    },
+    {
+      "index": 33,
+      "name": "enemy_action103",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 121
+      }
+    },
+    {
+      "index": 32,
+      "name": "enemy_action102",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 121
+      }
+    },
+    {
+      "index": 31,
+      "name": "enemy_action101",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 113
+      }
+    },
+    {
+      "index": 8,
+      "name": "element",
+      "as3Type": "EnemyElementKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 15,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 6,
+      "name": "damage_check_fore_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 75,
+        "noneOrEmpty": 22
+      }
+    },
+    {
+      "index": 5,
+      "name": "damage_check_back_animation_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 74,
+        "noneOrEmpty": 22
+      }
+    },
+    {
+      "index": null,
+      "name": "ability_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "enemy_ability",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/EnemyAbilityValues.as",
+    "clientMaxColumn": 21,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/enemy/ability/enemy_ability.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 16,
+      "name": "trigger",
+      "as3Type": "EnemyAbilityTriggerMasterValue",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "table": "character_speech",
+  "domain": "character",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterSpeechValues.as",
+    "clientMaxColumn": 4,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/character/character_speech.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "CharacterSpeechKind"
+  ],
+  "columns": [
+    {
+      "index": 0,
+      "name": "voice_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "speech",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "kind",
+      "as3Type": "CharacterSpeechKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

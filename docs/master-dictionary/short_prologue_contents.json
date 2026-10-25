@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "table": "short_prologue_contents",
+  "domain": "tutorial",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ShortPrologueContentsValues.as",
+    "clientMaxColumn": 2,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/tutorial/short_prologue_contents.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    },
+    {
+      "logicalPath": "master/tutorial/short_prologue_contents_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "ShortPrologueContentKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "kind",
+      "as3Type": "ShortPrologueContentKind",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

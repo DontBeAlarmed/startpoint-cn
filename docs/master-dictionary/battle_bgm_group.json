@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "table": "battle_bgm_group",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BattleBgmGroupValues.as",
+    "clientMaxColumn": 4,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/asset/battle_bgm_group.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/asset/battle_bgm_group_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "BattleBgmGroupKind"
+  ],
+  "columns": [
+    {
+      "index": 2,
+      "name": "kind",
+      "as3Type": "BattleBgmGroupKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

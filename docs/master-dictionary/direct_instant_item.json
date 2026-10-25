@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "table": "direct_instant_item",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/DirectInstantItemValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/yakumono/direct_instant_item.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "DirectInstantItemKind"
+  ],
+  "columns": [
+    {
+      "index": 1,
+      "name": "direct_instant_item",
+      "as3Type": "DirectInstantItemKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

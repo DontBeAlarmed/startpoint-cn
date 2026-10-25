@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "table": "hit_hp_correction_curve",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/HitHpCorrectionCurveValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 33
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/enemy/hp/hit_hp_correction_curve.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    },
+    {
+      "logicalPath": "master/battle/enemy/hp/hit_hp_correction_curve_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "hp_correction_value",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 29,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 78.271875
+      }
+    }
+  ]
+}

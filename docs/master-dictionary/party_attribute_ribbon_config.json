@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "table": "party_attribute_ribbon_config",
+  "domain": "character",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PartyAttributeRibbonConfigValues.as",
+    "clientMaxColumn": 6,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/character/party_attribute_ribbon_config.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 3,
+      "name": "score",
+      "as3Type": "Object",
+      "parseRule": "float",
+      "status": "client-only"
+    }
+  ]
+}

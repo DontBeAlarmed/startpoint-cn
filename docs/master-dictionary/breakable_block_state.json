@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "table": "breakable_block_state",
+  "domain": "battle",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BreakableBlockStateValues.as",
+    "clientMaxColumn": 52,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/battle/yakumono/breakable_block_state.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "TrialKind",
+    "GeneralEnemyForceChangeStateKind",
+    "GeneralEnemyMovementKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "state",
+      "as3Type": "Object",
+      "parseRule": "enum-ref-or-composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}
