@@ -142,7 +142,8 @@ test("single mail owner callback performs no player SELECT or transaction statem
         ))
     })()
 
-    assertOwnerSql(measured.statements)
+    // R-G01：persist 单点收口新增一次钱包权威读（free_mana/paid_mana）
+    assertOwnerSql(measured.statements, 1)
     assert.equal(
         measured.statements.some(statement => /^\s*UPDATE\s+players\s+SET\s+vmoney\b/i.test(statement)),
         false,
@@ -192,7 +193,7 @@ test("batch mail owner callback uses one snapshot and projects final mixed state
         ))
     })()
 
-    assertOwnerSql(measured.statements)
+    assertOwnerSql(measured.statements, 1)
     assert.deepEqual(measured.result.userInfo, {
         free_vmoney: player.freeVmoney + 3,
         free_mana: player.freeMana + 5,

@@ -218,10 +218,17 @@ const routes = async (fastify: FastifyInstance) => {
                     data: {},
                 })
             }
-            if (error instanceof MailRewardCapacityError) return reply.status(400).send({
-                error: "Mail reward cannot fit",
-                message: error.message,
-            })
+            // R-G03：超容单领走带内结果码（200+result_code），不走 HTTP 400——
+            // 客户端把任何 4xx 渲染成 H400 意外错误踢回登录；200+非白名单
+            // result_code（2005）在客户端是静默无操作：邮件保留、留在列表页，
+            // 领取意图的提示由客户端自身的 canBeReceived 预检承担。
+            if (error instanceof MailRewardCapacityError) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    data_headers: generateDataHeaders({ viewer_id: body.viewer_id, result_code: 2005 }),
+                    data: {},
+                })
+            }
             const unsupported = unsupportedMailReply(reply, error)
             if (unsupported !== null) return unsupported
             throw error

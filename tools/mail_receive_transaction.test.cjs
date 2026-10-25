@@ -108,6 +108,11 @@ function decode(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
 
+function decodeResultCode(response) {
+    const unpack = require("msgpackr").unpack
+    return unpack(Buffer.from(response.body, "base64")).data_headers.result_code
+}
+
 function mailState(mailId) {
     return database.prepare("SELECT receive_time FROM players_mails WHERE id = ?").get(mailId)?.receive_time ?? null
 }
@@ -211,7 +216,9 @@ test("single receive keeps an Item mail when the Inventory is full", async () =>
         url: "/receive",
         payload: { viewer_id: viewerId, mail_id: mailId },
     })
-    assert.equal(response.statusCode, 400, response.body)
+    // R-G03：超容单领走带内结果码 2005（客户端静默不领取、邮件保留），不再 400 踢登录
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(decodeResultCode(response), 2005)
     assert.equal(getPlayerItemSync(playerId, itemId), policy.maxCount(itemId))
     assert.equal(mailState(mailId), "0000-00-00 00:00:00")
     assert.equal(receiveHistoryCount(playerId), 0)
@@ -314,7 +321,9 @@ test("single receive keeps a FREE_MANA mail when total Mana is full", async () =
         url: "/receive",
         payload: { viewer_id: viewerId, mail_id: mailId },
     })
-    assert.equal(response.statusCode, 400, response.body)
+    // R-G03：同上——带内 2005，邮件保留
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(decodeResultCode(response), 2005)
     assert.equal(mailState(mailId), "0000-00-00 00:00:00")
     assert.equal(receiveHistoryCount(playerId), 0)
 })
@@ -366,7 +375,9 @@ test("expired EventTrade mail remains when its sale Mana cannot fit", async () =
         url: "/receive",
         payload: { viewer_id: viewerId, mail_id: mailId },
     })
-    assert.equal(response.statusCode, 400, response.body)
+    // R-G03：过期转玛纳超容同样走带内 2005，邮件保留
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(decodeResultCode(response), 2005)
     assert.equal(mailState(mailId), "0000-00-00 00:00:00")
     assert.equal(receiveHistoryCount(playerId), 0)
 })
