@@ -101,6 +101,71 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     // Returns the player's last login region (CN-specific)
+    fastify.post("/get_profile", async (request: FastifyRequest, reply: FastifyReply) => {
+        // 关注界面查看他人信息卡片（follow 列表刷新/添加后退出均触发）。
+        // 客户端强校验 target_user_info 全字段与 favorite_character 形状
+        //（ProfileGetProfileRealRemote：favorite_character 允许空数组）。
+        const body = request.body as any
+        const viewerId = body.viewer_id
+        const targetViewerId = Number(body.target_viewer_id)
+        if (!viewerId || isNaN(viewerId) || !Number.isSafeInteger(targetViewerId) || targetViewerId <= 0) {
+            return reply.status(400).send({
+                error: "Bad Request",
+                message: "Invalid request body."
+            })
+        }
+        const session = await getSession(viewerId.toString())
+        if (!session) return reply.status(400).send({
+            error: "Bad Request",
+            message: "Invalid viewer id."
+        })
+        const targetAccountId = await getSession(String(targetViewerId))
+            .then(s => s?.accountId ?? null)
+            .catch(() => null)
+        const targetPlayerId = targetAccountId === null ? null : resolvePlayerIdSync(targetAccountId)
+        const target = targetPlayerId === null ? null : getPlayerSync(targetPlayerId)
+        if (target === null || targetPlayerId === null) {
+            // 未知目标：空档案（客户端按 not-found 处理卡片）而非 404 踢登录
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                data: { favorite_character: [] },
+            })
+        }
+        const characters = getPlayerCharactersSync(targetPlayerId)
+        const charCount = Object.keys(characters).length
+        const degreeCount = getOwnedPlayerDegreeIdsSync(targetPlayerId, target.degreeId).length
+        const profileStats = getPlayerProfileStatsSync(characters)
+        const { getLocalFollowRelationSync } = require("../../data/domains/follow") as typeof import("../../data/domains/follow")
+        const requesterPlayerId = resolvePlayerIdSync(session.accountId)
+        const relation = requesterPlayerId === null
+            ? null
+            : getLocalFollowRelationSync(requesterPlayerId, targetPlayerId)
+        // LocalFollowState 数值即客户端 follow_state（F0 冻结：1=互关 2=我关注 3=被关注）
+        const followState = relation?.state ?? 0
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            data_headers: generateDataHeaders({ viewer_id: viewerId }),
+            data: {
+                favorite_character: [],
+                target_user_info: {
+                    comment: target.comment ?? "",
+                    degree_id: target.degreeId || 1,
+                    follow_state: followState,
+                    last_login_region: null,
+                    leader_character_full_shot_evolution_level: 0,
+                    max_opened_mana_board_second_count: profileStats.maxOpenedManaBoardSecondCount,
+                    max_owned_character_count: profileStats.maxOwnedCharacterCount,
+                    max_owned_degree_count: profileStats.maxOwnedDegreeCount,
+                    name: target.name,
+                    opened_mana_board_second_count: profileStats.openedManaBoardSecondCount,
+                    owned_character_count: charCount,
+                    owned_degree_count: degreeCount,
+                },
+            },
+        })
+    })
+
     fastify.post("/get_last_login_region", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as any
         const viewerId = body.viewer_id
