@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "table": "ranking_event_ranking_reward",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RankingEventRankingRewardValues.as",
+    "clientMaxColumn": 32,
+    "dataRows": 63
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/ranking_event_ranking_reward.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/reward.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/ranking-reward.ts"
+    ]
+  },
+  "enumRefs": [
+    "GeneralRewardKind"
+  ],
+  "columns": [
+    {
+      "index": 29,
+      "name": "reward9_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 29,
+      "name": "reward9_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 26,
+      "name": "reward8_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 26,
+      "name": "reward8_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 23,
+      "name": "reward7_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 23,
+      "name": "reward7_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 20,
+      "name": "reward6_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 20,
+      "name": "reward6_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 17,
+      "name": "reward5_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 55,
+        "intMin": 1,
+        "intMax": 7
+      }
+    },
+    {
+      "index": 17,
+      "name": "reward5_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 55,
+        "intMin": 1,
+        "intMax": 7
+      }
+    },
+    {
+      "index": 14,
+      "name": "reward4_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 28,
+        "intMin": 1,
+        "intMax": 7
+      }
+    },
+    {
+      "index": 14,
+      "name": "reward4_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 28,
+        "intMin": 1,
+        "intMax": 7
+      }
+    },
+    {
+      "index": 11,
+      "name": "reward3_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 54,
+        "intMin": 150,
+        "intMax": 1500
+      }
+    },
+    {
+      "index": 11,
+      "name": "reward3_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 54,
+        "intMin": 150,
+        "intMax": 1500
+      }
+    },
+    {
+      "index": 8,
+      "name": "reward2_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 54,
+        "intMin": 5,
+        "intMax": 50
+      }
+    },
+    {
+      "index": 8,
+      "name": "reward2_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 54,
+        "intMin": 5,
+        "intMax": 50
+      }
+    },
+    {
+      "index": 5,
+      "name": "reward1_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 27,
+        "intMin": 1,
+        "intMax": 20000
+      }
+    },
+    {
+      "index": 5,
+      "name": "reward1_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 27,
+        "intMin": 1,
+        "intMax": 20000
+      }
+    },
+    {
+      "index": 32,
+      "name": "reward10_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 32,
+      "name": "reward10_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 63
+      }
+    },
+    {
+      "index": 2,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used",
+      "sample": {
+        "distinctCount": 45,
+        "noneOrEmpty": 0,
+        "intMin": 10001,
+        "intMax": 10046
+      }
+    },
+    {
+      "index": 1,
+      "name": "rank_border",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "server-used",
+      "sample": {
+        "distinctCount": 12,
+        "noneOrEmpty": 0,
+        "intMin": 0.03,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 0,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used",
+      "sample": {
+        "distinctCount": 63,
+        "noneOrEmpty": 0,
+        "intMin": 101,
+        "intMax": 100109
+      }
+    }
+  ]
+}

@@ -1,0 +1,398 @@
+{
+  "version": 1,
+  "table": "ranking_event_single_quest",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RankingEventSingleQuestValues.as",
+    "clientMaxColumn": 108,
+    "dataRows": 7
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/ranking_event_single_quest.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/quest.ts",
+      "src/content/runtime/multi-battle-digest.ts",
+      "src/lib/mission/event-battle-facts.ts",
+      "src/lib/mission/event-rule-catalog.ts",
+      "src/lib/quest-content.ts"
+    ]
+  },
+  "enumRefs": [
+    "RankingPhaseQuestKind"
+  ],
+  "columns": [
+    {
+      "index": 16,
+      "name": "viewable_need_quest_2_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 16,
+      "name": "viewable_need_quest_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 11,
+      "name": "viewable_need_quest_1_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 11,
+      "name": "viewable_need_quest_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 18,
+      "name": "viewable_need_character_quest_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 17,
+      "name": "viewable_need_character_quest_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 20,
+      "name": "viewable_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 3,
+      "name": "thumbnail_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 1,
+      "name": "sub_name",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 6,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 46,
+      "name": "selectable_player_rank",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 33,
+      "name": "selectable_need_quest_set",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 43,
+      "name": "selectable_need_quest_2_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 43,
+      "name": "selectable_need_quest_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 38,
+      "name": "selectable_need_quest_1_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 38,
+      "name": "selectable_need_quest_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 45,
+      "name": "selectable_need_character_quest_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 44,
+      "name": "selectable_need_character_quest_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 50,
+      "name": "selectable_episode_node_counts",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 49,
+      "name": "selectable_episode_node_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 48,
+      "name": "selectable_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 33,
+      "name": "prevent_spoiler",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 29,
+      "name": "no_warning_spoiler_need_quest_2_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 29,
+      "name": "no_warning_spoiler_need_quest_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 24,
+      "name": "no_warning_spoiler_need_quest_1_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 24,
+      "name": "no_warning_spoiler_need_quest_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 31,
+      "name": "no_warning_spoiler_need_character_quest_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 30,
+      "name": "no_warning_spoiler_need_character_quest_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 2,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "server-used",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 0,
+        "intMin": 1001,
+        "intMax": 1001001
+      }
+    },
+    {
+      "index": 51,
+      "name": "kind",
+      "as3Type": "RankingPhaseQuestKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 4,
+      "name": "first_time_clear_reward_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    },
+    {
+      "index": 7,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 7
+      }
+    }
+  ]
+}

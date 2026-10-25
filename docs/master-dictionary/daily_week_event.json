@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "table": "daily_week_event",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/DailyWeekEventValues.as",
+    "clientMaxColumn": 18,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/daily_week_event.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "playable_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "open_day",
+      "as3Type": "Object",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "list_banner_path",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "how_to_play_content_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "header_mini_banner_path",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "header_background_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "flash_frame_reference",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "exchangeable_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 7,
+      "name": "boost_point_increase_rate",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "banner_schedule",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

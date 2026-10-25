@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "table": "advice_text_quest_group",
+  "domain": "tips",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AdviceTextQuestGroupValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/tips/advice_text_quest_group.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "AdviceTextQuestPlayKind",
+    "QuestRangeReferenceIdKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "quest",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 2,
+      "name": "play_kind",
+      "as3Type": "AdviceTextQuestPlayKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "group_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

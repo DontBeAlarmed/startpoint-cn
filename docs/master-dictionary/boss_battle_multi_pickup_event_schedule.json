@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "table": "boss_battle_multi_pickup_event_schedule",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BossBattleMultiPickupEventScheduleValues.as",
+    "clientMaxColumn": 7,
+    "dataRows": 594
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/boss_battle/boss_battle_multi_pickup_event_schedule.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "stage_node_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 26,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 34
+      }
+    },
+    {
+      "index": 7,
+      "name": "pickup_start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 311,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": null,
+      "name": "pickup_end_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 5,
+      "name": "flash_frame_reference",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 0,
+      "name": "chapter_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 4,
+      "name": "boss_battle_additional_score_reward",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 594
+      }
+    },
+    {
+      "index": 2,
+      "name": "background_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 26,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

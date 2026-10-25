@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "table": "rush_event_ranking_aggregation_schedule",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RushEventRankingAggregationScheduleValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": 3
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/rush_event_ranking_aggregation_schedule.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "table": "tips_loading_transition",
+  "domain": "config",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/TipsLoadingTransitionValues.as",
+    "clientMaxColumn": -1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/config/tips_loading_transition.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    },
+    {
+      "logicalPath": "master/config/tips_loading_transition_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": []
+}

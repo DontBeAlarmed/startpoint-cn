@@ -1,0 +1,340 @@
+{
+  "version": 1,
+  "table": "daily_exp_mana_event_quest_odds",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/DailyExpManaEventQuestOddsValues.as",
+    "clientMaxColumn": 34,
+    "dataRows": 228
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/daily_exp_mana_event_quest_odds.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "odds_group_string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 228,
+        "noneOrEmpty": 0,
+        "intMin": 1001,
+        "intMax": 6036
+      }
+    },
+    {
+      "index": 8,
+      "name": "battle_tp_correction_value_zako",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 9,
+      "name": "battle_tp_correction_value_funnel",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 10,
+      "name": "battle_tp_correction_value_boss",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 18,
+      "name": "battle_time_limit",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 36000,
+        "intMax": 36000
+      }
+    },
+    {
+      "index": 16,
+      "name": "battle_recommended_element",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 12,
+      "name": "battle_quest_rank",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 13,
+      "name": "battle_initial_fever_gauge_limit",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 40,
+        "intMax": 200
+      }
+    },
+    {
+      "index": 2,
+      "name": "battle_hp_correction_value_zako",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 3,
+      "name": "battle_hp_correction_value_funnel",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 4,
+      "name": "battle_hp_correction_value_boss",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 18,
+      "name": "battle_hide_recommended_element",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 36000,
+        "intMax": 36000
+      }
+    },
+    {
+      "index": 14,
+      "name": "battle_field_data_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 32,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 11,
+      "name": "battle_enemy_level",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 10,
+        "intMax": 60
+      }
+    },
+    {
+      "index": 20,
+      "name": "battle_enemy_condition_5",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 228
+      }
+    },
+    {
+      "index": 20,
+      "name": "battle_enemy_condition_4",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 228
+      }
+    },
+    {
+      "index": 25,
+      "name": "battle_enemy_condition_3",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 228
+      }
+    },
+    {
+      "index": 23,
+      "name": "battle_enemy_condition_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 228
+      }
+    },
+    {
+      "index": 21,
+      "name": "battle_enemy_condition_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 228
+      }
+    },
+    {
+      "index": 15,
+      "name": "battle_bgm_prefix",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 5,
+      "name": "battle_atk_correction_value_zako",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 6,
+      "name": "battle_atk_correction_value_funnel",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 7,
+      "name": "battle_atk_correction_value_boss",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 20,
+      "name": "battle_assist_character_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 228
+      }
+    },
+    {
+      "index": 20,
+      "name": "battle_assist_character",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 228
+      }
+    }
+  ]
+}

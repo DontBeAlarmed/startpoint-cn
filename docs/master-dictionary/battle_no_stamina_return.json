@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "table": "battle_no_stamina_return",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BattleNoStaminaReturnValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/battle_no_stamina_return.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "QuestRangeReferenceIdKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "quest_kind",
+      "as3Type": "QuestRangeReferenceIdKind",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

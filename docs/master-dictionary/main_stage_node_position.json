@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "table": "main_stage_node_position",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/MainStageNodePositionValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": 139
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/main_stage_node_position.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "VignetteKind"
+  ],
+  "columns": [
+    {
+      "index": 4,
+      "name": "y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 125,
+        "noneOrEmpty": 0,
+        "intMin": 60,
+        "intMax": 1870
+      }
+    },
+    {
+      "index": 3,
+      "name": "x",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 73,
+        "noneOrEmpty": 0,
+        "intMin": 76,
+        "intMax": 192
+      }
+    },
+    {
+      "index": 1,
+      "name": "path_visible",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 75,
+        "intMin": 0,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 1,
+      "name": "kind",
+      "as3Type": "VignetteKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 75,
+        "intMin": 0,
+        "intMax": 5
+      }
+    }
+  ]
+}

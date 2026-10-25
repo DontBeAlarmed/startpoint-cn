@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "both_boss_group",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BothBossGroupValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/both_boss/both_boss_group.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "map_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 1,
+      "name": "map",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

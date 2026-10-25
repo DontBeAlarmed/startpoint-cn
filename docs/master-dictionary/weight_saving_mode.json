@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "table": "weight_saving_mode",
+  "domain": "config",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/WeightSavingModeValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/config/weight_saving_mode.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    },
+    {
+      "logicalPath": "master/config/weight_saving_mode_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "multi_battle_saving",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

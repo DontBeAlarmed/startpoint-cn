@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "table": "quest_category",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/QuestCategoryValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/quest_category.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "BoostPointKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "retry_enable_in_battle",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 0,
+      "name": "category",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "boost_point",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "attention_enable_in_battle",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "table": "config",
+  "domain": "config",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ConfigValues.as",
+    "clientMaxColumn": 50,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/config/config.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    },
+    {
+      "logicalPath": "master/config/config_iosbundled.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/sync/table-registry.ts",
+      "src/lib/config-content.ts"
+    ]
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 39,
+      "name": "wildcard_ten_times_equipment_ticket_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 36,
+      "name": "wildcard_ten_times_character_ticket_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 37,
+      "name": "wildcard_once_rare4_character_ticket_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 38,
+      "name": "wildcard_once_equipment_ticket_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 35,
+      "name": "wildcard_once_character_ticket_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 27,
+      "name": "treasure_shop_item_number",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 41,
+      "name": "star_grain_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 1,
+      "name": "stamina_recovery_virtual_money",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 3,
+      "name": "stamina_recovery_value",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 2,
+      "name": "stamina_recovery_seconds",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 28,
+      "name": "special_pack_shop_days_as_new",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 48,
+      "name": "reward_multiplier_by_newbie",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "server-used"
+    },
+    {
+      "index": 18,
+      "name": "reward_multiplier_by_boost_point",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "server-used"
+    },
+    {
+      "index": 29,
+      "name": "privacy_policy_url",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "pool_exp_gain_value",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 9,
+      "name": "pool_exp_gain_seconds",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 17,
+      "name": "overflow_exp_to_mana_conversion_rate",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "server-used"
+    },
+    {
+      "index": 49,
+      "name": "newbie_rank",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 50,
+      "name": "newbie_days",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 46,
+      "name": "monthly_bonus_payment_total_requirement",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 5,
+      "name": "max_virtual_money",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 7,
+      "name": "max_star_crumb",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 4,
+      "name": "max_stamina_overflow",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 10,
+      "name": "max_pool_exp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 15,
+      "name": "max_player_name_length",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 16,
+      "name": "max_player_comment_length",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 6,
+      "name": "max_mana",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 12,
+      "name": "max_follows_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 13,
+      "name": "max_followers_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 26,
+      "name": "max_equipment_stack",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "max_display_pool_exp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 14,
+      "name": "max_display_followers_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 31,
+      "name": "max_display_boss_boost_point",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 33,
+      "name": "max_display_boost_point",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 30,
+      "name": "max_boss_boost_point",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 32,
+      "name": "max_boost_point",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 26,
+      "name": "max_bond_token",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 20,
+      "name": "limit_payment_under_16",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 21,
+      "name": "limit_payment_16_19",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 24,
+      "name": "level_correction_value_for_moderate_level_comparison",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 23,
+      "name": "level_correction_value_by_recommended_element",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 44,
+      "name": "growth_fund_unlock_chapter",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 43,
+      "name": "gacha_ten_max_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 42,
+      "name": "gacha_one_max_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 45,
+      "name": "gacha_crazy_ten_max_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 40,
+      "name": "encyclopedia_point_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 47,
+      "name": "crazygacha_ten_times_character_ticket_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 34,
+      "name": "craft_point_item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 0,
+      "name": "continue_virtual_money",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    },
+    {
+      "index": 19,
+      "name": "common_reward_multiplier_by_multi_play_mode",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "server-used"
+    },
+    {
+      "index": 22,
+      "name": "alert_payment",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "server-used"
+    }
+  ]
+}

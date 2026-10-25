@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "table": "event_shop_select_item_campaign_lineup",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/EventShopSelectItemCampaignLineupValues.as",
+    "clientMaxColumn": 2,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/event_shop_select_item_campaign_lineup.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "GeneralRewardKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "reward_kind",
+      "as3Type": "GeneralRewardKind",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 0,
+      "name": "campaign_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

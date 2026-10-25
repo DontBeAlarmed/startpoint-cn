@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "table": "score_attack_event_quest_funnel_zako",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ScoreAttackEventQuestFunnelZakoValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/score_attack_event_quest_funnel_zako.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "FunnelMetalOverrideKind"
+  ],
+  "columns": [
+    {
+      "index": 1,
+      "name": "targets",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "hp_value",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "hp_scale",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "force_metal",
+      "as3Type": "FunnelMetalOverrideKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

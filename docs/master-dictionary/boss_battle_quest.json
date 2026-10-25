@@ -1,0 +1,1113 @@
+{
+  "version": 1,
+  "table": "boss_battle_quest",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BossBattleQuestValues.as",
+    "clientMaxColumn": 123,
+    "dataRows": 232
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/boss_battle_quest.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/quest.ts",
+      "src/content/runtime/multi-battle-digest.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/mission/degree-content-tables.ts",
+      "src/lib/mission/degree-coverage.ts",
+      "src/lib/mission/event-battle-facts.ts",
+      "src/lib/quest-content.ts",
+      "src/lib/rescue-fragment-content.ts"
+    ]
+  },
+  "enumRefs": [
+    "BattleWinPlayKind"
+  ],
+  "columns": [
+    {
+      "index": 16,
+      "name": "viewable_need_quest_2_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 16,
+      "name": "viewable_need_quest_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 11,
+      "name": "viewable_need_quest_1_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 181,
+        "noneOrEmpty": 17,
+        "intMin": 1001002,
+        "intMax": 8009001
+      }
+    },
+    {
+      "index": 11,
+      "name": "viewable_need_quest_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 181,
+        "noneOrEmpty": 17,
+        "intMin": 1001002,
+        "intMax": 8009001
+      }
+    },
+    {
+      "index": 18,
+      "name": "viewable_need_character_quest_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 17,
+      "name": "viewable_need_character_quest_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 20,
+      "name": "viewable_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 121,
+      "name": "twitter_card_image_base_path",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 87,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 3,
+      "name": "thumbnail_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 196,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 6,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 210
+      }
+    },
+    {
+      "index": 46,
+      "name": "selectable_player_rank",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 33,
+      "name": "selectable_need_quest_set",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 43,
+      "name": "selectable_need_quest_2_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 43,
+      "name": "selectable_need_quest_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 38,
+      "name": "selectable_need_quest_1_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 38,
+      "name": "selectable_need_quest_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 45,
+      "name": "selectable_need_character_quest_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 44,
+      "name": "selectable_need_character_quest_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 50,
+      "name": "selectable_episode_node_counts",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 0
+      }
+    },
+    {
+      "index": 49,
+      "name": "selectable_episode_node_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 48,
+      "name": "selectable_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 33,
+      "name": "prevent_spoiler",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 29,
+      "name": "no_warning_spoiler_need_quest_2_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 29,
+      "name": "no_warning_spoiler_need_quest_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 24,
+      "name": "no_warning_spoiler_need_quest_1_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 24,
+      "name": "no_warning_spoiler_need_quest_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 31,
+      "name": "no_warning_spoiler_need_character_quest_id_2",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 30,
+      "name": "no_warning_spoiler_need_character_quest_id_1",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 2,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "server-used",
+      "sample": {
+        "distinctCount": 54,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 232,
+        "noneOrEmpty": 0,
+        "intMin": 1001001,
+        "intMax": 1071004
+      }
+    },
+    {
+      "index": 56,
+      "name": "is_both_boss",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 4,
+      "name": "first_time_clear_reward_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 11000000
+      }
+    },
+    {
+      "index": 7,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 17,
+        "intMin": 0,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 1,
+      "name": "display_order",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 19,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 19
+      }
+    },
+    {
+      "index": 56,
+      "name": "both_boss_hidden",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 103,
+      "name": "battle_tp_correction_value_zako",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 104,
+      "name": "battle_tp_correction_value_funnel",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 105,
+      "name": "battle_tp_correction_value_boss",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 111,
+      "name": "battle_time_limit",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 10,
+        "noneOrEmpty": 0,
+        "intMin": 36000,
+        "intMax": 216000
+      }
+    },
+    {
+      "index": 58,
+      "name": "battle_startable_use_item_mode",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 61,
+      "name": "battle_startable_party_without_unison_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 62,
+      "name": "battle_startable_party_unison_deny",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 66,
+      "name": "battle_startable_party_speciality_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 59,
+      "name": "battle_startable_party_rarity_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 65,
+      "name": "battle_startable_party_race_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 62,
+      "name": "battle_startable_party_limit_member_min",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 63,
+      "name": "battle_startable_party_limit_member_max",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 66,
+      "name": "battle_startable_party_gender",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 68,
+      "name": "battle_startable_party_element",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 68,
+      "name": "battle_startable_party_character_tag_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 60,
+      "name": "battle_startable_party_character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 69,
+      "name": "battle_stamina_cost",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 0,
+        "intMin": 6,
+        "intMax": 25
+      }
+    },
+    {
+      "index": 70,
+      "name": "battle_score_reward_group_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 204,
+        "noneOrEmpty": 0,
+        "intMin": 10053,
+        "intMax": 12000944
+      }
+    },
+    {
+      "index": 93,
+      "name": "battle_reward_rp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 23,
+        "noneOrEmpty": 0,
+        "intMin": 14,
+        "intMax": 1190
+      }
+    },
+    {
+      "index": 96,
+      "name": "battle_reward_pool_exp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 20,
+        "noneOrEmpty": 0,
+        "intMin": 26,
+        "intMax": 2600
+      }
+    },
+    {
+      "index": 95,
+      "name": "battle_reward_mana",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 20,
+        "noneOrEmpty": 0,
+        "intMin": 135,
+        "intMax": 2590
+      }
+    },
+    {
+      "index": 95,
+      "name": "battle_reward_exp",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 20,
+        "noneOrEmpty": 0,
+        "intMin": 135,
+        "intMax": 2590
+      }
+    },
+    {
+      "index": 72,
+      "name": "battle_recommended_element",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 87,
+      "name": "battle_rank_ss_time",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 14,
+        "noneOrEmpty": 0,
+        "intMin": 180,
+        "intMax": 720
+      }
+    },
+    {
+      "index": 71,
+      "name": "battle_rank_ss_reward_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 3,
+        "intMax": 11000003
+      }
+    },
+    {
+      "index": 92,
+      "name": "battle_rank_ss_item_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 4,
+        "intMax": 6
+      }
+    },
+    {
+      "index": 86,
+      "name": "battle_rank_s_time",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 36,
+        "noneOrEmpty": 0,
+        "intMin": 264,
+        "intMax": 1296
+      }
+    },
+    {
+      "index": 91,
+      "name": "battle_rank_s_item_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 3,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 88,
+      "name": "battle_rank_c_item_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 84,
+      "name": "battle_rank_b_time",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 36,
+        "noneOrEmpty": 0,
+        "intMin": 474,
+        "intMax": 2736
+      }
+    },
+    {
+      "index": 89,
+      "name": "battle_rank_b_item_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 85,
+      "name": "battle_rank_a_time",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 36,
+        "noneOrEmpty": 0,
+        "intMin": 369,
+        "intMax": 2016
+      }
+    },
+    {
+      "index": 90,
+      "name": "battle_rank_a_item_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 107,
+      "name": "battle_quest_rank",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 7
+      }
+    },
+    {
+      "index": 55,
+      "name": "battle_play_win",
+      "as3Type": "BattleWinPlayKind",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 120,
+      "name": "battle_max_mana_reward",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 100,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 119,
+      "name": "battle_max_continue_count",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 108,
+      "name": "battle_initial_fever_gauge_limit",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 28,
+        "noneOrEmpty": 0,
+        "intMin": 150,
+        "intMax": 5000
+      }
+    },
+    {
+      "index": 97,
+      "name": "battle_hp_correction_value_zako",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 0.4,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 98,
+      "name": "battle_hp_correction_value_funnel",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 0,
+        "intMin": 0.4,
+        "intMax": 20
+      }
+    },
+    {
+      "index": 99,
+      "name": "battle_hp_correction_value_boss",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 11,
+        "noneOrEmpty": 0,
+        "intMin": 0.2,
+        "intMax": 10
+      }
+    },
+    {
+      "index": 74,
+      "name": "battle_hide_recommended_element",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 117,
+      "name": "battle_fixed_party",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 109,
+      "name": "battle_field_data_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 143,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 106,
+      "name": "battle_enemy_level",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 0,
+        "intMin": 10,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 84,
+      "name": "battle_enemy_condition_5",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 36,
+        "noneOrEmpty": 0,
+        "intMin": 474,
+        "intMax": 2736
+      }
+    },
+    {
+      "index": 82,
+      "name": "battle_enemy_condition_4",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 80,
+      "name": "battle_enemy_condition_3",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 78,
+      "name": "battle_enemy_condition_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 76,
+      "name": "battle_enemy_condition_1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 110,
+      "name": "battle_bgm_prefix",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 45,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 100,
+      "name": "battle_atk_correction_value_zako",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0.6,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 101,
+      "name": "battle_atk_correction_value_funnel",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 0,
+        "intMin": 0.5,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 102,
+      "name": "battle_atk_correction_value_boss",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 11,
+        "noneOrEmpty": 0,
+        "intMin": 0.35,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 56,
+      "name": "battle_assist_character_2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    },
+    {
+      "index": 56,
+      "name": "battle_assist_character",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 232
+      }
+    }
+  ]
+}

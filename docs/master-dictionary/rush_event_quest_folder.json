@@ -1,0 +1,373 @@
+{
+  "version": 1,
+  "table": "rush_event_quest_folder",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RushEventQuestFolderValues.as",
+    "clientMaxColumn": 36,
+    "dataRows": 56
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/rush_event_quest_folder.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/reward.ts",
+      "src/content/runtime/multi-battle-digest.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/rush-event-content.ts"
+    ]
+  },
+  "enumRefs": [
+    "GeneralRewardKind"
+  ],
+  "columns": [
+    {
+      "index": 4,
+      "name": "thumbnail_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 28,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 33,
+      "name": "reward9_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 50,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 33,
+      "name": "reward9_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 50,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 30,
+      "name": "reward8_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 50,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 30,
+      "name": "reward8_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 50,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 27,
+      "name": "reward7_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 44,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 27,
+      "name": "reward7_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 44,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 24,
+      "name": "reward6_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 43,
+        "intMin": 1,
+        "intMax": 8
+      }
+    },
+    {
+      "index": 24,
+      "name": "reward6_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 43,
+        "intMin": 1,
+        "intMax": 8
+      }
+    },
+    {
+      "index": 21,
+      "name": "reward5_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 37,
+        "intMin": 1,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 21,
+      "name": "reward5_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 37,
+        "intMin": 1,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 18,
+      "name": "reward4_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 36,
+        "intMin": 1,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 18,
+      "name": "reward4_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 36,
+        "intMin": 1,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 15,
+      "name": "reward3_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 35,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 15,
+      "name": "reward3_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 35,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 12,
+      "name": "reward2_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 35,
+        "intMin": 4,
+        "intMax": 8
+      }
+    },
+    {
+      "index": 12,
+      "name": "reward2_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 35,
+        "intMin": 4,
+        "intMax": 8
+      }
+    },
+    {
+      "index": 9,
+      "name": "reward1_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 35,
+        "intMin": 50,
+        "intMax": 400
+      }
+    },
+    {
+      "index": 9,
+      "name": "reward1_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 35,
+        "intMin": 50,
+        "intMax": 400
+      }
+    },
+    {
+      "index": 36,
+      "name": "reward10_number",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 50,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 36,
+      "name": "reward10_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 50,
+        "intMin": 2,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 6,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 20001,
+        "intMax": 20002
+      }
+    },
+    {
+      "index": 1,
+      "name": "quest_kind",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 2
+      }
+    },
+    {
+      "index": 3,
+      "name": "need_folder_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 56
+      }
+    },
+    {
+      "index": 2,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "display_order",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 100
+      }
+    },
+    {
+      "index": 5,
+      "name": "background_animation",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

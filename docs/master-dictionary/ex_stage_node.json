@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "table": "ex_stage_node",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ExStageNodeValues.as",
+    "clientMaxColumn": 8,
+    "dataRows": 124
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/ex_stage_node.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": null,
+      "name": "quest_select_background_style",
+      "as3Type": "QuestSelectBackgroundStyle",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    },
+    {
+      "index": 5,
+      "name": "need_stage_node",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 13,
+        "noneOrEmpty": 12,
+        "intMin": 1,
+        "intMax": 12
+      }
+    },
+    {
+      "index": 3,
+      "name": "need_main_stage_node",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 8,
+        "noneOrEmpty": 69,
+        "intMin": 8,
+        "intMax": 15
+      }
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 17,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 124,
+        "noneOrEmpty": 0,
+        "intMin": 1001,
+        "intMax": 12004
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "table": "battle_no_daily_challenge_point_return",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/BattleNoDailyChallengePointReturnValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/battle_no_daily_challenge_point_return.orderedmap",
+      "wfAssetsCnStatus": "empty-stub"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "QuestRangeReferenceIdKind"
+  ],
+  "columns": [
+    {
+      "index": null,
+      "name": "quest_kind",
+      "as3Type": "QuestRangeReferenceIdKind",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

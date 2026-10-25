@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "table": "ranking_event_rank_asset",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RankingEventRankAssetValues.as",
+    "clientMaxColumn": 8,
+    "dataRows": 13
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/ranking_event_rank_asset.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "slider_color",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 13,
+        "noneOrEmpty": 0,
+        "intMin": 864604,
+        "intMax": 15918355
+      }
+    },
+    {
+      "index": 2,
+      "name": "row_gradation_color_right",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 10,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 16510469
+      }
+    },
+    {
+      "index": 1,
+      "name": "row_gradation_color_left",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 10,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 16776960
+      }
+    },
+    {
+      "index": 4,
+      "name": "row_gradation_alpha_right",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0.56,
+        "intMax": 0.8
+      }
+    },
+    {
+      "index": 3,
+      "name": "row_gradation_alpha_left",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 0.56,
+        "intMax": 0.8
+      }
+    },
+    {
+      "index": 6,
+      "name": "rank_mark_medium",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 13,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 5,
+      "name": "rank_mark_large",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 13,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 8,
+      "name": "rank_alphabet_medium",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 13,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 7,
+      "name": "rank_alphabet_large",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 12,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

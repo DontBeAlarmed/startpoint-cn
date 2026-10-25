@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "table": "carnival_event_quest_folder",
+  "domain": "quest",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CarnivalEventQuestFolderValues.as",
+    "clientMaxColumn": 3,
+    "dataRows": 57
+  },
+  "sources": [
+    {
+      "logicalPath": "master/quest/event/carnival_event_quest_folder.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 2,
+      "name": "thumbnail_image",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 0,
+      "name": "stage_number",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 20,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 3,
+      "name": "background_animation",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}
