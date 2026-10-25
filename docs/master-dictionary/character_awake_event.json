@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "table": "character_awake_event",
+  "domain": "mission",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterAwakeEventValues.as",
+    "clientMaxColumn": 1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/mission/character_awake_event.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 1,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": null,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "unknown-semantics"
+    }
+  ]
+}

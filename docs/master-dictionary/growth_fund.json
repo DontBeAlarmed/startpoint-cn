@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "table": "growth_fund",
+  "domain": "growth_fund",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/GrowthFundValues.as",
+    "clientMaxColumn": 18,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/growth_fund/growth_fund.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "GrowthFundKind",
+    "GrowthFundBonusKind"
+  ],
+  "columns": [
+    {
+      "index": 2,
+      "name": "thumbnail_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "reward_number_text",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "reward_detail_description",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "quest_thumbnail_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "kind2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "kind1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "fund_kind",
+      "as3Type": "GrowthFundKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "free_vmoney_num",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "display_order",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "charge_vmoney_num",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "bonus_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "table": "mission_display_tag",
+  "domain": "mission",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/MissionDisplayTagValues.as",
+    "clientMaxColumn": -1,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/mission/mission_display_tag.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": []
+}

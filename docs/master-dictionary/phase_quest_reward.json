@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "table": "phase_quest_reward",
+  "domain": "reward",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PhaseQuestRewardValues.as",
+    "clientMaxColumn": 7,
+    "dataRows": 20
+  },
+  "sources": [
+    {
+      "logicalPath": "master/reward/phase_quest_reward.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "multiplied_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 20,
+        "noneOrEmpty": 0,
+        "intMin": 1001,
+        "intMax": 5004
+      }
+    },
+    {
+      "index": 1,
+      "name": "group_string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 4,
+      "name": "battle_reward_rp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 93,
+        "intMax": 588
+      }
+    },
+    {
+      "index": 7,
+      "name": "battle_reward_pool_exp",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 266,
+        "intMax": 1650
+      }
+    },
+    {
+      "index": 6,
+      "name": "battle_reward_mana",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 780,
+        "intMax": 2460
+      }
+    },
+    {
+      "index": 2,
+      "name": "battle_reward_group_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 16,
+        "noneOrEmpty": 0,
+        "intMin": 20082101,
+        "intMax": 20085104
+      }
+    },
+    {
+      "index": 6,
+      "name": "battle_reward_exp",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 780,
+        "intMax": 2460
+      }
+    },
+    {
+      "index": 3,
+      "name": "battle_item_count",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 4,
+        "intMax": 5
+      }
+    }
+  ]
+}

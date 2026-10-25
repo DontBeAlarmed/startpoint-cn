@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "table": "additional_reward",
+  "domain": "reward",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/AdditionalRewardValues.as",
+    "clientMaxColumn": 4,
+    "dataRows": 378
+  },
+  "sources": [
+    {
+      "logicalPath": "master/reward/event/additional_reward.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "QuestRewardKind"
+  ],
+  "columns": [
+    {
+      "index": 4,
+      "name": "weight",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 4,
+      "name": "kind",
+      "as3Type": "QuestRewardKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 0,
+      "name": "group_string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 378,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

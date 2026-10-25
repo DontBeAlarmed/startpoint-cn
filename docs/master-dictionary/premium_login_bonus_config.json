@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "table": "premium_login_bonus_config",
+  "domain": "bonus",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PremiumLoginBonusConfigValues.as",
+    "clientMaxColumn": 5,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/bonus/premium_login_bonus_config.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 4,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "period",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "enable_auto_3x",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "daily_quest_boost_amount",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "boss_battle_boost_amount",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "table": "active_mission_event",
+  "domain": "active_mission",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ActiveMissionEventValues.as",
+    "clientMaxColumn": 22,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/active_mission/active_mission_event.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "ActiveMissionEventKind"
+  ],
+  "columns": [
+    {
+      "index": 4,
+      "name": "toast_icon_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 15,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 17,
+      "name": "playable_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "need_quest_multiplied_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "need_quest",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 14,
+      "name": "need_migration",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "max_phase",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "lottery_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 6,
+      "name": "logo_image",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "list_banner_image",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 3,
+      "name": "kind",
+      "as3Type": "ActiveMissionEventKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "how_to_play_content_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "home_banner_image",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "help_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "flash_frame_reference",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 5,
+      "name": "event_background_image",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

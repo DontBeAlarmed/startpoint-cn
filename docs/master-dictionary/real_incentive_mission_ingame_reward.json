@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "table": "real_incentive_mission_ingame_reward",
+  "domain": "active_mission",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RealIncentiveMissionIngameRewardValues.as",
+    "clientMaxColumn": 22,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/active_mission/real_incentive_mission_ingame_reward.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "RealIncentiveMissionIngameRewardProductContentKind"
+  ],
+  "columns": [
+    {
+      "index": 22,
+      "name": "weight",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "thumbnail_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "rarity",
+      "as3Type": "int",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "kind6",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "kind5",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 16,
+      "name": "kind4",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 13,
+      "name": "kind3",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "kind2",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 7,
+      "name": "kind1",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "event_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

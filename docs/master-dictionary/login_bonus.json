@@ -1,0 +1,340 @@
+{
+  "version": 1,
+  "table": "login_bonus",
+  "domain": "bonus",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/LoginBonusValues.as",
+    "clientMaxColumn": 47,
+    "dataRows": 973
+  },
+  "sources": [
+    {
+      "logicalPath": "master/bonus/login_bonus.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/login-bonus.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/login-bonus.ts"
+    ]
+  },
+  "enumRefs": [
+    "LoginBonusKind"
+  ],
+  "columns": [
+    {
+      "index": 36,
+      "name": "voice",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 835,
+        "intMin": 0,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 39,
+      "name": "start_time",
+      "as3Type": "Number",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 946
+      }
+    },
+    {
+      "index": 45,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 55,
+        "intMax": 119
+      }
+    },
+    {
+      "index": 5,
+      "name": "rarity",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 0,
+        "intMin": 2,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 3,
+      "name": "name",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 66,
+        "noneOrEmpty": 44
+      }
+    },
+    {
+      "index": 40,
+      "name": "last_login_time_condition_for_comeback",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 946,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 7,
+      "name": "include_beginner",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "server-used",
+      "sample": {
+        "distinctCount": 17,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 50000
+      }
+    },
+    {
+      "index": 4,
+      "name": "image_asset_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 22,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 40,
+      "name": "end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 946,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 39,
+      "name": "condition_period_start_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 946
+      }
+    },
+    {
+      "index": 40,
+      "name": "condition_period_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 946,
+        "intMin": 30,
+        "intMax": 30
+      }
+    },
+    {
+      "index": 46,
+      "name": "comeback_bonus_group_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 965
+      }
+    },
+    {
+      "index": 37,
+      "name": "bonus_panel_y",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 0,
+        "intMin": 780,
+        "intMax": 960
+      }
+    },
+    {
+      "index": 0,
+      "name": "bonus_group_type",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 7,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 6
+      }
+    },
+    {
+      "index": 34,
+      "name": "bonus7_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 61,
+        "noneOrEmpty": 835
+      }
+    },
+    {
+      "index": 30,
+      "name": "bonus6_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 968,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 26,
+      "name": "bonus5_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 968,
+        "intMin": 1,
+        "intMax": 3
+      }
+    },
+    {
+      "index": 22,
+      "name": "bonus4_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 968,
+        "intMin": 1,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 18,
+      "name": "bonus3_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 966,
+        "intMin": 1,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 14,
+      "name": "bonus2_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 961,
+        "intMin": 1,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 10,
+      "name": "bonus1_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 4,
+        "noneOrEmpty": 958,
+        "intMin": 1,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 2,
+      "name": "balloon_color",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 15,
+        "noneOrEmpty": 46,
+        "intMin": 34559,
+        "intMax": 16753920
+      }
+    },
+    {
+      "index": 1,
+      "name": "background_image",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 152,
+        "noneOrEmpty": 46
+      }
+    },
+    {
+      "index": 7,
+      "name": "annual_start_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 17,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 50000
+      }
+    },
+    {
+      "index": 7,
+      "name": "annual_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 17,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 50000
+      }
+    }
+  ]
+}

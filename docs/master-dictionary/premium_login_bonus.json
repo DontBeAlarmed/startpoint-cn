@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "table": "premium_login_bonus",
+  "domain": "bonus",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PremiumLoginBonusValues.as",
+    "clientMaxColumn": 23,
+    "dataRows": 30
+  },
+  "sources": [
+    {
+      "logicalPath": "master/bonus/premium_login_bonus.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "LoginBonusKind"
+  ],
+  "columns": [
+    {
+      "index": 23,
+      "name": "reason_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 500,
+        "intMax": 500
+      }
+    },
+    {
+      "index": 2,
+      "name": "rarity",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 5,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 0,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 1,
+      "name": "image_asset_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0
+      }
+    },
+    {
+      "index": 4,
+      "name": "bonus5_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 50,
+        "intMax": 50
+      }
+    },
+    {
+      "index": 4,
+      "name": "bonus4_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 50,
+        "intMax": 50
+      }
+    },
+    {
+      "index": 4,
+      "name": "bonus3_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 50,
+        "intMax": 50
+      }
+    },
+    {
+      "index": 11,
+      "name": "bonus2_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 30
+      }
+    },
+    {
+      "index": 7,
+      "name": "bonus1_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 30
+      }
+    }
+  ]
+}

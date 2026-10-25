@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "table": "active_mission_reward",
+  "domain": "active_mission",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/ActiveMissionRewardValues.as",
+    "clientMaxColumn": 30,
+    "dataRows": 96
+  },
+  "sources": [
+    {
+      "logicalPath": "master/active_mission/active_mission_reward.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "MissionRewardKind"
+  ],
+  "columns": [
+    {
+      "index": 1,
+      "name": "video_dialog_contents_id",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 95
+      }
+    },
+    {
+      "index": 4,
+      "name": "target_progress_clear_seconds",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 2,
+        "noneOrEmpty": 95,
+        "intMin": 10,
+        "intMax": 10
+      }
+    },
+    {
+      "index": 3,
+      "name": "target_progress",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 15,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 10000
+      }
+    },
+    {
+      "index": 8,
+      "name": "reward4_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 31,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 320000
+      }
+    },
+    {
+      "index": 8,
+      "name": "reward3_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 31,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 320000
+      }
+    },
+    {
+      "index": 19,
+      "name": "reward2_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 5,
+        "noneOrEmpty": 80,
+        "intMin": 1,
+        "intMax": 4
+      }
+    },
+    {
+      "index": 13,
+      "name": "reward1_kind",
+      "as3Type": "MissionRewardKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 76,
+        "intMin": 0,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 3,
+      "name": "real_incentive_lottery",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 15,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 10000
+      }
+    },
+    {
+      "index": 0,
+      "name": "mission_reward_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 96,
+        "noneOrEmpty": 0,
+        "intMin": 11010001,
+        "intMax": 25024001
+      }
+    },
+    {
+      "index": 7,
+      "name": "image_asset_rarity",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 6,
+        "noneOrEmpty": 0,
+        "intMin": 0,
+        "intMax": 5
+      }
+    },
+    {
+      "index": 5,
+      "name": "image_asset_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 9,
+        "noneOrEmpty": 81
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "table": "reward_element_map",
+  "domain": "reward",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/RewardElementMapValues.as",
+    "clientMaxColumn": 0,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/reward/reward_element_map.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/runtime/multi-battle-digest.ts",
+      "src/content/sync/table-registry.ts",
+      "src/lib/quest/score-reward-selection.ts"
+    ]
+  },
+  "enumRefs": [],
+  "columns": [
+    {
+      "index": 0,
+      "name": "item_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    }
+  ]
+}

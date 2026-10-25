@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "table": "character_awake_mission_reward",
+  "domain": "mission",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/CharacterAwakeMissionRewardValues.as",
+    "clientMaxColumn": 32,
+    "dataRows": 144
+  },
+  "sources": [
+    {
+      "logicalPath": "master/mission/character_awake_mission_reward.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "MissionRewardSpecialKind",
+    "MissionRewardKind"
+  ],
+  "columns": [
+    {
+      "index": 6,
+      "name": "target_progress_clear_seconds",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 3,
+        "noneOrEmpty": 142,
+        "intMin": 90,
+        "intMax": 180
+      }
+    },
+    {
+      "index": 5,
+      "name": "target_progress",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 10,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 604800
+      }
+    },
+    {
+      "index": 5,
+      "name": "special_reward_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 10,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 604800
+      }
+    },
+    {
+      "index": 2,
+      "name": "reward4_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 37,
+        "noneOrEmpty": 108,
+        "intMin": 1,
+        "intMax": 361002
+      }
+    },
+    {
+      "index": 2,
+      "name": "reward3_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 37,
+        "noneOrEmpty": 108,
+        "intMin": 1,
+        "intMax": 361002
+      }
+    },
+    {
+      "index": 21,
+      "name": "reward2_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 144
+      }
+    },
+    {
+      "index": 15,
+      "name": "reward1_kind",
+      "as3Type": "MissionRewardKind",
+      "parseRule": "composite",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 144
+      }
+    },
+    {
+      "index": 0,
+      "name": "mission_reward_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 144,
+        "noneOrEmpty": 0,
+        "intMin": 111,
+        "intMax": 36100241
+      }
+    },
+    {
+      "index": 9,
+      "name": "image_asset_rarity",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 7,
+      "name": "image_asset_path",
+      "as3Type": "Option",
+      "parseRule": "option-string",
+      "status": "always-empty",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 144
+      }
+    }
+  ]
+}

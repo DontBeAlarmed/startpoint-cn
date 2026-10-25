@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "table": "pass_card_daily_mission",
+  "domain": "pass_card",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PassCardDailyMissionValues.as",
+    "clientMaxColumn": 35,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/pass_card/pass_card_daily_mission.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "MissionPatternKind",
+    "QuestRangeReferenceIdKind",
+    "CampaignAndGachaKind"
+  ],
+  "columns": [
+    {
+      "index": 1,
+      "name": "string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 29,
+      "name": "show_start_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 30,
+      "name": "show_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "quest_rank_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 12,
+      "name": "quest_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 20,
+      "name": "need_mission_reward_stage",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "need_mission_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 2,
+      "name": "name",
+      "as3Type": "String",
+      "parseRule": "string",
+      "status": "client-only"
+    },
+    {
+      "index": 8,
+      "name": "mission_pattern",
+      "as3Type": "MissionPatternKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 19,
+      "name": "mission_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "leader_character_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 22,
+      "name": "item_ids",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 9,
+      "name": "item_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "is_repeat",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "is_hidden_mission",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 0,
+      "name": "event_id",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 10,
+      "name": "equipment_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 27,
+      "name": "enable_start_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 28,
+      "name": "enable_end_time",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "display_tags",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 35,
+      "name": "display_rank",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 32,
+      "name": "display_order",
+      "as3Type": "int",
+      "parseRule": "int",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "display_highlight",
+      "as3Type": "Boolean",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 25,
+      "name": "character_races",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 26,
+      "name": "character_quest_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 24,
+      "name": "character_ids",
+      "as3Type": "Array",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 11,
+      "name": "character_id",
+      "as3Type": "Option",
+      "parseRule": "option-int",
+      "status": "client-only"
+    },
+    {
+      "index": 18,
+      "name": "campaign_kind",
+      "as3Type": "Option",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}

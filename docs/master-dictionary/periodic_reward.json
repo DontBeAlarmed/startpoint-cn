@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "table": "periodic_reward",
+  "domain": "reward",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/PeriodicRewardValues.as",
+    "clientMaxColumn": 4,
+    "dataRows": 11
+  },
+  "sources": [
+    {
+      "logicalPath": "master/reward/periodic_reward.orderedmap",
+      "wfAssetsCnStatus": "decoded"
+    }
+  ],
+  "serverBundle": {
+    "present": true,
+    "consumers": [
+      "src/content/converters/periodic-reward.ts",
+      "src/lib/quest/periodic-reward-content.ts"
+    ]
+  },
+  "enumRefs": [
+    "QuestRewardKind"
+  ],
+  "columns": [
+    {
+      "index": 4,
+      "name": "item_drop_probability",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 4,
+      "name": "item",
+      "as3Type": "QuestRewardKind",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 1,
+        "noneOrEmpty": 0,
+        "intMin": 1,
+        "intMax": 1
+      }
+    },
+    {
+      "index": 0,
+      "name": "group_string_id",
+      "as3Type": "String",
+      "parseRule": "composite",
+      "status": "client-only",
+      "sample": {
+        "distinctCount": 11,
+        "noneOrEmpty": 0
+      }
+    }
+  ]
+}

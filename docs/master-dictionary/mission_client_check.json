@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "table": "mission_client_check",
+  "domain": "mission",
+  "authority": {
+    "valuesClass": "../wf-cn-client-as3-20261014/scripts/pinball/master/generated/MissionClientCheckValues.as",
+    "clientMaxColumn": 6,
+    "dataRows": null
+  },
+  "sources": [
+    {
+      "logicalPath": "master/mission/mission_client_check.orderedmap",
+      "wfAssetsCnStatus": "missing"
+    }
+  ],
+  "serverBundle": {
+    "present": false
+  },
+  "enumRefs": [
+    "MissionClientCheckDuringKind"
+  ],
+  "columns": [
+    {
+      "index": 6,
+      "name": "threshold",
+      "as3Type": "Number",
+      "parseRule": "float",
+      "status": "client-only"
+    },
+    {
+      "index": 4,
+      "name": "kind",
+      "as3Type": "MissionClientCheckKindMasterValue",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "during",
+      "as3Type": "MissionClientCheckDuringKind",
+      "parseRule": "composite",
+      "status": "client-only"
+    },
+    {
+      "index": 1,
+      "name": "direction",
+      "as3Type": "MissionClientCheckDirection",
+      "parseRule": "composite",
+      "status": "client-only"
+    }
+  ]
+}
