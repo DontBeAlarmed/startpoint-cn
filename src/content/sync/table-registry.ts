@@ -694,7 +694,7 @@ const definitionInputs: TableSourceInput[] = [
     questDerivedDefinition(
         "quest_join_gates.json",
         Object.keys(QUEST_TABLE_SOURCES)
-            .filter(table => table in {
+            .filter(table => table.replace(".json", "") in {
                 advent_event_quest: 1, boss_battle_quest: 1, carnival_event_quest: 1,
                 challenge_dungeon_event_quest: 1, character_quest: 1, daily_exp_mana_event_quest: 1,
                 daily_week_event_quest: 1, ex_quest: 1, expert_single_event_quest: 1,

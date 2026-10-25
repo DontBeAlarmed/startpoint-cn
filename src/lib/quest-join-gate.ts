@@ -61,6 +61,20 @@ function getQuestJoinGateTable(
     return table
 }
 
+/** 门查找的 fail-open 包装：内容快照不可用（如无内容环境的注入测试）时不阻塞加入。 */
+function tryGetQuestJoinGateSection(
+    category: number,
+    repository?: ReadonlyContentRepository,
+): BossJoinGateSection | null {
+    try {
+        const section = GATE_SECTION_BY_CATEGORY[category]
+        if (section === undefined) return null
+        return getQuestJoinGateTable(repository)[section] ?? null
+    } catch {
+        return null
+    }
+}
+
 // 房间 category → 门表分节。single/multi 变体（如降临 7/8）共用同一张任务表。
 const GATE_SECTION_BY_CATEGORY: Readonly<Record<number, string>> = Object.freeze({
     1: "main_quest", 2: "boss_battle_quest", 3: "character_quest", 4: "ex_quest",
@@ -84,9 +98,9 @@ export function hasQuestJoinGate(
 ): boolean {
     // category 短路必须先于内容快照解析（默认参数在函数体前求值，
     // 无内容快照的测试环境会被误伤）
-    const section = GATE_SECTION_BY_CATEGORY[category]
-    if (section === undefined) return false
-    return getQuestJoinGateTable(repository)[section]?.[String(questId)] !== undefined
+    const section = tryGetQuestJoinGateSection(category, repository)
+    if (section === null) return false
+    return section[String(questId)] !== undefined
 }
 
 export interface BossJoinGateProgressReader {
@@ -105,9 +119,9 @@ export function isQuestJoinAllowed(
     repository?: ReadonlyContentRepository,
 ): boolean {
     // 同 hasQuestJoinGate：category 短路先于快照解析
-    const section = GATE_SECTION_BY_CATEGORY[category]
-    if (section === undefined) return true
-    const references = getQuestJoinGateTable(repository)[section]?.[String(questId)]
+    const section = tryGetQuestJoinGateSection(category, repository)
+    if (section === null) return true
+    const references = section[String(questId)]
     if (references === undefined) return true
     for (const reference of references) {
         const progress = readProgress(reference.category, reference.questId)
