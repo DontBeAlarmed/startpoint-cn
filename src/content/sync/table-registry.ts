@@ -692,6 +692,10 @@ const definitionInputs: TableSourceInput[] = [
         ["assets/practice_quest.json"],
     ),
     questDerivedDefinition(
+        "boss_battle_join_gates.json",
+        [QUEST_TABLE_SOURCES["boss_battle_quest.json"].logicalPath],
+    ),
+    questDerivedDefinition(
         "quest_unlock_costs.json",
         Object.values(QUEST_TABLE_SOURCES).map(source => source.logicalPath),
     ),

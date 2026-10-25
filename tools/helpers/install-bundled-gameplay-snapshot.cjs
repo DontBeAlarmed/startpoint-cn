@@ -69,6 +69,7 @@ const QUEST_TABLE_NAMES = [
     "event_challenge_point_map.json",
     "quest_entry_costs.json",
     "quest_prerequisites.json",
+    "boss_battle_join_gates.json",
     "quest_lookup.json",
     "quest_unlock_costs.json",
 ]

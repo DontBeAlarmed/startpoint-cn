@@ -8,6 +8,8 @@ import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
 import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
+import { isBossQuestJoinAllowed } from "../../lib/boss-join-gate"
+import { getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
 import { issueRoomAdmission } from "./room-admission"
 import { listActiveRoomSharesSync } from "../../data/domains/social-room-shares"
 import { getSharedFollowRelationSync } from "../../data/domains/social-follow"
@@ -137,6 +139,14 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         if (!availability.available) return reply.status(400).send({
             "error": availability.code, "message": "Unable to create room."
         })
+        // R-G04：房主同样受领主战参加门约束（语义=未满足前置链不得开战该任务）
+        if (!isBossQuestJoinAllowed(
+            category,
+            quest_id,
+            (refCategory, refQuestId) => getPlayerSingleQuestProgressSync(ctx.playerId, refCategory, refQuestId),
+        )) return reply.status(400).send({
+            "error": "QUEST_NOT_AVAILABLE", "message": "Unable to create room."
+        })
 
         const room = await context.coordinator.createRoom({
             requestId: `create_room:${viewer_id}:${body.api_count}`,
@@ -242,6 +252,24 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
                     room.kind === "missing"
                         ? 9
                         : roomUnavailableRaisingState(room.error),
+                ),
+            })
+        }
+
+        // R-G04：领主战参加门——加入者的任务进度必须满足 viewable 前置链
+        // （主线关卡/前一档通关），堵住按房间号加入未解锁档位的跳关缺口
+        if (room.kind === "available"
+            && !isBossQuestJoinAllowed(
+                room.value.category,
+                room.value.questId,
+                (refCategory, refQuestId) => getPlayerSingleQuestProgressSync(ctx.playerId, refCategory, refQuestId),
+            )) {
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+                "data": unavailableConnection(
+                    body.room_number || "",
+                    roomUnavailableRaisingState("QUEST_NOT_AVAILABLE"),
                 ),
             })
         }
