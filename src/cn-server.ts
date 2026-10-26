@@ -32,6 +32,7 @@ import { loadBundleMetadata } from "./runtime/bundle-metadata";
 import { registerAdminUi } from "./runtime/admin";
 import { readAdminApiToken, requireAdminApiToken } from "./runtime/admin-auth";
 import { createRateLimiter, rateLimitRule } from "./lib/rate-limit";
+import { isLoopbackOnlyListenHost } from "./runtime/network-host";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import iosLeitingPlugin from "./routes/cn/ios-leiting";
@@ -119,6 +120,22 @@ const receiveHistoryRetentionService = new ReceiveHistoryRetentionService(
     resolveReceiveHistoryRetentionConfig(),
     { getNow: () => getRealNow() },
 );
+
+// 部署姿态提示：不是安全控制，只是把"故意不安全"的面在启动时显式化。
+// loopback 绑定（私人部署默认形态）保持静默；其余绑定打印一次分级清单。
+function logDeploymentPosture(listenHost: string): void {
+    if (isLoopbackOnlyListenHost(listenHost)) return
+    const adminAuth = readAdminApiToken() !== null
+        ? "已启用 ADMIN_API_TOKEN（Bearer）"
+        : "无鉴权——能连上端口即拥有全部管理权限（设置 ADMIN_API_TOKEN 可兜底）"
+    console.warn(
+        "[POSTURE] 监听地址非 loopback；以下为 by-design 不安全面（私人部署契约）：\n"
+        + "[POSTURE] 1. 管理 API /api/*：" + adminAuth + "\n"
+        + "[POSTURE] 2. /tool/signup：身份为客户端断言的 device_id，知悉他人 device_id 可复用其会话（无环境变量级缓解——网络隔离或补全认证，见文档）\n"
+        + "[POSTURE] 3. 游戏会话以 9 位 viewer_id 作为长期 bearer token\n"
+        + "[POSTURE] 详见 starpoint-cn/docs/getting-started/deployment-posture.md",
+    )
+}
 
 const crashRateLimiter = createRateLimiter(rateLimitRule("CRASH", 30));
 fastify.addHook("onRequest", async (request, reply) => {
@@ -464,7 +481,10 @@ runtimeCoordinator = createRuntimeCoordinator({
         accountCleanupService.start();
         receiveHistoryRetentionService.start();
     },
-    listenHttp: config => fastify.listen({ ...config.http }),
+    listenHttp: async config => {
+        await fastify.listen({ ...config.http });
+        logDeploymentPosture(config.http.host);
+    },
     closeHttp: async () => {
         await receiveHistoryRetentionService.stop();
         accountCleanupService.stop();

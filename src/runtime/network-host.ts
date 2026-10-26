@@ -29,6 +29,13 @@ export interface DisplayHostOptions {
     readonly publicHost?: string
 }
 
+const LOOPBACK_LISTEN_HOSTS = new Set(["localhost", "127.0.0.1", "::1"])
+
+/** 监听地址是否仅本机可达；0.0.0.0/:: 与公网地址均视为对外暴露。 */
+export function isLoopbackOnlyListenHost(value: string): boolean {
+    return LOOPBACK_LISTEN_HOSTS.has(value.trim().toLowerCase())
+}
+
 export function resolveDisplayHost(options: DisplayHostOptions = {}): string {
     const publicHost = options.publicHost?.trim()
     if (publicHost) return publicHost
