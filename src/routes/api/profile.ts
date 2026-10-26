@@ -20,6 +20,7 @@ import { getFavoritePartyGroupListSync } from "../../lib/profileFavorite";
 import { getPlayerProfileStatsSync } from "../../lib/player-profile-stats";
 import { getPlayerRankLevel } from "../../lib/player-rank-content";
 import { getCharactersEvolutionImgLevels } from "../../lib/character";
+import { buildFavoriteCharacterPartySync } from "../../lib/profile-favorite-party";
 
 const PROFILE_SETTING_FIELDS = [
     "show_opened_mana_board_second_count",
@@ -105,10 +106,11 @@ const routes = async (fastify: FastifyInstance) => {
     // Returns the player's last login region (CN-specific)
     fastify.post("/get_profile", async (request: FastifyRequest, reply: FastifyReply) => {
         // 关注界面查看他人信息卡片（follow 列表刷新/添加后退出均触发）。
-        // 客户端强校验 target_user_info 全字段（rank/role/viewer_id 必填抛
-        // 8700/8701）与 favorite_character 形状（必须是含四个数组的 Object，
-        // 空数组会继续取 .character_ex_boost 抛 8704）——见
-        // ProfileGetProfileRealRemote.successHandler。
+        // 客户端契约（ProfileGetProfileRealRemote + OtherProfileLogic）：
+        // target_user_info 全字段必填（rank/role/viewer_id 缺失抛 8700/8701）；
+        // favorite_character 是对方主队伍展示编队——**数组不允许为空**，
+        // 空数组会让 PlayerProfileView.layoutPartyExBoost / getLeaderFullShotImageId
+        // 读 [0].index 时抛 TypeError #1009（F1009 崩溃上报）。
         const body = request.body as any
         const viewerId = body.viewer_id
         const targetViewerId = Number(body.target_viewer_id)
@@ -123,24 +125,24 @@ const routes = async (fastify: FastifyInstance) => {
             error: "Bad Request",
             message: "Invalid viewer id."
         })
-        const emptyFavoriteCharacter = {
-            character_ex_boost: [],
-            character_ids: [],
-            unison_character_ex_boost: [],
-            unison_character_ids: [],
-        }
         const targetAccountId = await getSession(String(targetViewerId))
             .then(s => s?.accountId ?? null)
             .catch(() => null)
         const targetPlayerId = targetAccountId === null ? null : resolvePlayerIdSync(targetAccountId)
         const target = targetPlayerId === null ? null : getPlayerSync(targetPlayerId)
         if (target === null || targetPlayerId === null) {
-            // 未知目标：合法 stub 档案（客户端按 not-found 处理卡片）而非 404 踢登录
+            // 未知目标：最小合法 stub 档案（队长位占位为角色 1，资料页可渲染
+            // 不崩溃），而非 404 踢登录
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
-                    favorite_character: emptyFavoriteCharacter,
+                    favorite_character: {
+                        character_ex_boost: [null, null, null],
+                        character_ids: [1, null, null],
+                        unison_character_ex_boost: [null, null],
+                        unison_character_ids: [null, null],
+                    },
                     target_user_info: {
                         comment: "",
                         degree_id: 1,
@@ -172,11 +174,17 @@ const routes = async (fastify: FastifyInstance) => {
             : getLocalFollowRelationSync(requesterPlayerId, targetPlayerId)
         // LocalFollowState 数值即客户端 follow_state（F0 冻结：1=互关 2=我关注 3=被关注）
         const followState = relation?.state ?? 0
+        const favoriteParty = buildFavoriteCharacterPartySync(
+            targetPlayerId,
+            target.partySlot,
+            target.leaderCharacterId,
+        )
+        const profileLeaderId = favoriteParty.character_ids.find(id => id !== null && id > 0) ?? 0
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                favorite_character: emptyFavoriteCharacter,
+                favorite_character: favoriteParty,
                 target_user_info: {
                     comment: target.comment ?? "",
                     degree_id: target.degreeId || 1,
@@ -185,7 +193,7 @@ const routes = async (fastify: FastifyInstance) => {
                     leader_character_full_shot_evolution_level:
                         getCharactersEvolutionImgLevels(
                             targetPlayerId,
-                            [target.leaderCharacterId ?? 0],
+                            [profileLeaderId],
                         )[0] ?? 0,
                     max_opened_mana_board_second_count: profileStats.maxOpenedManaBoardSecondCount,
                     max_owned_character_count: profileStats.maxOwnedCharacterCount,

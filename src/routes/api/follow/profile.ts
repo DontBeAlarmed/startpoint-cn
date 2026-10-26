@@ -4,6 +4,7 @@ import { getViewerIdSync } from "../../../data/domains/session"
 import { getLocalFollowRelationSync } from "../../../data/domains/follow"
 import { getPlayerRankLevel } from "../../../lib/player-rank-content"
 import { getCharactersEvolutionImgLevels } from "../../../lib/character"
+import { resolveEffectiveLeaderCharacterIdSync } from "../../../lib/profile-favorite-party"
 import type { LocalFollowRelation, LocalFollowState } from "../../../data/domains/follow"
 
 /** F0 冻结的 follow_info / search_result 投影（CN 1.8.1 必填 + Option 字段）。 */
@@ -41,6 +42,13 @@ export function projectFollowUser(
     const accountId = accountPlayerId(targetPlayerId)
     const targetViewerId = accountId === null ? null : getViewerIdSync(accountId)
     if (targetViewerId === null || targetViewerId === 0) return null
+    // 队长口径 = 主队伍一号位（players.leader_character_id 是种子默认值，
+    // 历史账号未经 party/edit 写回前是陈旧的，读侧永远以有效队长为准）
+    const leaderCharacterId = resolveEffectiveLeaderCharacterIdSync(
+        targetPlayerId,
+        player.leaderCharacterId,
+        player.partySlot,
+    )
     return {
         viewer_id: targetViewerId,
         name: player.name,
@@ -50,10 +58,10 @@ export function projectFollowUser(
         comment: player.comment ?? "",
         last_login_time: Math.floor(player.lastLoginTime.getTime() / 1000),
         last_login_region: null,
-        leader_character_id: player.leaderCharacterId ?? 0,
+        leader_character_id: leaderCharacterId,
         leader_character_evolution_img_level: getCharactersEvolutionImgLevels(
             targetPlayerId,
-            [player.leaderCharacterId ?? 0],
+            [leaderCharacterId],
         )[0] ?? 0,
         follow_state: relation.state,
         follow_time: relation.followTime === null ? null : Math.floor(relation.followTime / 1000),

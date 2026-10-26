@@ -111,6 +111,48 @@ export function getPlayerPartyLoadoutSync(
     }
 }
 
+// main_party_id 由客户端按 组号*10+组内槽号 发号（PlayerSaveDataTools partyIds
+// 布局：组 1 → 1..10，组 2 → 11..20 …），category 1 是普通编队本体。
+export function mainPartyIdToGroupAndSlot(mainPartyId: number): { groupId: number, slot: number } | null {
+    if (!Number.isSafeInteger(mainPartyId) || mainPartyId < 1) return null
+    return {
+        groupId: Math.floor((mainPartyId - 1) / 10) + 1,
+        slot: ((mainPartyId - 1) % 10) + 1,
+    }
+}
+
+/** 主队伍（玩家当前选中的普通编队）成员读取。资料页展示编队
+ * （profile/get_profile favorite_character）与队长立绘/关注列表头像
+ * 的权威数据源。无对应行（新号未编队/越界 id）返回 null。
+ * 队长联动写入见 lib/profile-favorite-party.ts 的
+ * refreshMainPartyLeaderSync（domains 层禁止回依 player 域，避免环）。 */
+export function getMainBattlePartySync(
+    playerId: number,
+    mainPartyId: number,
+): Pick<PlayerParty, "characterIds" | "unisonCharacterIds"> | null {
+    const mapped = mainPartyIdToGroupAndSlot(mainPartyId)
+    if (mapped === null) return null
+    const raw = getDb().prepare(`
+    SELECT character_id_1, character_id_2, character_id_3,
+        unison_character_1, unison_character_2, unison_character_3
+    FROM players_parties
+    WHERE player_id = ? AND group_id = ? AND slot = ? AND category = 1
+    `).get(playerId, mapped.groupId, mapped.slot) as Pick<
+        RawPlayerParty,
+        "character_id_1" | "character_id_2" | "character_id_3"
+            | "unison_character_1" | "unison_character_2" | "unison_character_3"
+    > | undefined
+    if (!raw) return null
+    return {
+        characterIds: [raw.character_id_1, raw.character_id_2, raw.character_id_3],
+        unisonCharacterIds: [
+            raw.unison_character_1,
+            raw.unison_character_2,
+            raw.unison_character_3,
+        ],
+    }
+}
+
 function insertPlayerPartySync(playerId: number, slot: number | string, groupId: number | string, party: PlayerParty) {
     const db = getDb();
     db.prepare(`
