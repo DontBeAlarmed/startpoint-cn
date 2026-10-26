@@ -13,23 +13,33 @@ export function resolveBattlePartyLeaderCharacterIdSync(
     partyId: number | null | undefined,
     storedLeaderId: number | null | undefined,
 ): number {
-    const parsed = typeof partyId === "number" ? parseGlobalPartyId(partyId) : null
-    if (parsed !== null) {
-        const row = getDb().prepare(`
+    // 编队行读取 fail-open：无 DB/无快照的 stub 环境直接走回退链（展示字段，
+    // 不阻断建房）。parseGlobalPartyId 是纯函数不受环境影响。
+    try {
+        const parsed = typeof partyId === "number" ? parseGlobalPartyId(partyId) : null
+        if (parsed !== null) {
+            const row = getDb().prepare(`
         SELECT character_id_1, character_id_2, character_id_3
         FROM players_parties
         WHERE player_id = ? AND group_id = ? AND slot = ? AND category = 1
         `).get(playerId, parsed.groupId, parsed.slot) as Pick<
-            RawPlayerParty,
-            "character_id_1" | "character_id_2" | "character_id_3"
-        > | undefined
-        for (const id of [row?.character_id_1, row?.character_id_2, row?.character_id_3]) {
-            if (typeof id === "number" && id > 0) return id
+                RawPlayerParty,
+                "character_id_1" | "character_id_2" | "character_id_3"
+            > | undefined
+            for (const id of [row?.character_id_1, row?.character_id_2, row?.character_id_3]) {
+                if (typeof id === "number" && id > 0) return id
+            }
         }
+    } catch {
+        // fall through to stored-leader fallback
     }
     if (typeof storedLeaderId === "number" && storedLeaderId > 0) return storedLeaderId
-    const owned = getDb().prepare(`
+    try {
+        const owned = getDb().prepare(`
     SELECT id FROM players_characters WHERE player_id = ? ORDER BY id LIMIT 1
     `).get(playerId) as { id: number } | undefined
-    return owned?.id ?? 1
+        return owned?.id ?? 1
+    } catch {
+        return 1
+    }
 }

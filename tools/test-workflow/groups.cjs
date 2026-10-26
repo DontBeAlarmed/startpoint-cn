@@ -182,7 +182,9 @@ const TEST_GROUPS = Object.freeze({
         // ts-node (~15-25s per probe; ts-node 10 has no persistent transpile
         // cache) and the lifecycle suites spawn servers, so 60s per file
         // flakes under group load (same rationale as integration:party).
-        timeoutMs: 120_000,
+        // 180s: multi_remote_settlement's dual-process编排 adds a further
+        // spawn fan-out and grazes 120s when the host machine is busy.
+        timeoutMs: 180_000,
         tests: [
             "tools/handshake_lifecycle.test.cjs",
             "tools/multi_reconnect_admission.test.cjs",

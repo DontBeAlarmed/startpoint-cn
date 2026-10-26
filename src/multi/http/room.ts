@@ -21,7 +21,7 @@ import {
     pruneExpiredRecruitments,
 } from "../../data/domains/attention";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
-import { getCharactersEvolutionImgLevels } from "../../lib/character";
+import { safeEvolutionImgLevel } from "../safe-display-fields";
 import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader";
 import { openRoomShareRow } from "../room/share-sync";
 import { isNewbieHostSync } from "../../lib/newbie-host";
@@ -379,14 +379,14 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                         rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
                         hostEntryTime: room.value.hostEntryTime,
                         name: hostContext.player.name,
-                        evolutionImgLevel: getCharactersEvolutionImgLevels(
+                        evolutionImgLevel: safeEvolutionImgLevel(
                             hostContext.playerId,
-                            [resolveBattlePartyLeaderCharacterIdSync(
+                            resolveBattlePartyLeaderCharacterIdSync(
                                 hostContext.playerId,
                                 hostContext.player.partySlot,
                                 hostContext.player.leaderCharacterId,
-                            )],
-                        )[0] ?? 0,
+                            ),
+                        ),
                     }),
                 })
             } catch (error) {
@@ -414,10 +414,10 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                         character: bellLeaderCharacterId,
                         rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
                         hostEntryTime: room.value.hostEntryTime,
-                        evolutionImgLevel: getCharactersEvolutionImgLevels(
+                        evolutionImgLevel: safeEvolutionImgLevel(
                             hostContext.playerId,
-                            [bellLeaderCharacterId],
-                        )[0] ?? 0,
+                            bellLeaderCharacterId,
+                        ),
                     }),
                     nowMs: getRealNowMs(), // R-15=B
                 });

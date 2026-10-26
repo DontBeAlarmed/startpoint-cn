@@ -12,7 +12,7 @@ import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { applyNpcPostFill } from "../npc/release"
 import { closeRecruitmentForRoom, updateOpenRecruitmentSnapshotForRoom } from "../../data/domains/attention"
-import { getCharactersEvolutionImgLevels } from "../../lib/character"
+import { safeEvolutionImgLevel } from "../safe-display-fields"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import type { MultiRoom } from "../../lib/types"
 import { RoomState } from "../types"
@@ -532,7 +532,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
                     getRealNowMs(),
                     {
                         character: leaderId,
-                        evolutionImgLevel: getCharactersEvolutionImgLevels(hostPlayerId, [leaderId])[0] ?? 0,
+                        evolutionImgLevel: safeEvolutionImgLevel(hostPlayerId, leaderId),
                     },
                 )
             }

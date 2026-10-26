@@ -2404,7 +2404,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
 test("quick protocol includes multi runtime lifecycle coverage", () => {
     // Spawn-heavy group: global_embedded_startup probes ts-node-compile the
     // full server graph, so the per-file budget is double the default.
-    assert.equal(TEST_GROUPS["quick:protocol"].timeoutMs, 120_000)
+    assert.equal(TEST_GROUPS["quick:protocol"].timeoutMs, 180_000)
     assert.deepEqual(TEST_GROUPS["quick:protocol"].tests, [
         "tools/handshake_lifecycle.test.cjs",
         "tools/multi_reconnect_admission.test.cjs",

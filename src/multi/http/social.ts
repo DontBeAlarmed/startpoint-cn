@@ -5,7 +5,7 @@ import { getPlayerRankLevel } from "../player-context"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin } from "./join-result"
 import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
-import { getCharactersEvolutionImgLevels } from "../../lib/character"
+import { safeEvolutionImgLevel } from "../safe-display-fields"
 import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader"
 
 export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
@@ -65,12 +65,11 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
                 category_id: room.value.category,
                 establisher: room.value.host.viewerId,
                 establisher_character: establisherCharacter,
+                // 展示字段 fail-open：内容快照未初始化的 stub/无内容环境降级 0，
+                // 不让纯展示的进化等级把加入确认框打成 500
                 establisher_character_evolution_img_level: host === null
                     ? 0
-                    : getCharactersEvolutionImgLevels(
-                        host.playerId,
-                        [establisherCharacter],
-                    )[0] ?? 0,
+                    : safeEvolutionImgLevel(host.playerId, establisherCharacter),
                 establisher_follow: establisherFollow,
                 establisher_name: host?.player.name ?? `Player${room.value.host.viewerId}`,
                 establisher_rank: getPlayerRankLevel(host?.player.rankPoint ?? 0),
