@@ -31,6 +31,7 @@ import { registerRuntimeHealthRoute } from "./runtime/health";
 import { loadBundleMetadata } from "./runtime/bundle-metadata";
 import { registerAdminUi } from "./runtime/admin";
 import { readAdminApiToken, requireAdminApiToken } from "./runtime/admin-auth";
+import { createRateLimiter, rateLimitRule } from "./lib/rate-limit";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import iosLeitingPlugin from "./routes/cn/ios-leiting";
@@ -119,22 +120,10 @@ const receiveHistoryRetentionService = new ReceiveHistoryRetentionService(
     { getNow: () => getRealNow() },
 );
 
-// Simple in-memory rate limiter for /crash endpoint only.
-// /debug is excluded — game client sends heavy beacon traffic during normal startup.
-const rateLimitMap = new Map<string, { count: number; reset: number }>();
-const RATE_LIMIT_MAX = 30;
-const RATE_LIMIT_WINDOW = 60000;
+const crashRateLimiter = createRateLimiter(rateLimitRule("CRASH", 30));
 fastify.addHook("onRequest", async (request, reply) => {
-    if (request.url === "/crash") {
-        const ip = (request.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
-            || request.ip;
-        const now = getRealNowMs();
-        const entry = rateLimitMap.get(ip) || { count: 0, reset: now + RATE_LIMIT_WINDOW };
-        if (now > entry.reset) { entry.count = 0; entry.reset = now + RATE_LIMIT_WINDOW; }
-        if (++entry.count > RATE_LIMIT_MAX) {
-            return reply.status(429).send("Too Many Requests");
-        }
-        rateLimitMap.set(ip, entry);
+    if (request.url === "/crash" && crashRateLimiter(request)) {
+        return reply.status(429).send("Too Many Requests");
     }
 });
 

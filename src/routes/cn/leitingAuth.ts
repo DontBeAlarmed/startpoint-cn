@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { createRateLimiter, enforceRateLimit, rateLimitRule } from "../../lib/rate-limit"
 import { generateDataHeaders } from "../../utils";
 
 interface LoginBody {
@@ -16,6 +17,10 @@ interface LoginBody {
 }
 
 const routes = async (fastify: FastifyInstance) => {
+
+    // R-G04：SDK 登录桩限速（补全认证后自动承接真实验证负载）
+    const leitingRateLimiter = createRateLimiter(rateLimitRule("LEITING", 30))
+    fastify.addHook("preHandler", (request, reply) => enforceRateLimit(request, reply, leitingRateLimiter))
     fastify.post("/channels/channel_leiting/leiting_login",
         async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as LoginBody;

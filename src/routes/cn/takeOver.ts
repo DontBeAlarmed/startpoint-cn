@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs"
+import { createRateLimiter, enforceRateLimit, rateLimitRule } from "../../lib/rate-limit"
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { getDb } from "../../data/db"
 import { getAccountPlayersSync } from "../../data/domains/account"
@@ -207,6 +208,10 @@ function transferAccount(
 }
 
 const routes = async (fastify: FastifyInstance) => {
+
+    // R-G04：引继全路由限速（含两次 bcrypt 验证路径的 CPU 放大面）
+    const takeoverRateLimiter = createRateLimiter(rateLimitRule("TAKEOVER", 10))
+    fastify.addHook("preHandler", (request, reply) => enforceRateLimit(request, reply, takeoverRateLimiter))
     fastify.post("/take_over_register/get_take_over_setting", async (request, reply) => {
         const body = (request.body ?? {}) as ViewerBody
         const viewerId = parseViewerId(body.viewer_id)

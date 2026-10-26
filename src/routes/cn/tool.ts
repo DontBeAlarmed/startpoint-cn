@@ -5,6 +5,7 @@ import { getAccountSync, insertAccountSync, updateAccountSync } from "../../data
 import { insertDefaultPlayerSync } from "../../data/domains/player"
 import { SessionType } from "../../data/types";
 import { saveAccountDefaultPlayer, resolvePlayerIdSync } from "../../data/activeAccount";
+import { createRateLimiter, enforceRateLimit, rateLimitRule } from "../../lib/rate-limit";
 import { bumpEconomyGenerationForPlayer } from "../../lib/economy-response-cache";
 import { getAccountIdentityProvider } from "../../lib/account-identity-provider";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
@@ -57,7 +58,10 @@ const routes = async (fastify: FastifyInstance) => {
         });
     });
 
-    fastify.post("/signup", async (request: FastifyRequest, reply: FastifyReply) => {
+    const signupRateLimiter = createRateLimiter(rateLimitRule("SIGNUP", 10))
+    fastify.post("/signup", {
+        preHandler: (request, reply) => enforceRateLimit(request, reply, signupRateLimiter),
+    }, async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as CnSignupBody;
         const udid = request.headers["udid"] as string || "unknown";
         const shortUdid = 0;
