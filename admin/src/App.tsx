@@ -26,6 +26,7 @@ import GameplaySettings from "./pages/GameplaySettings"
 import ContentManagement from "./pages/ContentManagement"
 import logoUrl from "./assets/logo.png"
 import { ThemeToggle } from "./theme"
+import { AdminTokenGate } from "./components/AdminTokenGate"
 
 const { Sider, Content, Header } = Layout
 const { useBreakpoint } = Grid
@@ -108,6 +109,7 @@ export default function App() {
                     )}
                     <span className="admin-topbar-title">{currentTitle}</span>
                     <Space>
+                        <AdminTokenGate />
                         <ThemeToggle />
                     </Space>
                 </Header>

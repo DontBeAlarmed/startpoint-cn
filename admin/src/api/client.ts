@@ -5,8 +5,20 @@ export class ApiError extends Error {
     }
 }
 
+// ADMIN_API_TOKEN 模式：面板从 localStorage 读取 token 附加 Bearer 头。
+// 未存储 token 时请求头与现状完全一致（无 token 的私人部署不受影响）。
+export function getStoredAdminToken(): string {
+    try { return localStorage.getItem("adminApiToken") ?? "" } catch { return "" }
+}
+
+function authHeaders(): Record<string, string> {
+    const token = getStoredAdminToken()
+    return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function handle<T>(res: Response): Promise<T> {
     if (!res.ok) {
+        if (res.status === 401) window.dispatchEvent(new CustomEvent("admin-api-unauthorized"))
         const text = await res.text().catch(() => "")
         let msg = text || res.statusText
         // 后端错误多为 { "error": "..." }，提取出来更友好
@@ -18,13 +30,13 @@ async function handle<T>(res: Response): Promise<T> {
 }
 
 export function apiGet<T>(url: string): Promise<T> {
-    return fetch(url, { headers: { Accept: "application/json" } }).then(r => handle<T>(r))
+    return fetch(url, { headers: { Accept: "application/json", ...authHeaders() } }).then(r => handle<T>(r))
 }
 
 export function apiPost<T>(url: string, body?: unknown): Promise<T> {
     return fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
         body: body === undefined ? undefined : JSON.stringify(body)
     }).then(r => handle<T>(r))
 }
@@ -32,13 +44,13 @@ export function apiPost<T>(url: string, body?: unknown): Promise<T> {
 export function apiPatch<T>(url: string, body?: unknown): Promise<T> {
     return fetch(url, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders() },
         body: body === undefined ? undefined : JSON.stringify(body)
     }).then(r => handle<T>(r))
 }
 
 export function apiDelete<T>(url: string): Promise<T> {
-    return fetch(url, { method: "DELETE", headers: { Accept: "application/json" } })
+    return fetch(url, { method: "DELETE", headers: { Accept: "application/json", ...authHeaders() } })
         .then(r => handle<T>(r))
 }
 
@@ -46,7 +58,7 @@ export function apiDelete<T>(url: string): Promise<T> {
 export function apiUpload<T>(url: string, file: File, fieldName = "file"): Promise<T> {
     const fd = new FormData()
     fd.append(fieldName, file)
-    return fetch(url, { method: "POST", headers: { Accept: "application/json" }, body: fd })
+    return fetch(url, { method: "POST", headers: { Accept: "application/json", ...authHeaders() }, body: fd })
         .then(r => handle<T>(r))
 }
 
@@ -75,7 +87,7 @@ export async function apiDownloadFile(url: string, fallbackFilename: string): Pr
         setTimeout(() => frame.remove(), 60_000)
         return
     }
-    const res = await fetch(url, { headers: { Accept: "application/json" } })
+    const res = await fetch(url, { headers: { Accept: "application/json", ...authHeaders() } })
     if (!res.ok) {
         const text = await res.text().catch(() => "")
         let msg = text || res.statusText
