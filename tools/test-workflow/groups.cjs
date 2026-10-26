@@ -450,6 +450,9 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:database": {
         execution: "serial",
+        // Follow 路由套件在组内满载时逼近串行默认 120s（本机跑着游戏服务+
+        // 设备轮询时尤甚），按 integration:party 先例给显式余量。
+        timeoutMs: 180_000,
         tests: [
             "tools/shop_purchase_count_storage.test.cjs",
             "tools/account_cleanup_admin.test.cjs",

@@ -108,7 +108,7 @@ const routes = async (fastify: FastifyInstance) => {
         // 关注界面查看他人信息卡片（follow 列表刷新/添加后退出均触发）。
         // 客户端契约（ProfileGetProfileRealRemote + OtherProfileLogic）：
         // target_user_info 全字段必填（rank/role/viewer_id 缺失抛 8700/8701）；
-        // favorite_character 是对方主队伍展示编队——**数组不允许为空**，
+        // favorite_character 是对方喜爱配队（ProfilePartyGroupSource，回退普通第一编队）——**数组不允许为空**，
         // 空数组会让 PlayerProfileView.layoutPartyExBoost / getLeaderFullShotImageId
         // 读 [0].index 时抛 TypeError #1009（F1009 崩溃上报）。
         const body = request.body as any
@@ -178,7 +178,6 @@ const routes = async (fastify: FastifyInstance) => {
         const followState = relation?.state ?? 0
         const favoriteParty = buildFavoriteCharacterPartySync(
             targetPlayerId,
-            target.partySlot,
             target.leaderCharacterId,
         )
         const profileLeaderId = favoriteParty.character_ids.find(id => id !== null && id > 0) ?? 0

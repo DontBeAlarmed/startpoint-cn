@@ -616,9 +616,9 @@ const routes = async (fastify: FastifyInstance) => {
                     }], evaluationTime))
                 }
             }
-            // 资料队长联动（官方语义：leader_character_id = 当前主队伍首位角色）。
-            // 必须在编队 upsert 之后执行，读取的是本次请求写入后的主队伍行。
-            refreshMainPartyLeaderSync(playerId, body.main_party_id, player.leaderCharacterId)
+            // 资料队长联动（官方语义：leader_character_id = 喜爱配队一号位，回退普通第一编队）。
+            // 必须在编队 upsert 之后执行，读取的是本次请求写入后的编队行。
+            refreshMainPartyLeaderSync(playerId, player.leaderCharacterId)
             const activeMission = publishActiveMissionOwnerStateWithinTransaction({
                 playerId,
                 now: evaluationTime,

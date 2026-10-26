@@ -42,12 +42,11 @@ export function projectFollowUser(
     const accountId = accountPlayerId(targetPlayerId)
     const targetViewerId = accountId === null ? null : getViewerIdSync(accountId)
     if (targetViewerId === null || targetViewerId === 0) return null
-    // 队长口径 = 主队伍一号位（players.leader_character_id 是种子默认值，
-    // 历史账号未经 party/edit 写回前是陈旧的，读侧永远以有效队长为准）
+    // 队长口径 = 喜爱配队一号位（回退普通第一编队）。players.leader_character_id
+    // 是种子默认值，历史账号未经 party/edit 写回前是陈旧的，读侧永远以有效队长为准
     const leaderCharacterId = resolveEffectiveLeaderCharacterIdSync(
         targetPlayerId,
         player.leaderCharacterId,
-        player.partySlot,
     )
     return {
         viewer_id: targetViewerId,

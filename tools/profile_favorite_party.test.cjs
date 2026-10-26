@@ -24,7 +24,7 @@ const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("..
 const { insertPlayerCharacterSync } = require("../src/data/domains/character")
 const { updatePlayerPartySync } = require("../src/data/domains/party")
 const { refreshMainPartyLeaderSync } = require("../src/lib/profile-favorite-party")
-const { PartyCategory } = require("../src/data/types")
+const { PartyCategory, PROFILE_FAVORITE_PARTY_CATEGORY } = require("../src/data/types")
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot()
@@ -74,16 +74,16 @@ function makePlayer(name) {
     return { playerId, viewerId }
 }
 
-function makeParty(characterIds, unisonCharacterIds = [null, null, null]) {
+function makeParty(characterIds, unisonCharacterIds = [null, null, null], category = PartyCategory.NORMAL) {
     return {
-        name: "main",
+        name: "party",
         characterIds,
         unisonCharacterIds,
         equipmentIds: [null, null, null],
         abilitySoulIds: [null, null, null],
         edited: true,
         options: { allowOtherPlayersToHealMe: false },
-        category: PartyCategory.NORMAL,
+        category,
         currentBattlePower: 0,
         beforeBattlePower: 0,
     }
@@ -112,87 +112,90 @@ function decodeResponse(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
 
-test("refreshMainPartyLeaderSync links the stored leader to the main party's first member", () => {
+test("leader refresh follows the favorite party, falling back to the normal first party", () => {
     const { playerId } = makePlayer("leader-refresh")
-    // 三个角色，队长位角色带进化
     insertPlayerCharacterSync(playerId, 111007, makeCharacter(111007, { evolutionLevel: 2 }))
     insertPlayerCharacterSync(playerId, 151006, makeCharacter(151006))
     insertPlayerCharacterSync(playerId, 111002, makeCharacter(111002))
-    // 主队伍：party id 1 = 组 1 槽 1
+    // 未配置喜爱配队 → 回退普通第一编队（覆盖默认种子队伍）
     updatePlayerPartySync(playerId, 1, makeParty([111007, 151006, 111002]), 1)
     updatePlayerSync({ id: playerId, partySlot: 1 })
 
-    const nextLeader = refreshMainPartyLeaderSync(playerId, 1, getPlayerSync(playerId).leaderCharacterId)
-    assert.equal(nextLeader, 111007, "队长联动到主队伍一号位")
-    assert.equal(getPlayerSync(playerId).leaderCharacterId, 111007, "存档字段被写回")
+    const fromNormal = refreshMainPartyLeaderSync(playerId, 1)
+    assert.equal(fromNormal, 111007, "未配置喜爱配队时回退普通第一编队一号位")
+    assert.equal(getPlayerSync(playerId).leaderCharacterId, 111007)
 
-    // 一号位为空时顺位取首个非空成员
-    updatePlayerPartySync(playerId, 2, makeParty([null, 151006, 111002]), 1)
-    const fallbackLeader = refreshMainPartyLeaderSync(playerId, 2, 111007)
-    assert.equal(fallbackLeader, 151006, "一号位为空顺位取首位非空成员")
+    // 配置喜爱配队后队长跟随喜爱配队
+    updatePlayerPartySync(playerId, 1, makeParty([151006, null, null], [null, null, null], PROFILE_FAVORITE_PARTY_CATEGORY), 1)
+    const fromFavorite = refreshMainPartyLeaderSync(playerId, 111007)
+    assert.equal(fromFavorite, 151006, "喜爱配队一号位优先于普通编队")
+    assert.equal(getPlayerSync(playerId).leaderCharacterId, 151006)
 
-    // 全空成员的主队伍（party id 99 = 组 10 槽 9）不产生误写，保持现队长
-    updatePlayerPartySync(playerId, 9, makeParty([null, null, null]), 10)
-    const unchanged = refreshMainPartyLeaderSync(playerId, 99, 151006)
-    assert.equal(unchanged, 151006, "全空主队伍保持现队长")
+    // 喜爱配队全空成员 → 不误写，保持现队长
+    updatePlayerPartySync(playerId, 1, makeParty([null, null, null], [null, null, null], PROFILE_FAVORITE_PARTY_CATEGORY), 1)
+    const kept = refreshMainPartyLeaderSync(playerId, 151006)
+    assert.equal(kept, 151006, "全空喜爱配队保持现队长")
     assert.equal(getPlayerSync(playerId).leaderCharacterId, 151006)
 })
 
-test("party id mapping: main_party_id = group*10 + slot (client save layout)", () => {
-    const { playerId } = makePlayer("id-mapping")
-    insertPlayerCharacterSync(playerId, 241003, makeCharacter(241003))
-    insertPlayerCharacterSync(playerId, 131001, makeCharacter(131001))
-    updatePlayerPartySync(playerId, 3, makeParty([241003]), 1)
-    updatePlayerPartySync(playerId, 2, makeParty([131001]), 2)
-    updatePlayerSync({ id: playerId, partySlot: 12 })
-
-    // party id 12 = 组 2 槽 2；party id 3 = 组 1 槽 3
-    const next = refreshMainPartyLeaderSync(playerId, 12, 0)
-    assert.equal(next, 131001, "party id 12 解析为组 2 槽 2")
-    const next3 = refreshMainPartyLeaderSync(playerId, 3, 131001)
-    assert.equal(next3, 241003, "party id 3 解析为组 1 槽 3")
-})
-
-test("get_profile returns the target's main party as favorite_character (F1009 contract)", async () => {
+test("get_profile returns the favorite party when set, normal first party otherwise", async () => {
     const requester = makePlayer("card-viewer")
-    const target = makePlayer("card-target")
-    insertPlayerCharacterSync(target.playerId, 111007, makeCharacter(111007, { evolutionLevel: 2 }))
-    insertPlayerCharacterSync(target.playerId, 151006, makeCharacter(151006))
-    insertPlayerCharacterSync(target.playerId, 111002, makeCharacter(111002, {
+    // 目标 A：配置了喜爱配队（与普通编队不同）
+    const withFavorite = makePlayer("card-favorite")
+    insertPlayerCharacterSync(withFavorite.playerId, 111007, makeCharacter(111007, { evolutionLevel: 2 }))
+    insertPlayerCharacterSync(withFavorite.playerId, 151006, makeCharacter(151006))
+    insertPlayerCharacterSync(withFavorite.playerId, 111002, makeCharacter(111002, {
         exBoost: { statusId: 3, abilityIdList: [51, 52] },
     }))
-    updatePlayerPartySync(target.playerId, 1, makeParty(
-        [111007, 151006, 111002],
-        [null, 111002, null],
+    updatePlayerPartySync(withFavorite.playerId, 1, makeParty([111007, 151006, 111002]), 1)
+    updatePlayerPartySync(withFavorite.playerId, 1, makeParty(
+        [151006, 111002, null],
+        [null, 111007, null],
+        PROFILE_FAVORITE_PARTY_CATEGORY,
     ), 1)
-    updatePlayerSync({ id: target.playerId, partySlot: 1 })
+    updatePlayerSync({ id: withFavorite.playerId, partySlot: 1 })
+    // 目标 B：未配置喜爱配队 → 回退普通第一编队
+    const withoutFavorite = makePlayer("card-normal")
+    insertPlayerCharacterSync(withoutFavorite.playerId, 221002, makeCharacter(221002, { evolutionLevel: 1 }))
+    updatePlayerPartySync(withoutFavorite.playerId, 1, makeParty([221002, 1, null]), 1)
 
     const app = await buildProfileApp()
     try {
-        const response = await app.inject({
+        const favoriteView = decodeResponse(await app.inject({
             method: "POST",
             url: "/profile/get_profile",
-            payload: { viewer_id: requester.viewerId, target_viewer_id: target.viewerId, api_count: 1 },
-        })
-        assert.equal(response.statusCode, 200, response.body)
-        const data = decodeResponse(response).data
-        const favorite = data.favorite_character
+            payload: { viewer_id: requester.viewerId, target_viewer_id: withFavorite.viewerId, api_count: 1 },
+        })).data
         assert.deepEqual(
-            favorite.character_ids,
-            [111007, 151006, 111002],
-            "展示编队 = 主队伍三成员（资料页按位布局，空数组=客户端 F1009）",
+            favoriteView.favorite_character.character_ids,
+            [151006, 111002, null],
+            "资料卡展示编队 = 玩家配置的喜爱配队",
         )
-        assert.deepEqual(favorite.unison_character_ids, [null, 111002, null])
-        assert.deepEqual(favorite.character_ex_boost, [null, null, { status_id: 3, ability_id_list: [51, 52] }],
-            "EX Boost 逐位跟随角色行，无强化位为 null")
-        assert.deepEqual(favorite.unison_character_ex_boost, [null, { status_id: 3, ability_id_list: [51, 52] }, null])
-        assert.equal(data.target_user_info.last_login_region, "CN",
-            "区域信息必填（None = 客户端 ClientError 2821）")
+        assert.deepEqual(favoriteView.favorite_character.unison_character_ids, [null, 111007, null])
+        assert.deepEqual(
+            favoriteView.favorite_character.character_ex_boost,
+            [null, { status_id: 3, ability_id_list: [51, 52] }, null],
+            "EX Boost 逐位跟随角色行",
+        )
         assert.equal(
-            data.target_user_info.leader_character_full_shot_evolution_level,
-            2,
-            "队长立绘进化等级跟随有效队长（主队伍一号位）",
+            favoriteView.target_user_info.leader_character_full_shot_evolution_level,
+            0,
+            "队长立绘进化等级跟随喜爱配队一号位（151006 未进化）",
         )
+        assert.equal(favoriteView.target_user_info.last_login_region, "CN",
+            "区域信息必填（None = 客户端 ClientError 2821）")
+
+        const normalView = decodeResponse(await app.inject({
+            method: "POST",
+            url: "/profile/get_profile",
+            payload: { viewer_id: requester.viewerId, target_viewer_id: withoutFavorite.viewerId, api_count: 2 },
+        })).data
+        assert.deepEqual(
+            normalView.favorite_character.character_ids,
+            [221002, 1, null],
+            "未配置喜爱配队时回退普通第一编队",
+        )
+        assert.equal(normalView.target_user_info.leader_character_full_shot_evolution_level, 1)
     } finally {
         await app.close()
     }
@@ -217,12 +220,12 @@ test("get_profile unknown target answers a non-empty stub party (client renders,
     }
 })
 
-test("follow projection leader follows the target's main party", async () => {
+test("follow projection leader follows the effective (favorite → normal) party", async () => {
     const viewer = makePlayer("follow-viewer")
     const target = makePlayer("follow-target")
     insertPlayerCharacterSync(target.playerId, 221002, makeCharacter(221002, { evolutionLevel: 1 }))
     // 角色 1 已由默认存档种下（evolution 0）；存档 leader 停在种子默认值 1
-    //（历史账号形态），主队伍一号位是 221002
+    //（历史账号形态），普通第一编队一号位是 221002，未配置喜爱配队
     updatePlayerPartySync(target.playerId, 1, makeParty([221002, 1, null]), 1)
     updatePlayerSync({ id: target.playerId, partySlot: 1, leaderCharacterId: 1 })
     getDb().prepare("INSERT INTO players_follows (follower_player_id, followed_player_id, followed_at) VALUES (?, ?, ?)")
@@ -231,6 +234,6 @@ test("follow projection leader follows the target's main party", async () => {
     const { projectRelationFor } = require("../src/routes/api/follow/profile")
     const projected = projectRelationFor(viewer.playerId, target.playerId)
     assert.ok(projected, "关注投影应成功")
-    assert.equal(projected.leader_character_id, 221002, "关注头像角色 = 主队伍一号位（而非陈旧存档值）")
+    assert.equal(projected.leader_character_id, 221002, "关注头像角色 = 有效编队一号位（而非陈旧存档值）")
     assert.equal(projected.leader_character_evolution_img_level, 1, "头像进化等级跟随该角色的真实进化")
 })
