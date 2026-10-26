@@ -38,6 +38,7 @@ const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const { addLocalFollowSync } = require("../src/data/domains/follow")
@@ -338,6 +339,54 @@ async function main() {
         gateRow.attention_key,
         "重发 [3] 不得更换 attention_key",
     )
+
+    // ---- share_room 路由层快照契约：横幅角色 = 战斗所选编队一号位，且携带
+    // 进化等级（缺失会让 attention/check 下发 0 = 未觉醒皮肤） ----
+    const { insertPlayerCharacterSync } = require("../src/data/domains/character")
+    const { updatePlayerPartySync } = require("../src/data/domains/party")
+    const { PartyCategory } = require("../src/data/types")
+    const evolvedLeaderId = 341005
+    const nowForCharacter = new Date()
+    insertPlayerCharacterSync(shareGateHost.playerId, evolvedLeaderId, {
+        entryCount: 1,
+        evolutionLevel: 2,
+        overLimitStep: 0,
+        protection: false,
+        joinTime: nowForCharacter,
+        updateTime: nowForCharacter,
+        exp: 0,
+        stack: 0,
+        manaBoardIndex: 0,
+        bondTokenList: [],
+        illustrationSettings: [2],
+    })
+    updatePlayerPartySync(shareGateHost.playerId, 1, {
+        name: "battle",
+        characterIds: [evolvedLeaderId, null, null],
+        unisonCharacterIds: [null, null, null],
+        equipmentIds: [null, null, null],
+        abilitySoulIds: [null, null, null],
+        edited: true,
+        options: { allowOtherPlayersToHealMe: false },
+        category: PartyCategory.NORMAL,
+        currentBattlePower: 0,
+        beforeBattlePower: 0,
+    })
+    updatePlayerSync({ id: shareGateHost.playerId, partySlot: 1 })
+    const reShared = await post(fastify, shareUrl, {
+        viewer_id: shareGateHost.viewerId,
+        room_number: shareRoom.room_number,
+        share_type_list: [3],
+        api_count: 6,
+    })
+    assert.equal(reShared.statusCode, 200, reShared.body)
+    const snapshotAfterReshare = JSON.parse(db.prepare(
+        "SELECT establisher_json FROM attention_recruitments WHERE room_number = ?"
+    ).get(shareRoom.room_number).establisher_json)
+    assert.equal(snapshotAfterReshare.character, evolvedLeaderId,
+        "横幅角色 = 战斗所选编队一号位（而非存档 leader/房间冻结值）")
+    assert.equal(snapshotAfterReshare.evolutionImgLevel, 2,
+        "路由层落库的快照必须携带进化等级（缺字段 = check 下发 0，铃铛头像未觉醒皮肤）")
 
     // ---- F-06 边界：虚拟偏移在场时，真实钟已过期的招募行不得投递 ----
     // 写侧（share_room/get-or-create）锚真实钟；修复前读侧（check 路由）传虚拟钟，

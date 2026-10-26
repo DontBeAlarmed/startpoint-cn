@@ -409,10 +409,15 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                     roomNumber: body.room_number,
                     isNewbieHost: isNewbieHostSync(hostContext.playerId),
                     establisherJson: buildEstablisherSnapshot({
-                        // 每次重发 live 解析：房内换编队后重投的铃铛横幅 15s 内跟随新编队
+                        // 每次重发 live 解析：房内换编队后重投的铃铛横幅 15s 内跟随新编队。
+                        // 进化等级必须随行——缺失会让 attention/check 下发 0（未觉醒皮肤）
                         character: bellLeaderCharacterId,
                         rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
                         hostEntryTime: room.value.hostEntryTime,
+                        evolutionImgLevel: getCharactersEvolutionImgLevels(
+                            hostContext.playerId,
+                            [bellLeaderCharacterId],
+                        )[0] ?? 0,
                     }),
                     nowMs: getRealNowMs(), // R-15=B
                 });
