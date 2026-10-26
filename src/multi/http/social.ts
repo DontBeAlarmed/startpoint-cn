@@ -5,6 +5,7 @@ import { getPlayerRankLevel } from "../player-context"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin } from "./join-result"
 import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
+import { getCharactersEvolutionImgLevels } from "../../lib/character"
 
 export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
 
@@ -55,7 +56,13 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
                 category_id: room.value.category,
                 establisher: room.value.host.viewerId,
                 establisher_character: room.value.hostMainCharacterId,
-                establisher_character_evolution_img_level: 0,
+                // 房间号加入确认框的房主头像：实查房主队长真实进化等级
+                establisher_character_evolution_img_level: host === null
+                    ? 0
+                    : getCharactersEvolutionImgLevels(
+                        host.playerId,
+                        [room.value.hostMainCharacterId],
+                    )[0] ?? 0,
                 establisher_follow: establisherFollow,
                 establisher_name: host?.player.name ?? `Player${room.value.host.viewerId}`,
                 establisher_rank: getPlayerRankLevel(host?.player.rankPoint ?? 0),

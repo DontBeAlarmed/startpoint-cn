@@ -97,7 +97,9 @@ const routes = async (fastify: FastifyInstance) => {
                 "quest_info": {
                     "category_id": recruitment.category,
                     "establisher_character": snapshot.character,
-                    "establisher_character_evolution_img_level": 0,
+                    // share_room 快照已捕获房主队长真实进化等级（room.ts 实查）；
+                    // 与好友大厅（lobby.ts）同款转发，硬编码 0 会让铃铛弹框头像恒为初始皮肤
+                    "establisher_character_evolution_img_level": Number(snapshot.evolutionImgLevel) || 0,
                     "establisher_follow": establisherFollow,
                     "establisher_rank": snapshot.rankLevel,
                     "host_entry_time": snapshot.hostEntryTime,

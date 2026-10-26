@@ -130,6 +130,7 @@ async function main() {
             character: 341005,
             rankLevel: 42,
             hostEntryTime: 1700,
+            evolutionImgLevel: 3,
         }),
         nowMs: getServerTime() * 1000,
     })
@@ -169,6 +170,8 @@ async function main() {
     assert.equal(bell.quest_info.establisher_rank, 42)
     assert.equal(bell.quest_info.host_entry_time, 1700)
     assert.equal(bell.quest_info.establisher_follow, 0, "无关注关系时为 0")
+    assert.equal(bell.quest_info.establisher_character_evolution_img_level, 3,
+        "快照捕获的进化等级必须原样下发（硬编码 0 = 铃铛弹框头像恒为初始皮肤）")
 
     // ---- check 轮询即 presence 上报 ----
     assert.equal(isPresenceOnline(guest.viewerId), true, "check 轮询必须 touch presence")
