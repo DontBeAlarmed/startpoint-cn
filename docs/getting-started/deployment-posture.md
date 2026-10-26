@@ -8,14 +8,14 @@
 |---|---|---|
 | 管理 API `/api/*` 无鉴权（未设 `ADMIN_API_TOKEN` 时） | 端口可达 | env 开关（`ADMIN_API_TOKEN`）或网络层 |
 | `/tool/signup` 设备断言接管 + 引继源删除 | 知悉/撞到 device_id | **无 env 缓解**——只有网络隔离或补全认证（见第 4 节） |
-| viewer_id 低熵 bearer（9 位、365 天、不轮换） | 可发包即可枚举 | RATE_LIMIT_* 缓解枚举速率；根治需补全会话模型 |
+| viewer_id 低熵 bearer（9 位、365 天、不轮换） | 可发包即可枚举 | **RATE_LIMIT_* 不覆盖普通游戏端点，不缓解枚举**——只有网络隔离；根治需补全会话模型 |
 | 凭据端点爆破（signup/takeover/leiting/crash） | 可发包 | RATE_LIMIT_* 已兜底（默认 10/分/IP，crash 30/分） |
 
 ## 公网最低动作清单
 
 1. 反向代理 + TLS（本服务不做 TLS）；
 2. 防火墙收管理面端口，或设置 `ADMIN_API_TOKEN`；
-3. 确认 `TRUST_PROXY_XFF=1` **仅在可信反代之后**设置——直连公网设它等于不限速；
+3. 确认 `TRUST_PROXY_XFF=1` **仅在可信反代之后**设置——直连公网设它等于不限速；且反代须写 XFF **末段**（追加式 `$proxy_add_x_forwarded_for` 下首段是客户端可伪造值，服务端取末段）；
 4. `web/dist` 需 `npm run build:admin` 重建（token 模式下面板才有 token 输入口）；
 5. 定期备份 `.database/`。
 

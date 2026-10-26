@@ -1,10 +1,18 @@
 import { createHash, timingSafeEqual } from "node:crypto"
 import type { FastifyInstance } from "fastify"
 
-/** 读取 ADMIN_API_TOKEN；未设置或空白返回 null（私人形态：不鉴权）。 */
+/** 读取 ADMIN_API_TOKEN；未设置或空白返回 null（私人形态：不鉴权）。
+ * 设了值但为空白时单独告警——这是最常见的"以为开了鉴权"误配。 */
 export function readAdminApiToken(): string | null {
-    const value = process.env.ADMIN_API_TOKEN?.trim()
-    return value ? value : null
+    const raw = process.env.ADMIN_API_TOKEN
+    const value = raw?.trim()
+    if (!value) {
+        if (raw !== undefined && raw !== "") {
+            console.warn("[POSTURE] ADMIN_API_TOKEN 已设置但全为空白——管理 API 实际不鉴权")
+        }
+        return null
+    }
+    return value
 }
 
 /**

@@ -139,7 +139,9 @@ function logDeploymentPosture(listenHost: string): void {
 
 const crashRateLimiter = createRateLimiter(rateLimitRule("CRASH", 30));
 fastify.addHook("onRequest", async (request, reply) => {
-    if (request.url === "/crash" && crashRateLimiter(request)) {
+    // 路径段精确匹配：request.url 含 query string，仅比 whole-url 会让 /crash?x=1 绕过
+    if ((request.url === "/crash" || request.url.startsWith("/crash?"))
+        && crashRateLimiter(request)) {
         return reply.status(429).send("Too Many Requests");
     }
 });
