@@ -30,6 +30,7 @@ import { productionGameCalendarProvider } from "./time/game-calendar-provider";
 import { registerRuntimeHealthRoute } from "./runtime/health";
 import { loadBundleMetadata } from "./runtime/bundle-metadata";
 import { registerAdminUi } from "./runtime/admin";
+import { readAdminApiToken, requireAdminApiToken } from "./runtime/admin-auth";
 
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import iosLeitingPlugin from "./routes/cn/ios-leiting";
@@ -298,36 +299,47 @@ fastify.register(giftApiPlugin, { prefix: `${apiPrefix}/gift` });
 fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_election` });
 fastify.register(bonusApiPlugin, { prefix: `${apiPrefix}/bonus` });
 
-fastify.register(indexWebApiPlugin, {
-    prefix: "/api",
-    getMultiStatus: () => multiRuntimeService.getAdminStatus(),
-    getMultiManagementService: () => multiManagementService,
-    getRuntimeConfig: () => startupRuntimeConfig,
-    serverTimeService,
-    // loadConfig（启动序列）后必有值；请求期 getter 惰性读取
-    getGameCalendarUtcOffsetMinutes: () => {
-        if (startupRuntimeConfig === null) {
-            throw new Error("runtime config not loaded");
-        }
-        return startupRuntimeConfig.gameCalendarUtcOffsetMinutes;
-    },
-    // 内容 apply 且资产版本推进 → 对所有在线会话广播 AssetUpdate(9)，
-    // 客户端弹窗确认后回标题重走资产检查（仅房间内玩家即时触达，其余等结算兜底/重登）
-    onContentApplied: (previousVersion, currentVersion) => {
-        const notified = sessionManager.broadcastAssetUpdateToAll();
-        console.log(`[CONTENT] AssetUpdate broadcast: ${previousVersion} -> ${currentVersion} sessions=${notified}`);
-    },
-    // Lazy: CDN_DIR may resolve to a directory that only exists under the
-    // local asset mode; avatar requests degrade to 404 when it is absent.
-    getAvatarCdnRoot: () => {
-        try {
-            return resolveCnCdnRoot(process.env.CDN_DIR ?? ".cdn", projectRoot);
-        } catch {
-            return null;
-        }
-    },
+const adminApiToken = readAdminApiToken();
+if (adminApiToken !== null && adminApiToken.length < 16) {
+    console.warn("[ADMIN-AUTH] ADMIN_API_TOKEN 少于 16 字符——建议使用长随机值（openssl rand -base64 32）");
+}
+// 管理面封装作用域：web_api + seeds 挂进同一子树，可选 Bearer 门禁统一覆盖。
+// 游戏 API /api/index.php/* 在兄弟子树，不受影响；registerAdminUi（静态 SPA）留在作用域外。
+fastify.register(async function adminApiScope(scope) {
+    if (adminApiToken !== null) {
+        requireAdminApiToken(scope, adminApiToken);
+    }
+    scope.register(indexWebApiPlugin, {
+        prefix: "/api",
+        getMultiStatus: () => multiRuntimeService.getAdminStatus(),
+        getMultiManagementService: () => multiManagementService,
+        getRuntimeConfig: () => startupRuntimeConfig,
+        serverTimeService,
+        // loadConfig（启动序列）后必有值；请求期 getter 惰性读取
+        getGameCalendarUtcOffsetMinutes: () => {
+            if (startupRuntimeConfig === null) {
+                throw new Error("runtime config not loaded");
+            }
+            return startupRuntimeConfig.gameCalendarUtcOffsetMinutes;
+        },
+        // 内容 apply 且资产版本推进 → 对所有在线会话广播 AssetUpdate(9)，
+        // 客户端弹窗确认后回标题重走资产检查（仅房间内玩家即时触达，其余等结算兜底/重登）
+        onContentApplied: (previousVersion, currentVersion) => {
+            const notified = sessionManager.broadcastAssetUpdateToAll();
+            console.log(`[CONTENT] AssetUpdate broadcast: ${previousVersion} -> ${currentVersion} sessions=${notified}`);
+        },
+        // Lazy: CDN_DIR may resolve to a directory that only exists under the
+        // local asset mode; avatar requests degrade to 404 when it is absent.
+        getAvatarCdnRoot: () => {
+            try {
+                return resolveCnCdnRoot(process.env.CDN_DIR ?? ".cdn", projectRoot);
+            } catch {
+                return null;
+            }
+        },
+    });
+    scope.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 });
-fastify.register(seedsWebApiPlugin, { prefix: "/api/seeds" });
 
 registerAdminUi(fastify, { projectRoot });
 
