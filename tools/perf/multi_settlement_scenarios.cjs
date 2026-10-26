@@ -17,6 +17,7 @@ const { insertAccountSync } = require("../../src/data/domains/account")
 const { setInventoryFixtureItemExactSync } = require("../helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../../src/data/domains/quest_active")
+const { insertPlayerQuestProgressSync } = require("../../src/data/domains/quest")
 const { activeQuests } = require("../../src/lib/quest/active-quest-service")
 const { computeRealTimeStamina } = require("../../src/lib/stamina")
 const { registerBattleRoutes } = require("../../src/multi/http/battle")
@@ -177,6 +178,12 @@ async function runFinishScenario() {
             totalStaminaUsed: 0,
         })
         setInventoryFixtureItemExactSync(playerId, QUEST.ticketId, 1)
+        // R-G04 参加门：challenge_dungeon 2001 的 viewable 前置是主线 1008004 通关
+        insertPlayerQuestProgressSync(playerId, 1, {
+            questId: 1008004,
+            finished: true,
+            unlocked: true,
+        })
         computeRealTimeStamina(getPlayerSync(playerId))
 
         const battle = Object.freeze({

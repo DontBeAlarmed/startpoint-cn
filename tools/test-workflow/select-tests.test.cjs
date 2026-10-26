@@ -2294,6 +2294,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/multi_snapshot_baseline.test.cjs",
         "tools/multi_response_projection.test.cjs",
         "tools/multi_settlement_active_mission.test.cjs",
+        "tools/multi_finish_idempotent.test.cjs",
         "tools/rescue_fragment_reward.test.cjs",
         "tools/rescue_counters.test.cjs",
         "tools/special_quest_party.test.cjs",

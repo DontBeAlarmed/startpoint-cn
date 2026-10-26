@@ -4,15 +4,15 @@
     "finish": {
       "activeQuestCleared": true,
       "observations": {
-        "eventLoopDelayMs": 2271.215615,
-        "latencyMs": 2269.4965389999998
+        "eventLoopDelayMs": 867.172351,
+        "latencyMs": 867.159404
       },
-      "outputSignature": "sha256:b9ae40c5d330d1e889c920e28ccd838d6f55f5d08a332217be41add2a8815686",
+      "outputSignature": "sha256:621bff766a8069d02df26f4dc957853f5f372f23ff1d1acaf9ee57314b23d156",
       "sql": {
         "selectStatements": 71,
-        "statements": 111,
+        "statements": 114,
         "transactionStatements": 12,
-        "writeStatements": 28,
+        "writeStatements": 31,
         "byTable": {
           "players": {
             "reads": 14,
@@ -31,13 +31,13 @@
           },
           "players_active_missions": {
             "reads": 1,
-            "statements": 1,
-            "writes": 0
+            "statements": 3,
+            "writes": 2
           },
           "players_active_missions_stages": {
             "reads": 1,
-            "statements": 1,
-            "writes": 0
+            "statements": 2,
+            "writes": 1
           },
           "players_active_quests": {
             "reads": 1,
