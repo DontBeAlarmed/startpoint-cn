@@ -186,6 +186,8 @@ test("get_profile returns the target's main party as favorite_character (F1009 c
         assert.deepEqual(favorite.character_ex_boost, [null, null, { status_id: 3, ability_id_list: [51, 52] }],
             "EX Boost 逐位跟随角色行，无强化位为 null")
         assert.deepEqual(favorite.unison_character_ex_boost, [null, { status_id: 3, ability_id_list: [51, 52] }, null])
+        assert.equal(data.target_user_info.last_login_region, "CN",
+            "区域信息必填（None = 客户端 ClientError 2821）")
         assert.equal(
             data.target_user_info.leader_character_full_shot_evolution_level,
             2,

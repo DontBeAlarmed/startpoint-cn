@@ -147,7 +147,9 @@ const routes = async (fastify: FastifyInstance) => {
                         comment: "",
                         degree_id: 1,
                         follow_state: 0,
-                        last_login_region: null,
+                        // 其他资料页 getLastLoginRegion 对 None 抛 ClientError 2821
+                        //（"玩家区域信息不存在"）——本服区域恒为 CN
+                        last_login_region: "CN",
                         leader_character_full_shot_evolution_level: 0,
                         max_opened_mana_board_second_count: null,
                         max_owned_character_count: null,
@@ -189,7 +191,9 @@ const routes = async (fastify: FastifyInstance) => {
                     comment: target.comment ?? "",
                     degree_id: target.degreeId || 1,
                     follow_state: followState,
-                    last_login_region: null,
+                    // 其他资料页 getLastLoginRegion 对 None 抛 ClientError 2821
+                    //（"玩家区域信息不存在"）——本服区域恒为 CN
+                    last_login_region: "CN",
                     leader_character_full_shot_evolution_level:
                         getCharactersEvolutionImgLevels(
                             targetPlayerId,
