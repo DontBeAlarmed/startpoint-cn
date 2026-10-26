@@ -288,20 +288,22 @@ function handleConnection(
     }, context.handshakeTimeoutMs)
     handshakeTimer.unref()
 
-    // 每 tick 帧上限：单 socket 大批量帧不得独占事件循环
-    // （参考服 SESSION_MAX_FRAMES_PER_TICK 同款，128 帧/tick + setImmediate 让出）
+    // 每 tick（事件循环轮）帧上限：单 socket 大批量帧不得独占事件循环
+    // （参考服 SESSION_MAX_FRAMES_PER_TICK 同款，128 帧/tick + setImmediate 让出）。
+    // 配额在让出恢复时复位；缓冲自然排空（本轮工作结束）也复位，正常小流量
+    // 每次入站都拿满配额，只有连续洪泛才触发让出。
     const maxFramesPerTick = 128
     let framesProcessedThisTick = 0
     let rescheduleTick: NodeJS.Immediate | null = null
 
     const processBuffer = (): void => {
         if (protocolClosed || handshakePending !== null || !isAccepting(context, socket)) return
-        framesProcessedThisTick = 0
         while (isAccepting(context, socket) && buffer.includes("\0")) {
             if (framesProcessedThisTick >= maxFramesPerTick) {
                 if (rescheduleTick === null) {
                     rescheduleTick = setImmediate(() => {
                         rescheduleTick = null
+                        framesProcessedThisTick = 0
                         processBuffer()
                     })
                 }
@@ -369,6 +371,7 @@ function handleConnection(
                 return
             }
         }
+        if (!buffer.includes("\0")) framesProcessedThisTick = 0
         if (hasOversizedBufferedFrame(buffer, context.maxFrameBytes)) {
             closeForProtocolViolation("unterminated_frame_too_large")
         }

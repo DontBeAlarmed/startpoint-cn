@@ -12,6 +12,7 @@ const Fastify = require("fastify")
 
 const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
 const { registerBattleRoutes } = require("../src/multi/http/battle")
+const { clearFinishResponseCacheForTest } = require("../src/multi/finish-response-cache")
 const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 
 const databaseRoot = fs.mkdtempSync(path.join(os.tmpdir(), "multi-finish-idempotent-db-"))
@@ -58,8 +59,8 @@ const compatibility = Object.freeze({
     modeDigest: `sha256:${"b".repeat(64)}`,
 })
 
-// finish-response-cache 是模块级单例（key 含 playId），每个用例用独立 playId
-// 防止跨用例的缓存命中串扰。
+// finish-response-cache 是模块级单例（key 含 playId），每个用例开头清空缓存、
+// 并用独立 playId，双保险防止跨用例的缓存命中串扰。
 function startPayload(viewerId, playId, overrides = {}) {
     return {
         viewer_id: viewerId,
@@ -107,6 +108,7 @@ function finishPayload(viewerId, playId, overrides = {}) {
 }
 
 async function openIdempotentHome(label) {
+    clearFinishResponseCacheForTest()
     closeDatabase()
     const homeDirectory = path.join(databaseRoot, label)
     process.env.DATA_DIR = homeDirectory
@@ -220,7 +222,7 @@ test("duplicate finish inside the cache TTL replays the original response and se
         })
         assert.equal(second.statusCode, 200, second.body)
         const secondBody = JSON.parse(second.body)
-        assert.deepEqual(secondBody, firstBody, "TTL 内重复 finish 必须逐字节回放首次响应")
+        assert.deepEqual(secondBody, firstBody, "TTL 内重复 finish 必须完整回放首次响应")
 
         const third = await home.app.inject({
             method: "POST",
@@ -256,16 +258,24 @@ test("concurrent duplicate finishes settle exactly once", async () => {
             home.app.inject({ method: "POST", url: "/finish", payload: finishPayload(participant.viewerId, playId) }),
             home.app.inject({ method: "POST", url: "/finish", payload: finishPayload(participant.viewerId, playId) }),
         ])
+        // 允许的结局集合（stub 的 await 链全为微任务，胜者可能先于落败方的
+        // 缓存查询完成写入，两种交错都合法）：
+        //   a) 恰好一个 200（胜者）+ 一个 400（事务冲突/无活跃局）
+        //   b) 双 200：落败方走缓存回放，必须与胜者响应完全一致
+        // 双 400 / 出现 5xx / 响应不一致都禁止。硬不变量：只结算一次。
         for (const response of [a, b]) {
             assert.ok(response.statusCode === 200 || response.statusCode === 400,
-                `并发重复 finish 只允许 200（回放）或 400（冲突），实际 ${response.statusCode}`)
+                `并发重复 finish 只允许 200 或 400，实际 ${response.statusCode}`)
         }
-        assert.equal(a.statusCode, 200, a.body)
-        if (b.statusCode === 200) {
+        const settled = [a, b].filter(response => response.statusCode === 200)
+        assert.ok(settled.length >= 1, `至少一个 200：实际 ${a.statusCode}/${b.statusCode}`)
+        assert.ok(a.statusCode !== 400 || b.statusCode !== 400,
+            `双 400 禁止（胜者恒 200）：实际 ${a.statusCode}/${b.statusCode}`)
+        if (settled.length === 2) {
             assert.deepEqual(
-                JSON.parse(b.body),
                 JSON.parse(a.body),
-                "并发落败方若走缓存回放，必须与胜者响应完全一致",
+                JSON.parse(b.body),
+                "双 200 时落败方必须回放胜者的完全一致响应",
             )
         }
         assert.equal(

@@ -50,6 +50,12 @@ export function cacheFinishResponse(
 ): void {
     const key = cacheKey(viewerId, category, questId, playId)
     if (key === null) return
+    // 插入时顺带清扫链头连续过期条目：低流量下过期条目不必等 LRU 逐出才释放
+    const nowMs = Date.now()
+    for (const [oldestKey, oldest] of cacheByKey) {
+        if (nowMs <= oldest.expiresAtMs) break
+        cacheByKey.delete(oldestKey)
+    }
     if (cacheByKey.size >= DEFAULT_MAX_ENTRIES) {
         const oldest = cacheByKey.keys().next().value
         if (oldest !== undefined) cacheByKey.delete(oldest)
@@ -57,6 +63,11 @@ export function cacheFinishResponse(
     cacheByKey.set(key, {
         key,
         response,
-        expiresAtMs: Date.now() + DEFAULT_TTL_MS,
+        expiresAtMs: nowMs + DEFAULT_TTL_MS,
     })
+}
+
+/** 测试隔离钩子：清空全部缓存条目（生产代码不得调用）。 */
+export function clearFinishResponseCacheForTest(): void {
+    cacheByKey.clear()
 }

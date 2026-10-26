@@ -481,7 +481,8 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         })
         }
         // 宽容解析：CN 客户端的 abort 可能缺 category/quest_id（参考服同型事故），
-        // 以 storedQuest 为主键来源补全；仅显式冲突值才拒绝。
+        // 以 storedQuest 为主键来源补全；身份元组有任何不符（含显式错误值）都走
+        // 200 幂等无操作终态——垃圾/过期请求不得取消在打战斗，状态零破坏。
         const abortQuestId = body.quest_id === undefined || body.quest_id === 0
             ? storedQuest.questId : body.quest_id
         const abortCategory = body.category === undefined || body.category === 0
