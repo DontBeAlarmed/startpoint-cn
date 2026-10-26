@@ -61,18 +61,22 @@ function getQuestJoinGateTable(
     return table
 }
 
-/** 门查找的 fail-open 包装：内容快照不可用（如无内容环境的注入测试）时不阻塞加入。 */
+/** 门查找的 fail-open 包装：内容快照未初始化（如无内容环境的注入测试）时不
+ * 阻塞加入。表损坏/校验失败不属于"快照不可用"——大声抛出，不静默放行。 */
 function tryGetQuestJoinGateSection(
     category: number,
     repository?: ReadonlyContentRepository,
 ): BossJoinGateSection | null {
+    const section = GATE_SECTION_BY_CATEGORY[category]
+    if (section === undefined) return null
+    let resolved: ReadonlyContentRepository
     try {
-        const section = GATE_SECTION_BY_CATEGORY[category]
-        if (section === undefined) return null
-        return getQuestJoinGateTable(repository)[section] ?? null
+        resolved = repository ?? getContentSnapshot().repository
     } catch {
+        // 仅快照未初始化走 fail-open（ContentSnapshotError/其它初始化错误）
         return null
     }
+    return getQuestJoinGateTable(resolved)[section] ?? null
 }
 
 // 房间 category → 门表分节。single/multi 变体（如降临 7/8）共用同一张任务表。

@@ -847,9 +847,14 @@ export function buildQuestJoinGates(
         const source = QUEST_TABLE_SOURCES[tableKey]
         if (!tree || !source) continue
         for (const { path: rowPath, fields } of collectRows(tableName, tree, source.nestingDepth)) {
-            const questId = Number(fields[0])
+            // character_quest 的行主键在 path[0]（角色 id），不在 fields[0]
+            //（该列是角色内序号）——与 questIdForRow 同一口径
+            const questIdRaw = tableName === "character_quest.json"
+                ? rowPath[0]
+                : fields[0]
+            const questId = Number(questIdRaw)
             if (!Number.isSafeInteger(questId)) {
-                invalidQuest(tableName, `row id ${String(fields[0])} is not numeric`)
+                invalidQuest(tableName, `row id ${String(questIdRaw)} is not numeric`)
             }
             const gates: { category: number; questId: number }[] = []
             for (const [kindColumn, resolvedColumn] of [

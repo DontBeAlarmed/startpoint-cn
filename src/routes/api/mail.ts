@@ -219,13 +219,16 @@ const routes = async (fastify: FastifyInstance) => {
                 })
             }
             // R-G03：超容单领走带内结果码（200+result_code），不走 HTTP 400——
-            // 客户端把任何 4xx 渲染成 H400 意外错误踢回登录；200+非白名单
-            // result_code（2005）在客户端是静默无操作：邮件保留、留在列表页，
-            // 领取意图的提示由客户端自身的 canBeReceived 预检承担。
+            // 客户端把任何 4xx 渲染成 H400 意外错误踢回登录。客户端只对
+            // 2001/2002/2004 走站内 ReceiveError（MailReceiveRealRemote
+            // errorHandler case 8）；2005 等其它码落 defaultErrorHandler，
+            // 与 400 同 UX（错误框+回标题）。超容映射到泛化的"无法领取"
+            // 2001：邮件保留、留在列表页；领取意图的预检由客户端自身的
+            // canBeReceived 承担（官方语义中服务器永不超容拒绝）。
             if (error instanceof MailRewardCapacityError) {
                 reply.header("content-type", "application/x-msgpack")
                 return reply.status(200).send({
-                    data_headers: generateDataHeaders({ viewer_id: body.viewer_id, result_code: 2005 }),
+                    data_headers: generateDataHeaders({ viewer_id: body.viewer_id, result_code: 2001 }),
                     data: {},
                 })
             }

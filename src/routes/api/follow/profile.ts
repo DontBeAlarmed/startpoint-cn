@@ -51,7 +51,10 @@ export function projectFollowUser(
         last_login_time: Math.floor(player.lastLoginTime.getTime() / 1000),
         last_login_region: null,
         leader_character_id: player.leaderCharacterId ?? 0,
-        leader_character_evolution_img_level: 0,
+        leader_character_evolution_img_level: getCharactersEvolutionImgLevels(
+            targetPlayerId,
+            [player.leaderCharacterId ?? 0],
+        )[0] ?? 0,
         follow_state: relation.state,
         follow_time: relation.followTime === null ? null : Math.floor(relation.followTime / 1000),
         followed_time: relation.followedTime === null ? null : Math.floor(relation.followedTime / 1000),
