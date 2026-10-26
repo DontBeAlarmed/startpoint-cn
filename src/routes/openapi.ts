@@ -5,6 +5,11 @@ import { getAccount, getAccountFromIdpIdSync, insertAccount, updateAccount } fro
 import { getAccountFromPlayerIdSync } from "../data/domains/player"
 import { getAccountIdentityProvider } from "../lib/account-identity-provider";
 import { getRealNow, getRealNowMs } from "../runtime/time/game-time";
+import { randomBytes } from "crypto";
+
+// 设备 access token 占位值：客户端 SDK 只透传，服务端从不校验。
+// 不得硬编码常量——公共仓库里的固定值会被当作已泄露的凭据。
+const DEVICE_ACCESS_TOKEN = randomBytes(48).toString("base64");
 
 interface CreateDeviceAccessTokenBody {
     adid: string
@@ -131,7 +136,7 @@ const routes = async (fastify: FastifyInstance) => {
         //const body = request.body as CreateDeviceAccessTokenBody
         
         reply.status(200).send({
-            "accessToken": "fwPla7fQ8ty9+DZT/lD//uWZD4uD6C4lD6gGIIZTLKRTQ52/SLCRmk/370jcWGs+e+1iSoZtL7lj8ov9B0/jHmijH4nsHPQT6pchaQM1M9mtwYNQq0BWhVr9hF0jjCK/a5LIVd1kBac/Gemv29WKEDKSrUS9HxxUigoPRwtOy8m+oDj9FmDJZ+rzqWCc0QjES4Ky0fTpXZ7ESoguDzNmRtW3FYr+OFexw8wBPlwiC4w=",
+            "accessToken": DEVICE_ACCESS_TOKEN,
             "expiryTime": getRealNowMs() + 4600000
         })
     })

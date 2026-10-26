@@ -24,17 +24,6 @@ interface CnSignupBody {
     advertise_id?: string;
 }
 
-function generateLoginToken(): string {
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    let token = "";
-    for (let i = 0; i < 32; i++) {
-        token += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return token;
-}
-
-const viewerIdToAccountId = new Map<number, number>();
-
 interface GetHeaderResponseBody {
     viewer_id: number
 }
@@ -74,7 +63,6 @@ const routes = async (fastify: FastifyInstance) => {
         const shortUdid = 0;
         const deviceId = body.device_id
 
-        const loginToken = generateLoginToken();
         let accountId: number;
         let newAccount = true;
         let viewerId: number | undefined;   // set when reusing existing session
@@ -133,8 +121,6 @@ const routes = async (fastify: FastifyInstance) => {
             expires: new Date(getRealNowMs() + 365 * 24 * 60 * 60 * 1000)
         });
 
-        viewerIdToAccountId.set(viewerId, accountId);
-
         // 新登录会话：推进经济幂等世代——客户端 api_count 回标题归零，重登后
         // 同计数请求不得回放旧会话响应（跨会话误回放=静默跳过业务执行）
         const signupPlayerId = resolvePlayerIdSync(accountId)
@@ -150,7 +136,6 @@ const routes = async (fastify: FastifyInstance) => {
                 udid: udid,
             }),
             data: {
-                login_token: loginToken,
                 newAccount: newAccount ? 1 : 0,
                 roleName: `Player${accountId}`,
                 accountName: `Player${accountId}`,
