@@ -753,6 +753,21 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
         staminaHealTime: new Date(Math.floor(Date.now() / 1_000) * 1_000),
         totalStaminaUsed: 0,
     })
+    // R-G04 参加门统一 seed：productionQuest(2001) 与 activityHardMultiQuest
+    // (100002001) 的 viewable 前置链。bundled 快照携带门数据，不 seed 则
+    // /start 被门拒（断言 200 的用例炸 / origin-gate 用例死等在 gate promise 上）。
+    for (const [gateSection, gateQuestId] of [
+        [1, 1008004],      // 2001 的门（主线）
+        [13, 1038],        // 100002001 的门（挑战副本）
+        [7, 200077004],    // 100002001 的门（降临）
+    ]) {
+        getDb().prepare(`
+            INSERT INTO players_quest_progress (
+                section, quest_id, finished, unlocked, multi_clear_count, player_id
+            ) VALUES (?, ?, 1, 1, 0, ?)
+            ON CONFLICT (section, quest_id, player_id) DO UPDATE SET finished = 1
+        `).run(gateSection, gateQuestId, playerId)
+    }
     const quest = options.quest ?? productionQuest
     if (quest.ticketId !== undefined) grantInventoryFixtureItemSync(playerId, quest.ticketId, 1)
     const entryStamina = computeRealTimeStamina(getPlayerSync(playerId))
@@ -847,16 +862,6 @@ test("production /finish settles activity hard multi periodic rewards for host a
                 { quest: activityHardMultiQuest },
             )
             const playId = `periodic-route-${label}`
-            // R-G04：100002001 的 viewable 前置链（挑战副本 1038 + 降临 200077004）
-            // ——seed 通关事实以通过参加门（生产环境语义：解锁后开战）
-            for (const [gateSection, gateQuestId] of [[13, 1038], [7, 200077004]]) {
-                home.db.prepare(`
-                    INSERT INTO players_quest_progress (
-                        section, quest_id, finished, unlocked, multi_clear_count, player_id
-                    ) VALUES (?, ?, 1, 1, 0, ?)
-                    ON CONFLICT (section, quest_id, player_id) DO UPDATE SET finished = 1
-                `).run(gateSection, gateQuestId, home.playerId)
-            }
             const questFields = {
                 category: activityHardMultiQuest.category,
                 quest_id: activityHardMultiQuest.questId,
@@ -1568,7 +1573,8 @@ for (const [label, participant, isHost] of [
             finalized = true
             grantInventoryFixtureItemSync(home.playerId, productionQuest.ticketId, 1)
             const settledOnce = observableSettlementState(home.db, home.playerId)
-            assert.equal(settledOnce.questHistory.length, 1)
+            const clearedHistory = settledOnce.questHistory.filter(row => row.multi_clear_count > 0)
+            assert.equal(clearedHistory.length, 1, "统一门 seed 行不参与结算口径")
             assert.ok(settledOnce.inventory.length > 0)
 
             const restarted = await home.app.inject({
@@ -1654,8 +1660,9 @@ test("production /finish consumes one SQLite settlement after both requests pass
         assert.equal(first.statusCode, 200, first.body)
         const settledOnce = observableSettlementState(home.db, home.playerId)
         assert.equal(settledOnce.activeQuest.length, 0)
-        assert.equal(settledOnce.questHistory.length, 1)
-        assert.equal(settledOnce.questHistory[0].multi_clear_count, 1)
+        const clearedHistory = settledOnce.questHistory.filter(row => row.multi_clear_count > 0)
+        assert.equal(clearedHistory.length, 1, "统一门 seed 行不参与结算口径")
+        assert.equal(clearedHistory[0].multi_clear_count, 1)
         assert.equal(settledOnce.missionFacts[0].multi_clear_count, 1)
         assert.ok(settledOnce.inventory.length > 0, "真实奖励必须落入库存")
 
