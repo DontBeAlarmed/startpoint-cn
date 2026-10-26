@@ -49,9 +49,10 @@ test.after(() => {
 
 test("social capacity policy reads follow limits from content config", () => {
     const policy = getSocialCapacityPolicySync()
-    assert.equal(policy.maxFollows, 100)
-    assert.equal(policy.maxFollowers, 50)
-    assert.equal(policy.maxDisplayFollowers, 50)
+    // config_iosbundled 官方真值（2f6b6075 对齐）：300 / 1500 / 100
+    assert.equal(policy.maxFollows, 300)
+    assert.equal(policy.maxFollowers, 1500)
+    assert.equal(policy.maxDisplayFollowers, 100)
 })
 
 test("relation state derives from both edge directions with per-edge times", () => {
@@ -92,8 +93,48 @@ test("add validates self, missing target and capacity limits from config", () =>
         "missing_target",
     )
 
-    const { maxFollows } = getSocialCapacityPolicySync()
-    const targets = Array.from({ length: maxFollows }, (_, index) => freshPlayer(`add-t${index}`))
+    const { maxFollows, maxFollowers } = getSocialCapacityPolicySync()
+    assert.equal(maxFollows, 300)
+    assert.equal(maxFollowers, 1500)
+
+    // 官方上限是 300/1500：完整默认玩家初始化（missions/box gacha 等）单个
+    // ~60ms，1800 个会超组内 120s 每测试上限。容量语义只需要"玩家行存在"，
+    // 用模板玩家 + SQL 行克隆（账户走轻量 insertAccountSync）铺量。
+    const { getDb } = require("../src/data/db")
+    const db = getDb()
+    const cloneColumns = db.prepare("PRAGMA table_info(players)").all()
+        .map(column => column.name)
+        .filter(name => name !== "id" && name !== "account_id" && name !== "name")
+    const clonePlayer = db.prepare(`
+        INSERT INTO players (id, account_id, name, ${cloneColumns.join(", ")})
+        SELECT ?, ?, ?, ${cloneColumns.join(", ")} FROM players WHERE id = ?
+    `)
+    const { insertAccountSync } = require("../src/data/domains/account")
+    function makeLightPlayers(templateId, tag, count) {
+        return db.transaction(() => {
+            const ids = []
+            for (let index = 0; index < count; index += 1) {
+                const accountId = insertAccountSync({
+                    appId: "wf_cn",
+                    idpAlias: "",
+                    idpCode: "test",
+                    idpId: `${tag}-${index}-${Math.random()}`,
+                    status: "normal",
+                }).id
+                const info = clonePlayer.run(
+                    800_000_000 + Math.floor(Math.random() * 99_999_999),
+                    accountId,
+                    `${tag}-${index}`,
+                    templateId,
+                )
+                ids.push(Number(info.lastInsertRowid))
+            }
+            return ids
+        })()
+    }
+
+    // 关注上限：关注满 maxFollows 人后再关注 → source_limit
+    const targets = makeLightPlayers(a, "add-t", maxFollows)
     for (const target of targets) {
         assert.equal(
             addLocalFollowSync({ sourcePlayerId: a, targetPlayerId: target, followedAtMs: 1 }).ok,
@@ -108,9 +149,7 @@ test("add validates self, missing target and capacity limits from config", () =>
 
     // 目标被关注上限：maxFollowers 名粉丝后再关注 → target_limit
     const star = freshPlayer("add-star")
-    const fans = Array.from({ length: maxFollows > 50 ? 50 : maxFollows }, (_, index) => (
-        freshPlayer(`add-fan${index}`)
-    ))
+    const fans = makeLightPlayers(star, "add-fan", maxFollowers)
     for (const fan of fans) {
         assert.equal(addLocalFollowSync({
             sourcePlayerId: fan, targetPlayerId: star, followedAtMs: 1,

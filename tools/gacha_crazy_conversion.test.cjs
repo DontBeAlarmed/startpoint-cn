@@ -303,10 +303,10 @@ test("expired points convert once, respect Star Crumb cap, mail overflow and ack
         url: "/mail/receive",
         payload: { viewer_id: viewerId, mail_id: overflow[0].id, api_count: 1 },
     })
-    // 超容量领取走带内结果码 2005（客户端静默不领取）且邮件保留（花费后可再领）——
+    // 超容量领取走带内结果码 2001（客户端站内 ReceiveError）且邮件保留（花费后可再领）——
     // 不消费邮件（否则溢出附件被静默丢失）；不再以 HTTP 400 踢登录（R-G03）
     assert.equal(blockedClaim.statusCode, 200, blockedClaim.body)
-    assert.equal(unpack(Buffer.from(blockedClaim.body, "base64")).data_headers.result_code, 2005)
+    assert.equal(unpack(Buffer.from(blockedClaim.body, "base64")).data_headers.result_code, 2001)
     assert.equal(getPlayerSync(playerId).starCrumb, maxStarCrumb)
     assert.equal(getPlayerMailsSync(playerId, 1, 100, true)
         .some(mail => mail.id === overflow[0].id

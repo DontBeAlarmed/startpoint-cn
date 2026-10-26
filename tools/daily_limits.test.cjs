@@ -2,7 +2,7 @@
 
 // R-daily 反例回归：
 // ① 扭蛋每日上限——计数按池、上限全局（99/99）、真实业务日重置、响应带计数；
-// ② 星导石邮件——免费余额+附件 > 999999 统一拒绝（2005），admin 发送端同口径拦截；
+// ② 星导石邮件——合并钱包余额+附件 > 999999 统一拒绝（带内 2001 ReceiveError），admin 发送端同口径拦截；
 // ③ search_twitter 空响应（合法 200，防 404 踢人）。
 
 require("ts-node/register/transpile-only")
@@ -150,7 +150,7 @@ test("gacha ten-draw limit rejects after 99 ten-draws", async () => {
 
 // ---------- ② 星导石邮件容量 ----------
 
-test("free vmoney mail over capacity is rejected in-band (2005), aligned with client", async () => {
+test("free vmoney mail over capacity is rejected in-band (2001 ReceiveError), aligned with client wallet", async () => {
     const { insertMailSync, getMailArrivedSync } = require("../src/data/domains/mail")
     const { MailType } = require("../src/data/domains/mail")
     const { getCurrencyCapacityPolicySync } = require("../src/lib/config-content")
@@ -175,7 +175,8 @@ test("free vmoney mail over capacity is rejected in-band (2005), aligned with cl
     await fastify.ready()
     test.after?.(() => fastify.close())
 
-    // 近顶余额（差 10）+ 100 星导石邮件 → 2005 不领取
+    // 近顶免费余额（差 10）+ 100 星导石邮件 → 超容拒（带内 2001，邮件保留）。
+    // 客户端 canGetVirtualMoney 是合并钱包：vmoney + free_vmoney + n <= max。
     updatePlayerSync({ id: playerId, freeVmoney: maxVmoney - 10 })
     const mailId = insertMailSync(playerId, {
         reason_id: 0,
@@ -193,15 +194,26 @@ test("free vmoney mail over capacity is rejected in-band (2005), aligned with cl
         viewer_id: viewerId, mail_id: mailId, api_count: 1,
     })
     assert.equal(response.statusCode, 200)
-    assert.equal(decode(response).data_headers.result_code, 2005)
+    assert.equal(decode(response).data_headers.result_code, 2001,
+        "超容映射白名单 ReceiveError（2001）：客户端站内处理，不回标题")
     assert.equal(getPlayerSync(playerId).freeVmoney, maxVmoney - 10, "拒绝时余额不动")
     const stillThere = db.prepare(
         "SELECT receive_time FROM players_mails WHERE id = ?"
     ).get(mailId)
     assert.equal(stillToReceive(stillThere), true, "邮件保留")
 
-    // 正常域：余额 0 + 100 → 领取成功
-    updatePlayerSync({ id: playerId, freeVmoney: 0 })
+    // 合并钱包判定：付费余额占容量时同样拒（客户端 get_virtualMoney 合并口径）
+    updatePlayerSync({ id: playerId, freeVmoney: maxVmoney - 10, vmoney: 50 })
+    const paidBlock = await post(fastify, "/api/index.php/mail/receive", {
+        viewer_id: viewerId, mail_id: mailId, api_count: 3,
+    })
+    assert.equal(paidBlock.statusCode, 200)
+    assert.equal(decode(paidBlock).data_headers.result_code, 2001,
+        "付费余额挤占容量时同样拒绝（合并钱包）")
+    assert.equal(getPlayerSync(playerId).freeVmoney, maxVmoney - 10)
+
+    // 正常域：合并钱包腾出空间 + 100 → 领取成功
+    updatePlayerSync({ id: playerId, freeVmoney: 0, vmoney: 0 })
     const ok = await post(fastify, "/api/index.php/mail/receive", {
         viewer_id: viewerId, mail_id: mailId, api_count: 2,
     })

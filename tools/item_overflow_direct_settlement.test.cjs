@@ -80,8 +80,12 @@ test("direct settlement sells sellable overflow and mails unsellable overflow in
 })
 
 test("direct settlement sends sold Mana beyond capacity to FREE_MANA Mail", () => {
+    const { getCurrencyCapacityPolicySync } = require("../src/lib/config-content")
+    const maxMana = getCurrencyCapacityPolicySync().maxMana
+    assert.equal(maxMana, 999999999, "官方玛纳上限（config_iosbundled 对齐）")
     const player = getPlayerSync(playerId)
-    updatePlayerSync({ id: playerId, freeMana: 99999999 - player.paidMana - 5 })
+    // 逼近真实容量上限：差 5 满时卖 10 玛纳 → 5 入包、5 溢出转邮件
+    updatePlayerSync({ id: playerId, freeMana: maxMana - player.paidMana - 5 })
     const before = getPlayerSync(playerId)
     const result = database.transaction(() => settleDirectItemOverflowsWithinTransactionSync({
         playerId,
