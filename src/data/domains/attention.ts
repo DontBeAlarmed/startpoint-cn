@@ -61,6 +61,16 @@ export interface AttentionStore {
     /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null；
      * includeExpired=true 时不过滤过期（释放点服务端接管行寿命的兜底读） */
     findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number, includeExpired?: boolean): AttentionRecruitment | null
+    /** 房内即时刷新：房主切换编队时重建 open 招募的房主快照（角色+进化等级） */
+    updateOpenRecruitmentSnapshotForRoom(
+        hostPid: number,
+        hostViewerId: number,
+        roomNumber: string,
+        nowMs: number,
+        patch: { character: number; evolutionImgLevel: number },
+    ): void
+    /** 房主当前所有未过期 open 招募的房间号（房内即时刷新的定位用） */
+    listOpenRecruitmentRoomNumbersForHost(hostPid: number, hostViewerId: number, nowMs: number): string[]
     /** T2 门票：投递行存在且未被拒绝（delivered/accepted 均持票） */
     hasActiveDelivery(recruitmentId: number, viewerId: number): boolean
     recordResponse(
@@ -183,7 +193,9 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         /**
          * 读时惰性投递：guest 轮询 check 时才写入投递行（对齐官方
          * "房主 15s 重发 × guest 轮询"节奏，晚上线玩家下次轮询自然收到）。
-         * 返回该玩家当前应见到的铃铛（新投递 + 已投递未响应），并保证投递行存在。
+         * **每个招募对每个 viewer 只投递一次**（客户端 receive 按空槽插入、
+         * 不按 key 去重——重投已投递条目会在弹框里堆叠同一房间的多个铃铛）；
+         * 铃铛消失由客户端本地过期（随招募生命周期）处理。
          * 已 accepted/declined 的不再出现；房主自己的招募对自己不可见。
          */
         deliverOpenRecruitmentsToViewer(viewerId, nowMs, limit) {
@@ -193,7 +205,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
                     ON d.recruitment_id = r.id AND d.viewer_id = ?
                 WHERE r.status = 'open' AND r.expires_at_ms > ?
                     AND r.host_viewer_id != ?
-                    AND (d.state IS NULL OR d.state = 'delivered')
+                    AND d.state IS NULL
                 ORDER BY r.posted_at_ms DESC
                 LIMIT ?
             `).all(viewerId, nowMs, viewerId, limit) as Array<Record<string, unknown>>
@@ -263,6 +275,48 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
                 WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
                     AND expires_at_ms > ?
             `).run(nowMs + lifetimeMs, hostViewerId, roomNumber, nowMs)
+        },
+
+        /** 房内即时刷新：房主切换编队（party/edit 或 TCP Enter 帧）时重建 open
+         * 招募的房主快照。patch 只覆盖角色与进化等级；rank/name/hostEntryTime
+         * 保留原值（15s 重发会带全新快照，这里只做即时补丁）。无 open 行则空操作。 */
+        updateOpenRecruitmentSnapshotForRoom(
+            hostPid: number,
+            hostViewerId: number,
+            roomNumber: string,
+            nowMs: number,
+            patch: { character: number; evolutionImgLevel: number },
+        ) {
+            const immediate = db.transaction(() => {
+                const row = db.prepare(`
+                    SELECT id, establisher_json FROM attention_recruitments
+                    WHERE host_pid = ? AND host_viewer_id = ? AND room_number = ?
+                        AND status = 'open' AND expires_at_ms > ?
+                    LIMIT 1
+                `).get(hostPid, hostViewerId, roomNumber, nowMs) as
+                    { id: number; establisher_json: string } | undefined
+                if (row === undefined) return
+                const parsed = parseEstablisherSnapshot(row.establisher_json)
+                db.prepare(`
+                    UPDATE attention_recruitments SET establisher_json = ? WHERE id = ?
+                `).run(buildEstablisherSnapshot({
+                    character: patch.character,
+                    rankLevel: parsed.rankLevel,
+                    hostEntryTime: parsed.hostEntryTime,
+                    ...(parsed.name !== undefined ? { name: parsed.name } : {}),
+                    evolutionImgLevel: patch.evolutionImgLevel,
+                }), row.id)
+            })
+            immediate()
+        },
+
+        listOpenRecruitmentRoomNumbersForHost(hostPid: number, hostViewerId: number, nowMs: number): string[] {
+            const rows = db.prepare(`
+                SELECT room_number FROM attention_recruitments
+                WHERE host_pid = ? AND host_viewer_id = ? AND status = 'open'
+                    AND expires_at_ms > ?
+            `).all(hostPid, hostViewerId, nowMs) as Array<{ room_number: string }>
+            return rows.map(row => row.room_number)
         },
 
         /** 热切换清扫：publishBell on→off 时全量关闭 open 招募（共享库下跨节点生效） */
@@ -363,6 +417,24 @@ export function refreshRecruitmentForRoom(
     lifetimeMs: number,
 ): void {
     getAttentionStore().refreshRecruitmentForRoom(hostViewerId, roomNumber, nowMs, lifetimeMs)
+}
+
+export function updateOpenRecruitmentSnapshotForRoom(
+    hostPid: number,
+    hostViewerId: number,
+    roomNumber: string,
+    nowMs: number,
+    patch: { character: number; evolutionImgLevel: number },
+): void {
+    getAttentionStore().updateOpenRecruitmentSnapshotForRoom(hostPid, hostViewerId, roomNumber, nowMs, patch)
+}
+
+export function listOpenRecruitmentRoomNumbersForHost(
+    hostPid: number,
+    hostViewerId: number,
+    nowMs: number,
+): string[] {
+    return getAttentionStore().listOpenRecruitmentRoomNumbersForHost(hostPid, hostViewerId, nowMs)
 }
 
 export function recordResponse(

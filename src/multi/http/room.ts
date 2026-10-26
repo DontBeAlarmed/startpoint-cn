@@ -22,6 +22,7 @@ import {
 } from "../../data/domains/attention";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { getCharactersEvolutionImgLevels } from "../../lib/character";
+import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader";
 import { openRoomShareRow } from "../room/share-sync";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import { getPlayerRankLevel } from "../player-context";
@@ -368,13 +369,23 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                     questId: room.value.questId,
                     shareBits,
                     establisherJson: buildEstablisherSnapshot({
-                        character: room.value.hostMainCharacterId,
+                        // 每次重发 live 解析当前战斗所选编队一号位：房内改编队，
+                        // 好友大厅横幅 15s 内跟随（诚实展示当前配队状态）
+                        character: resolveBattlePartyLeaderCharacterIdSync(
+                            hostContext.playerId,
+                            hostContext.player.partySlot,
+                            hostContext.player.leaderCharacterId,
+                        ),
                         rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
                         hostEntryTime: room.value.hostEntryTime,
                         name: hostContext.player.name,
                         evolutionImgLevel: getCharactersEvolutionImgLevels(
                             hostContext.playerId,
-                            [room.value.hostMainCharacterId],
+                            [resolveBattlePartyLeaderCharacterIdSync(
+                                hostContext.playerId,
+                                hostContext.player.partySlot,
+                                hostContext.player.leaderCharacterId,
+                            )],
                         )[0] ?? 0,
                     }),
                 })
@@ -385,6 +396,11 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         if (wantsRecruitment) {
             // 尽力而为：招募落库/过期清理失败不得阻断分享主流程（15s 重发自愈）
             try {
+                const bellLeaderCharacterId = resolveBattlePartyLeaderCharacterIdSync(
+                    hostContext.playerId,
+                    hostContext.player.partySlot,
+                    hostContext.player.leaderCharacterId,
+                );
                 const recruitment = getOrCreateRecruitmentForRoom({
                     hostPid: hostContext.playerId,
                     hostViewerId: viewerId,
@@ -393,7 +409,8 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                     roomNumber: body.room_number,
                     isNewbieHost: isNewbieHostSync(hostContext.playerId),
                     establisherJson: buildEstablisherSnapshot({
-                        character: room.value.hostMainCharacterId,
+                        // 每次重发 live 解析：房内换编队后重投的铃铛横幅 15s 内跟随新编队
+                        character: bellLeaderCharacterId,
                         rankLevel: getPlayerRankLevel(hostContext.player.rankPoint ?? 0),
                         hostEntryTime: room.value.hostEntryTime,
                     }),

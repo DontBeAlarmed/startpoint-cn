@@ -11,7 +11,9 @@ import {
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { applyNpcPostFill } from "../npc/release"
-import { closeRecruitmentForRoom } from "../../data/domains/attention"
+import { closeRecruitmentForRoom, updateOpenRecruitmentSnapshotForRoom } from "../../data/domains/attention"
+import { getCharactersEvolutionImgLevels } from "../../lib/character"
+import { getRealNowMs } from "../../runtime/time/game-time"
 import type { MultiRoom } from "../../lib/types"
 import { RoomState } from "../types"
 import {
@@ -20,7 +22,6 @@ import {
     scheduleLobbyTask,
 } from "./lobby-lifecycle"
 import { updatePlayerSnapshotParty } from "../snapshot/player-snapshot"
-import { getRealNowMs } from "../../runtime/time/game-time"
 import { participantKey, type ParticipantIdentity } from "../coordinator/contracts"
 
 const DEFAULT_NPC_JOIN_DELAY_MS = 2_000
@@ -514,6 +515,30 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 
     if (isHost) {
         updateRoomState(client.roomNumber, 1)
+        // 房内切换编队的即时刷新：重写 open 招募的房主快照（角色 = 本次上报
+        // 编队一号位）。尽力而为：失败由 15s 重发兜底。进化等级按房间主人的
+        // 玩家行实查（client 会话不携带 playerId）。
+        try {
+            const enteredRoom = getRoom(client.roomNumber)
+            const hostPlayerId = enteredRoom?.host_player_id
+            const leaderId = Array.isArray(ed.party?.characterIds)
+                ? ed.party.characterIds.find((id: unknown) => typeof id === "number" && id > 0) ?? 0
+                : 0
+            if (hostPlayerId !== undefined && leaderId > 0) {
+                updateOpenRecruitmentSnapshotForRoom(
+                    hostPlayerId,
+                    client.viewerId,
+                    client.roomNumber,
+                    getRealNowMs(),
+                    {
+                        character: leaderId,
+                        evolutionImgLevel: getCharactersEvolutionImgLevels(hostPlayerId, [leaderId])[0] ?? 0,
+                    },
+                )
+            }
+        } catch (error) {
+            console.warn(`[LOBBY] in-room bell snapshot refresh failed room=${client.roomNumber}`, describeError(error))
+        }
     }
 
     const hostClient = findHostClient(client.roomNumber)

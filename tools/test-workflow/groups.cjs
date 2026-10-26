@@ -471,6 +471,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mail_overflow.test.cjs",
             "tools/mail_receive_transaction.test.cjs",
             "tools/profile_favorite_party.test.cjs",
+            "tools/battle_party_leader.test.cjs",
             "tools/mission_category_batch_read.test.cjs",
             "tools/player_history_profile_route.test.cjs",
             "tools/player_save_schema_guard.test.cjs",

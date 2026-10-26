@@ -6,6 +6,7 @@ import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin } from "./join-result"
 import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
 import { getCharactersEvolutionImgLevels } from "../../lib/character"
+import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader"
 
 export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
 
@@ -48,6 +49,14 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
             requesterPlayerId: ctx.playerId,
             hostPlayerId: host?.playerId ?? null,
         })
+        // 房间号加入确认框：诚实展示房主当前战斗所选编队一号位（与喜爱配队解耦）
+        const establisherCharacter = host === null
+            ? room.value.hostMainCharacterId
+            : resolveBattlePartyLeaderCharacterIdSync(
+                host.playerId,
+                host.player.partySlot,
+                host.player.leaderCharacterId,
+            )
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -55,13 +64,12 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
                 room_exists: true,
                 category_id: room.value.category,
                 establisher: room.value.host.viewerId,
-                establisher_character: room.value.hostMainCharacterId,
-                // 房间号加入确认框的房主头像：实查房主队长真实进化等级
+                establisher_character: establisherCharacter,
                 establisher_character_evolution_img_level: host === null
                     ? 0
                     : getCharactersEvolutionImgLevels(
                         host.playerId,
-                        [room.value.hostMainCharacterId],
+                        [establisherCharacter],
                     )[0] ?? 0,
                 establisher_follow: establisherFollow,
                 establisher_name: host?.player.name ?? `Player${room.value.host.viewerId}`,

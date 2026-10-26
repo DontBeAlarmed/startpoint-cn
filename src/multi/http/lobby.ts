@@ -14,6 +14,7 @@ import { issueRoomAdmission } from "./room-admission"
 import { listActiveRoomSharesSync } from "../../data/domains/social-room-shares"
 import { getSharedFollowRelationSync } from "../../data/domains/social-follow"
 import { parseEstablisherSnapshot } from "../../data/domains/attention"
+import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
@@ -155,7 +156,13 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             partyId: party_id,
             category,
             questId: quest_id,
-            leaderCharacterId: ctx.player?.leaderCharacterId || 1,
+            // 房间主角色 = 本次所选战斗编队一号位（诚实展示当前配队状态；
+            // 存档 leader 是社交层字段且历史账号停在种子默认值，不作依据）
+            leaderCharacterId: resolveBattlePartyLeaderCharacterIdSync(
+                ctx.playerId,
+                party_id,
+                ctx.player?.leaderCharacterId,
+            ),
             compatibility: compatibility.value,
         })
         if (!room.ok) return reply.status(400).send({

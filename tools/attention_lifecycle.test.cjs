@@ -105,9 +105,10 @@ function share(input = {}) {
     assert.equal(delivery.length, 1)
     assert.equal(delivery[0].state, "delivered")
 
-    // 再次轮询：仍可见（delivered 未响应），不产生重复投递行
+    // 再次轮询：不再重投（客户端 receive 按空槽插入、不按 key 去重——
+    // 重投已投递条目会在弹框里堆叠同一房间的多个铃铛）
     const again = deliverOpenRecruitmentsToViewer(viewerB, nowMs, 3)
-    assert.equal(again.length, 1)
+    assert.equal(again.length, 0, "已投递的铃铛不得重投")
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries WHERE viewer_id = ?").get(viewerB).n, 1)
 
     // 房主看不见自己的招募

@@ -135,7 +135,13 @@ async function main() {
         nowMs: getServerTime() * 1000,
     })
 
-    // ---- guest 轮询 check：收到铃铛，字段集与客户端契约一致 ----
+    // ---- guest 单向关注房主后首投：establisher_follow 实时投影（F0 语义：2=我→对方单向） ----
+    // 投递语义 = 每招募每 viewer 一次：关注关系在投递瞬间取值，横幅本地保存后不重刷
+    addLocalFollowSync({
+        sourcePlayerId: guest.playerId,
+        targetPlayerId: host.playerId,
+        followedAtMs: Date.now(),
+    })
     const checked = await post(fastify, "/api/index.php/attention/check", {
         viewer_id: guest.viewerId, holding_number: 1, retry_count: 0, request_number: 3,
     })
@@ -169,33 +175,39 @@ async function main() {
     assert.equal(bell.quest_info.establisher_character, 341005)
     assert.equal(bell.quest_info.establisher_rank, 42)
     assert.equal(bell.quest_info.host_entry_time, 1700)
-    assert.equal(bell.quest_info.establisher_follow, 0, "无关注关系时为 0")
+    assert.equal(bell.quest_info.establisher_follow, 2, "单向关注投影 establisher_follow=2")
     assert.equal(bell.quest_info.establisher_character_evolution_img_level, 3,
         "快照捕获的进化等级必须原样下发（硬编码 0 = 铃铛弹框头像恒为初始皮肤）")
 
     // ---- check 轮询即 presence 上报 ----
     assert.equal(isPresenceOnline(guest.viewerId), true, "check 轮询必须 touch presence")
 
-    // ---- guest 关注房主后，establisher_follow 实时投影（F0 语义：2=我→对方单向） ----
-    addLocalFollowSync({
-        sourcePlayerId: guest.playerId,
-        targetPlayerId: host.playerId,
-        followedAtMs: Date.now(),
-    })
-    const refollowed = unpack(Buffer.from((await post(fastify, "/api/index.php/attention/check", {
-        viewer_id: guest.viewerId, holding_number: 2, retry_count: 0, request_number: 3,
-    })).body, "base64")).data
-    assert.equal(refollowed.multi[0].quest_info.establisher_follow, 2, "单向关注投影 establisher_follow=2")
-
-    // ---- 互关后投影 1（与房间 join 路径同源：getLocalFollowRelationSync().state） ----
+    // ---- 互关后房主开第二条招募：新投递携带 establisher_follow=1（与房间 join 路径同源） ----
     addLocalFollowSync({
         sourcePlayerId: host.playerId,
         targetPlayerId: guest.playerId,
         followedAtMs: Date.now(),
     })
+    const secondRecruitment = getOrCreateRecruitmentForRoom({
+        hostPid: host.playerId,
+        hostViewerId: host.viewerId,
+        category: 1,
+        questId: 1001002,
+        roomNumber: "345679",
+        isNewbieHost: true,
+        establisherJson: buildEstablisherSnapshot({
+            character: 341005,
+            rankLevel: 42,
+            hostEntryTime: 1800,
+            evolutionImgLevel: 3,
+        }),
+        nowMs: getServerTime() * 1000,
+    })
     const mutual = unpack(Buffer.from((await post(fastify, "/api/index.php/attention/check", {
-        viewer_id: guest.viewerId, holding_number: 3, retry_count: 0, request_number: 3,
+        viewer_id: guest.viewerId, holding_number: 2, retry_count: 0, request_number: 3,
     })).body, "base64")).data
+    assert.equal(mutual.multi.length, 1, "新招募才产生新投递")
+    assert.equal(mutual.multi[0].attention_key, secondRecruitment.attentionKey)
     assert.equal(mutual.multi[0].quest_info.establisher_follow, 1, "互关投影 establisher_follow=1")
 
     // ---- 房主自己看不到自己的招募 ----
@@ -204,11 +216,15 @@ async function main() {
     })).body, "base64")).data
     assert.equal(hostCheck.multi.length, 0, "房主不得收到自己的铃铛")
 
-    // ---- 惰性投递：guest 再次轮询不重复、accepted 后收敛 ----
+    // ---- 惰性投递：guest 再次轮询不重投已投递铃铛、不产生重复投递行 ----
+    const redelivered = unpack(Buffer.from((await post(fastify, "/api/index.php/attention/check", {
+        viewer_id: guest.viewerId, holding_number: 3, retry_count: 0, request_number: 3,
+    })).body, "base64")).data
+    assert.equal(redelivered.multi.length, 0, "已投递的铃铛不得重投（客户端 receive 无 key 去重，重投会堆叠弹框）")
     const deliveries = db.prepare(
         "SELECT COUNT(*) AS n FROM attention_deliveries WHERE viewer_id = ?"
     ).get(guest.viewerId)
-    assert.equal(deliveries.n, 1, "重复轮询不得产生重复投递行")
+    assert.equal(deliveries.n, 2, "每招募一条投递行（两条招募各一次）")
 
     // ---- /attention/action：参加优先度评分（客户端强校验两个 Float） ----
     const action = await post(fastify, "/api/index.php/attention/action", {
