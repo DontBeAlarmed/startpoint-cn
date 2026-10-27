@@ -66,6 +66,16 @@ function reconnectKey(participant: ParticipantIdentity): string {
     return participantKey(participant.nodeSessionId, participant.viewerId)
 }
 
+/**
+ * OV-2：战斗释放（4→1）后 host 回房宽限。release 时刻 host 在结算页/强退
+ * 的 socket 拓扑相同，无法现场区分——统一安排宽限：host 重进（Enter 取消
+ * 点 lobby.ts 既有）则取消，宽限到期仍未重进 → expireReconnectLease 的
+ * host 分支解散房间（guest 快速得到 Disbanded，僵尸房寿命 15min → 25s）。
+ */
+export function scheduleHostReturnLease(roomNumber: string, hostParticipant: ParticipantIdentity): void {
+    scheduleReconnectLease(roomNumber, hostParticipant, `return-lease-${roomNumber}`)
+}
+
 export function cancelReconnectLease(participant: ParticipantIdentity): void {
     const key = reconnectKey(participant)
     const lease = reconnectLeases.get(key)
@@ -133,6 +143,8 @@ function expireReconnectLease(key: string): void {
 function scheduleReconnectLease(
     roomNumber: string,
     participant: ParticipantIdentity,
+    // connectionId 仅被 guest 到期分支的 removeDisconnectedMate 消费；
+    // host 分支不解引用，合成 id（如 return-lease）安全
     connectionId: string,
 ): void {
     cancelReconnectLease(participant)
@@ -503,6 +515,10 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     const isHost = !!client.participant
         && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
     if (!isHost && (!room || !client.participant || !isRoomMember(room, client.participant))) return
+
+    // OV-2：重进 = host 回来了——取消战斗释放安排的回房宽限（漏取消会把
+    // 正常重赛在 25s 后误解散）。guest Enter 同样取消自身的重连租约。
+    if (client.participant) cancelReconnectLease(client.participant)
 
     client.yourself.party = ed.party
     if (ed.autoplayMode !== undefined) client.yourself.autoplayMode = ed.autoplayMode;

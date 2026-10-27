@@ -1,6 +1,7 @@
 import { closeAllOpenRecruitments } from "../../data/domains/attention"
 import { purgeAllRoomShareRowsSync } from "../../data/domains/social-room-shares"
 import { isSharedSocialDbConfigured } from "../../data/social/shared-db"
+import { describeError } from "../describe-error"
 import { listActiveRooms } from "../room/manager"
 
 /**
@@ -29,12 +30,12 @@ export function purgeOrphanedSocialRowsForLocalAuthority(): void {
     try {
         closeAllOpenRecruitments()
     } catch (error) {
-        console.warn("[MULTI] startup sweep: recruitment close failed", error)
+        console.warn(`[MULTI] startup sweep: recruitment close failed: ${describeError(error)}`)
     }
     try {
         const purged = purgeAllRoomShareRowsSync()
         console.log(`[MULTI] startup sweep: purged ${purged} orphaned room share row(s)`)
     } catch (error) {
-        console.warn("[MULTI] startup sweep: share row purge failed", error)
+        console.warn(`[MULTI] startup sweep: share row purge failed: ${describeError(error)}`)
     }
 }

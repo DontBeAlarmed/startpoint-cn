@@ -726,3 +726,52 @@ test("CN measurement, line warning, and heartbeat indices do not alias finalize"
     assert.equal(first.socket.writes.length, beforeHeartbeat)
     assert.equal(countMessage(first, [1, [2]]), 0)
 })
+
+test("a finalized participant's socket close publishes no Leave to peers (OV-1)", () => {
+    const battle = createBattle(1001001, 2)
+    const [host, guest] = battle.clients
+
+    notify(host, [0])
+    notify(guest, [0])
+    assert.equal(countMessage(host, [1, [1]]), 1, "前置：屏障完成 BattleStart")
+    assert.equal(countMessage(guest, [1, [1]]), 1)
+
+    // host 先 finalize（客户端收到 ack 后自弃 socket）
+    notify(host, [2])
+    assert.equal(countMessage(host, [1, [2]]), 1, "前置：Finalized ack")
+    assert.equal(
+        sessionManager.hasParticipantFinalizedBattle(battle.room.room_number, host.client.participant),
+        true,
+    )
+
+    // host socket 关闭（模拟 Finalized-ack 后的客户端 disconnect）
+    sessionManager.removeClientBySocket(host.socket)
+
+    assert.equal(
+        countMessage(guest, [1, [0, host.client.connectionId]]),
+        0,
+        "OV-1：finalize 后的离场不得向对端广播假通信中断",
+    )
+
+    // guest 未 finalize 的真中断：仍广播 Leave（对端应知）
+    sessionManager.removeClientBySocket(guest.socket)
+    assert.equal(countMessage(host, [1, [0, guest.client.connectionId]]), 0, "host socket 已关，无接收方（不抛错）")
+})
+
+test("an unfinalized participant's mid-battle disconnect still broadcasts Leave", () => {
+    const battle = createBattle(1001001, 2)
+    const [host, guest] = battle.clients
+
+    notify(host, [0])
+    notify(guest, [0])
+    assert.equal(countMessage(host, [1, [1]]), 1)
+
+    // guest 未 finalize 直接断线（真通信中断）
+    sessionManager.removeClientBySocket(guest.socket)
+
+    assert.equal(
+        countMessage(host, [1, [0, guest.client.connectionId]]),
+        1,
+        "战斗中真掉线必须广播 Leave（对端渲染通信中断）",
+    )
+})

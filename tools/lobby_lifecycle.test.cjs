@@ -15,6 +15,7 @@ const {
     isRoomMember,
     removeRoomMember,
     setRoomDisbandListener,
+    setRoomReleaseListener,
     startRoomCleanup,
     stopRoomCleanup,
     updateRoomState,
@@ -313,7 +314,10 @@ test("a transport disconnect preserves the room for restore", t => {
 
 test("an explicit host Bye disbands the room even while guests remain", t => {
     installDisbandLifecycleListener()
-    t.after(() => setRoomDisbandListener(null))
+    t.after(() => {
+            setRoomDisbandListener(null)
+            setRoomReleaseListener(null)
+        })
     const { room, host, guests } = createLobbyRoom(t, 498, [598])
 
     handleMessage(host.socket, [0, [1]])
@@ -421,7 +425,10 @@ test("a network-disconnected host is disbanded only after the reconnect grace", 
 
 test("an expired host reconnect lease broadcasts dismissal only once", { concurrency: false }, async t => {
     installDisbandLifecycleListener()
-    t.after(() => setRoomDisbandListener(null))
+    t.after(() => {
+            setRoomDisbandListener(null)
+            setRoomReleaseListener(null)
+        })
     configureReconnectGraceMs(25)
     const { room, host, guests } = createLobbyRoom(t, 507, [607])
     const guest = guests[0]
@@ -1032,23 +1039,32 @@ test("a previous-round host Enter cannot authorize the next rematch generation",
     handleMessage(host.socket, [0, [6]])
     assert.equal(room.raising_state, 4)
 
+    // 释放（OV-2：安排 host 回房宽限）→ host 立即重进（正常重赛，取消宽限）
     updateRoomState(room.room_number, 1)
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+
+    // guest 断线 → 自身租约到期移除（host 在场，房间存活）
     assert.equal(handleSocketDisconnect(guest.socket), true)
     await new Promise(resolve => setTimeout(resolve, 40))
     assert.equal(isRoomMember(room, guest.client.participant), false)
 
-    const beforeRematchEnter = timers.filter(timer => timer.delayMs === 500)
-    assert.equal(beforeRematchEnter.length, 1)
-    beforeRematchEnter[0].callback()
+    // 前一代 Enter 的 NPC join 定时器不得授权新一代招募（世代守卫）
+    // （第三个 500ms 计时器 = guest 移除后 reconcileRematchSlots 的 NPC 补位 join）
+    const joinTimers = timers.filter(timer => timer.delayMs === 500)
+    assert.equal(joinTimers.length, 3, "两次 host Enter + 一次补位各安排一次 NPC join")
+    joinTimers[0].callback()
     await flushPromises()
-    assert.equal(getRecruitCalls(), 0)
+    assert.equal(getRecruitCalls(), 0, "前一代 Enter 不得授权新一代招募")
 
-    handleMessage(host.socket, [0, [0, { party: {} }]])
-    const afterRematchEnter = timers.filter(timer => timer.delayMs === 500)
-    assert.equal(afterRematchEnter.length, 2)
-    afterRematchEnter[1].callback()
+    // T2（重进 Enter 的挂起 join）被 guest 移除触发的补位招募世代顶掉
+    joinTimers[1].callback()
     await flushPromises()
-    assert.equal(getRecruitCalls(), 1)
+    assert.equal(getRecruitCalls(), 0, "补位招募 bump 世代后，重进 Enter 的挂起 join 失效")
+
+    // T3（补位 join）是当前世代：招募生效
+    joinTimers[2].callback()
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 1, "补位 join 按当前世代招募")
 })
 
 test("a released real member with a stale TCP client cannot occupy a rematch seat", async t => {
@@ -1716,4 +1732,45 @@ test("expired guest lease cleanup is idempotent and connection-scoped", async t 
         "到期清理后 host 列表只剩自己",
     )
     void host
+})
+
+test("release schedules a host return lease: force-quit host disbands within grace (OV-2)", async t => {
+    installDisbandLifecycleListener()
+    t.after(() => {
+        require("../src/multi/room/manager").setRoomReleaseListener(null)
+        require("../src/multi/room/manager").setRoomDisbandListener(null)
+    })
+    configureReconnectGraceMs(25)
+    const { room } = createLobbyRoom(t, 511, [])
+
+    // 进入战斗再释放（4→1，host 无任何 socket = 结算页强退拓扑）
+    updateRoomState(room.room_number, 4)
+    updateRoomState(room.room_number, 1)
+
+    assert.equal(getRoom(room.room_number), room, "释放后房间保留（重赛窗口）")
+
+    // host 强退 = 不重进；宽限到期 → 解散（guest 快速得到 Disbanded）
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(getRoom(room.room_number), undefined, "宽限到期无主房解散")
+})
+
+test("host re-enter within the grace cancels the return lease (OV-2 正常重赛)", async t => {
+    installDisbandLifecycleListener()
+    t.after(() => {
+        require("../src/multi/room/manager").setRoomReleaseListener(null)
+        require("../src/multi/room/manager").setRoomDisbandListener(null)
+    })
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 512, [612])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+
+    updateRoomState(room.room_number, 4)
+    updateRoomState(room.room_number, 1)
+
+    // host 正常重进（返回房间）→ 取消宽限（handleEnter 既有取消点）
+    handleMessage(host.socket, [0, [0, host.client.yourself, 1]])
+
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(getRoom(room.room_number)?.room_number, room.room_number, "host 重进取消宽限，房间存活")
 })

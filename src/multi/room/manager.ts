@@ -45,6 +45,16 @@ let roomDisbandListener:
     | ((roomNumber: string, hostPlayerId: number, hostViewerId: number) => void)
     | null = null;
 
+let roomReleaseListener:
+    | ((roomNumber: string, hostNodeSessionId: string, hostViewerId: number) => void)
+    | null = null;
+
+export function setRoomReleaseListener(
+    listener: ((roomNumber: string, hostNodeSessionId: string, hostViewerId: number) => void) | null,
+): void {
+    roomReleaseListener = listener;
+}
+
 interface RoomCleanupTiming {
     readonly incompleteExpiryMs: number;
     readonly fullExpiryMs: number;
@@ -327,8 +337,25 @@ export function updateRoomState(
             return false;
         }
     }
+    const previousState = room.raising_state;
     console.log(`[MULTI] room state: ${roomNumber} → ${state}`);
     room.raising_state = state;
+    // OV-2：战斗释放（4→1）是 host 回房宽限的起点——release 时刻正常结算
+    // 与强退的 socket 拓扑不可区分，统一安排宽限：host 重进则取消，宽限内
+    // 未重进（强退）则解散（见 tcp/lobby 的 return-lease）。
+    if (previousState === 4 && state === 1) {
+        try {
+            // host 的 nodeSessionId 取自成员簿（与 Enter 取消点同一复合键）
+            const hostMember = room.member_participants.find(
+                member => member.viewerId === room.host_viewer_id,
+            );
+            if (hostMember) {
+                roomReleaseListener?.(roomNumber, hostMember.nodeSessionId, room.host_viewer_id);
+            }
+        } catch (error) {
+            console.warn(`[MULTI] room release listener failed: ${roomNumber}`, describeError(error));
+        }
+    }
     // 好友房间大厅注册行同步（未开放列表可见的房无行，no-op）
     try {
         const { syncRoomShareRow } = require("./share-sync") as typeof import("./share-sync")

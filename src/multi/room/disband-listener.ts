@@ -2,7 +2,7 @@ import { sessionManager } from "../state/SessionManager"
 import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
 import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import { describeError } from "../describe-error"
-import { setRoomDisbandListener } from "./manager"
+import { setRoomDisbandListener, setRoomReleaseListener } from "./manager"
 
 /**
  * Every disband path funnels through manager.disbandRoom, which invokes the
@@ -11,6 +11,20 @@ import { setRoomDisbandListener } from "./manager"
  * a second dismissal before deleting the room.
  */
 export function installDisbandLifecycleListener(): void {
+    // OV-2：战斗释放（4→1）即 host 回房宽限起点；host 重进 Enter 取消
+    // （tcp/lobby handleEnter 既有 cancel 点），宽限到期仍未重进 → 解散。
+    setRoomReleaseListener((roomNumber, hostNodeSessionId, hostViewerId) => {
+        try {
+            const { scheduleHostReturnLease } = require("../tcp/lobby") as typeof import("../tcp/lobby")
+            // NodeSessionId 是 room 层 plain string 的 brand 视图；此处一次性还原
+            scheduleHostReturnLease(roomNumber, {
+                nodeSessionId: hostNodeSessionId as Parameters<typeof scheduleHostReturnLease>[1]["nodeSessionId"],
+                viewerId: hostViewerId,
+            })
+        } catch (error) {
+            console.warn(`[MULTI] host return lease failed: room=${roomNumber}: ${describeError(error)}`)
+        }
+    })
     setRoomDisbandListener((roomNumber, hostPlayerId, hostViewerId) => {
         try {
             sessionManager.broadcastToRoom(roomNumber, [1, [6, "multibattle_room_dismissed"]])

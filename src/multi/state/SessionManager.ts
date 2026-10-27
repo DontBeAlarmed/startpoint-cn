@@ -458,7 +458,7 @@ export class SessionManager {
         }
     }
 
-    private removeBattleConnectionRecord(roomNumber: string, connectionId: string): void {
+    private removeBattleConnectionRecord(roomNumber: string, connectionId: string, participant?: ParticipantIdentity): void {
         const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
         const battleConnections = this.battleClients.get(roomNumber)
         const wasConnected = battleConnections?.delete(connectionId) === true
@@ -466,8 +466,17 @@ export class SessionManager {
 
         const activeMembers = this.activatedBattleScenes.get(roomNumber)?.get(generation)
         if (activeMembers) {
+            // participant 缺省时不做 finalize 抑制（fail-open 广播）；
+            // :684 的 stale-connection 分支故意不传 participant——那里的
+            // 连接身份与被移除参与者不一致，按被移除者判 finalize 会误抑制。
             if (activeMembers.delete(connectionId)) {
-                this.broadcastBattleLeave(roomNumber, connectionId)
+                // finalize 后的 socket 丢弃是官方客户端的预期离场（Finalized-ack
+                // 语义，BattleSocketContact 收到 [1,[2]] 即 disconnect）——不是
+                // 通信中断，对端不应收到假 Leave 帧。战斗中真掉线（未
+                // finalize）照常广播（OV-1，真机实测图1）。
+                const finalizedDeparture = participant !== undefined
+                    && this.hasParticipantFinalizedBattle(roomNumber, participant)
+                if (!finalizedDeparture) this.broadcastBattleLeave(roomNumber, connectionId)
             }
             return
         }
@@ -481,10 +490,10 @@ export class SessionManager {
         if (this.isSceneBarrierComplete(roomNumber)) this.activateBattleScene(roomNumber)
     }
 
-    private removeCurrentBattleConnection(connectionId: string): void {
+    private removeCurrentBattleConnection(connectionId: string, participant?: ParticipantIdentity): void {
         const client = this.cidToBattleClient.get(connectionId)
         if (!client) return
-        this.removeBattleConnectionRecord(client.roomNumber, connectionId)
+        this.removeBattleConnectionRecord(client.roomNumber, connectionId, participant ?? client.participant)
         this.cidToBattleClient.delete(connectionId)
         this.removeSocketIndex(client)
     }
@@ -495,7 +504,7 @@ export class SessionManager {
                 this.removeSocketIndex(client)
                 return { ok: true, value: undefined }
             }
-            this.removeCurrentBattleConnection(client.connectionId)
+            this.removeCurrentBattleConnection(client.connectionId, client.participant)
             this.clearBattleHeartbeatLease(client.connectionId)
             if ((this.battleClients.get(client.roomNumber)?.size ?? 0) === 0) {
                 const { getRoom } = require("../room/manager")
