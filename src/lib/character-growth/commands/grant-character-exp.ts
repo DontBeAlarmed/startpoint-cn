@@ -38,6 +38,8 @@ export interface GrantCharacterExpCommand {
     readonly ignoreUpdate?: boolean
     readonly knownExpPool?: number
     readonly evaluationTime?: Date
+    /** 开局块加成：按角色的经验乘数（缺键 = 1；amount 已是活动倍率后基值） */
+    readonly expMultipliers?: Readonly<Record<number, number>>
 }
 
 interface GrantCharacterExpProjectionSeeds {
@@ -139,11 +141,15 @@ export function grantCharacterExpWithinTransactionSync(
             bondTokenStatusList[characterId] = { before: [], after: [] }
             continue
         }
+        // -1e-9 抵消浮点 overshoot（如 100*1.03 = 103.00000000000001 → 误入 104）
+        const effectiveAmount = Math.ceil(
+            command.amount * (command.expMultipliers?.[characterId] ?? 1) - 1e-9,
+        )
         const calculation = calculateCharacterExpAfter(
             character.rarity,
             character.overLimitStep,
             character.exp,
-            command.amount,
+            effectiveAmount,
         )
         updates.push({ characterId, exp: calculation.afterExp })
         plannedAfterExp.set(characterId, calculation.afterExp)

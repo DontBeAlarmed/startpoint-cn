@@ -3,6 +3,12 @@ import { recordRescueBattleMissionCountersSync } from "../../lib/mission/rescue-
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 import { getAdditionalRewardTable, settleAdditionalRewardsSync } from "../../lib/additional-reward"
+import { resolveOpeningBonus } from "../../lib/opening-bonus"
+import {
+    buildOpeningPartyComposition,
+    parseOpeningPartyComposition,
+} from "../../lib/opening-bonus-composition"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
@@ -301,6 +307,13 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             isMultiHost: isRoomHost,
         }
         const fieldMana = freshValidation.addMana
+        // 开局块加成：优先用开战冻结的编队快照；旧行 fail-open 回退指针重读
+        const openingComposition = storedQuest.partyComposition
+            ?? parseOpeningPartyComposition(storedQuest.partyCompositionJson)
+            ?? buildOpeningPartyComposition(input.playerId, player.partySlot)
+        const openingBonus = openingComposition === null
+            ? undefined
+            : resolveOpeningBonus(getContentSnapshot().repository, openingComposition)
         const { settlementTime, valuePlan } = createMultiSettlementValuePlan({
             player,
             activeQuest,
@@ -310,6 +323,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             questAccomplished,
             fieldMana,
             maxComboCount: Number((freshValidation.statistics as any).max_combo_count ?? 0),
+            openingBonus,
         })
         const {
             beforeRankPoint,
@@ -444,6 +458,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             questData.fixedParty !== undefined,
             undefined,
             settlementTime,
+            valuePlan.expMultiplierByCharacter,
         )
         const missionEvaluation = settleMissionCategoriesWithEvaluation(
             input.playerId,

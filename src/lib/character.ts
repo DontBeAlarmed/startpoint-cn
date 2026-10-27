@@ -157,6 +157,7 @@ export function givePlayerCharactersExpSync(
     ignoreUpdate: boolean,
     knownExpPool?: number,
     evaluationTime?: Date,
+    expMultipliers?: Readonly<Record<number, number>>,
 ): ReturnType<typeof grantCharacterExp> {
     const command = {
         playerId,
@@ -165,6 +166,7 @@ export function givePlayerCharactersExpSync(
         ignoreUpdate,
         knownExpPool,
         evaluationTime,
+        expMultipliers,
     }
     return getDb().inTransaction
         ? grantCharacterExpWithinTransactionSync(command)

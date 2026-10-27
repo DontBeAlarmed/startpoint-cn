@@ -373,6 +373,42 @@ function serverDefinition(tableName: string): TableSourceInput {
 }
 
 const definitionInputs: TableSourceInput[] = [
+    // 开局块（opening）解析源表：窄行提取（[trigger, kind, power1, first_max]）
+    // + mana_node 原始三层嵌套透传（现有 mana_node.json 转换表裁剪掉了
+    // kind/effect 列）。部分行（leader_ability 多行描述）含未引号裸换行，
+    // 单行 CSV 解析拒收，由 opening-ability 转换器按 orderedmap 结构切分。
+    {
+        tableName: "ability.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/ability/ability.orderedmap"],
+        converterId: "opening-ability",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "leader_ability.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/ability/leader_ability.orderedmap"],
+        converterId: "opening-ability",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "ability_soul.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/ability/ability_soul.orderedmap"],
+        converterId: "opening-ability",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "mana_node_raw.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/mana_board/mana_node.orderedmap"],
+        converterId: "opening-ability",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
     {
         tableName: "additional_reward_rules.json",
         scope: "cdn",

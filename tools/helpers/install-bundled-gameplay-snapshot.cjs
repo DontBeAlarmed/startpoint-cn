@@ -74,6 +74,10 @@ const QUEST_TABLE_NAMES = [
     "quest_unlock_costs.json",
 ]
 const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
+    "ability.json",
+    "leader_ability.json",
+    "ability_soul.json",
+    "mana_node_raw.json",
     "cdndata/player_rank_full.json",
     "cdndata/player_rank.json",
     "mission_event_battle_rules.json",

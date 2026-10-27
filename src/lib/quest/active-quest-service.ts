@@ -14,6 +14,10 @@ import {
 } from "./entry-lifecycle"
 import type { MultiCoordinatorOrigin } from "../../multi/coordinator/contracts"
 import { withEntryItemInventoryWithinTransactionSync } from "./entry-item-inventory"
+import {
+    serializeOpeningPartyComposition,
+    type OpeningPartyComposition,
+} from "../opening-bonus-composition"
 
 export interface ActiveQuest {
     questId: number
@@ -36,6 +40,10 @@ export interface ActiveQuest {
     newbieRescueEligible: boolean
     playId: string
     continueCount: number
+    /** 开局块加成的编队组成快照（开战冻结；null = 旧行/失败，结算 fail-open） */
+    partyComposition?: OpeningPartyComposition | null
+    /** DB 存储的冻结 JSON（PlayerActiveQuest 直通形态；优先用 partyComposition） */
+    partyCompositionJson?: string | null
 }
 
 export interface ActiveQuestIdentity {
@@ -84,6 +92,9 @@ export function persistActiveQuest(playerId: number, quest: ActiveQuest): void {
         rescueFragmentEligible: quest.isMulti && quest.rescueFragmentEligible === true,
         newbieRescueEligible: quest.isMulti && quest.newbieRescueEligible === true,
         continueCount: quest.continueCount,
+        partyCompositionJson: quest.partyComposition
+            ? serializeOpeningPartyComposition(quest.partyComposition)
+            : null,
     })
 }
 

@@ -703,6 +703,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/battle_quest_progress_plan.test.cjs",
             "tools/battle_settlement_boundary.test.cjs",
             "tools/battle_settlement_values.test.cjs",
+            "tools/opening_bonus.test.cjs",
             "tools/battle_entry_inventory_route.test.cjs",
             "tools/open_period_boundaries.test.cjs",
             "tools/quest_prerequisite_boundaries.test.cjs",

@@ -903,6 +903,7 @@ export interface RawPlayerActiveQuest {
     rescue_fragment_eligible: number
     newbie_rescue_eligible: number
     continue_count: number
+    party_composition_json: string | null
 }
 
 export interface PlayerActiveQuest {
@@ -925,4 +926,5 @@ export interface PlayerActiveQuest {
     rescueFragmentEligible: boolean
     newbieRescueEligible: boolean
     continueCount: number
+    partyCompositionJson: string | null
 }

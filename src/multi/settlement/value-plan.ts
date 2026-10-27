@@ -2,6 +2,7 @@ import type { Player } from "../../data/types"
 import type { ActiveQuest } from "../../lib/quest/active-quest-service"
 import {
     createBattleSettlementValuePlan,
+    type BattleSettlementOpeningBonus,
     type BattleSettlementValuePlan,
 } from "../../lib/quest/finish/battle-settlement-values"
 import { getRewardCampaignRates } from "../../lib/reward-campaign"
@@ -17,6 +18,7 @@ export function createMultiSettlementValuePlan(input: {
     readonly questAccomplished: boolean
     readonly fieldMana: number
     readonly maxComboCount: number
+    readonly openingBonus?: BattleSettlementOpeningBonus
 }): { readonly settlementTime: Date; readonly valuePlan: BattleSettlementValuePlan } {
     const settlementTime = new Date(getServerTime() * 1000)
     const rewardCampaignRates = getRewardCampaignRates(
@@ -41,6 +43,7 @@ export function createMultiSettlementValuePlan(input: {
         fieldMana: input.fieldMana,
         maxComboCount: input.maxComboCount,
         rewardCampaignRates,
+        openingBonus: input.openingBonus,
     })
     return Object.freeze({ settlementTime, valuePlan })
 }

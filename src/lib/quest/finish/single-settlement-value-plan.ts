@@ -6,6 +6,7 @@ import type { ActiveQuest } from "../active-quest-service"
 import type { ValidatedSingleFinishBody } from "../single-finish-validation"
 import {
     createBattleSettlementValuePlan,
+    type BattleSettlementOpeningBonus,
     type BattleSettlementValuePlan,
 } from "./battle-settlement-values"
 
@@ -15,6 +16,7 @@ export function createSingleSettlementValuePlan(input: {
     readonly quest: BattleQuest
     readonly body: ValidatedSingleFinishBody
     readonly questAccomplished: boolean
+    readonly openingBonus?: BattleSettlementOpeningBonus
 }): { readonly settlementTime: Date; readonly valuePlan: BattleSettlementValuePlan } {
     const settlementTime = new Date(getServerTime() * 1000)
     const rewardCampaignRates = getRewardCampaignRates(
@@ -39,6 +41,7 @@ export function createSingleSettlementValuePlan(input: {
         fieldMana: input.body.add_mana,
         maxComboCount: input.body.statistics.max_combo_count ?? 0,
         rewardCampaignRates,
+        openingBonus: input.openingBonus,
     })
     return Object.freeze({ settlementTime, valuePlan })
 }

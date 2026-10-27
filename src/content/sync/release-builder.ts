@@ -3,6 +3,11 @@ import {
     type AdditionalRewardConversionOutput,
     type AdditionalRewardSourceReader,
 } from "../converters/additional-reward"
+import {
+    convertOpeningAbilityTables,
+    type OpeningAbilityConversionOutput,
+    type OpeningAbilitySourceReader,
+} from "../converters/opening-ability"
 import type { ContentConverterContext } from "../converters/context"
 import {
     convertCharacters,
@@ -108,6 +113,7 @@ const RELEASE_BUILD_IO_CONCURRENCY = 8
 const DIRECT_ORDERED_MAP_CONVERTER = /^ordered-map-json-([1-3])$/
 const SUPPORTED_CONVERTER_IDS = new Set([
     "additional-reward",
+    "opening-ability",
     "character",
     "character-election",
     "character-mana-admission",
@@ -151,6 +157,10 @@ export function deriveCharacterManaAdmissionSeedTableName(
 }
 
 export interface DefaultContentTableBuilderDependencies {
+    readonly convertOpeningAbilityTables?: (
+        reader: OpeningAbilitySourceReader,
+        context: ContentConverterContext,
+    ) => OpeningAbilityConversionOutput | Promise<OpeningAbilityConversionOutput>
     readonly convertAdditionalRewards?: (
         reader: AdditionalRewardSourceReader,
         context: ContentConverterContext,
@@ -506,6 +516,7 @@ export function createDefaultContentTableBuilder(
             const staticPaths = context.definitions.flatMap(definition => (
                 definition.converterId === "character"
                     || definition.converterId === "additional-reward"
+                    || definition.converterId === "opening-ability"
                     || definition.converterId === "character-election"
                     || definition.converterId === "character-mana-admission"
                     || definition.converterId === "box-gacha"
@@ -543,6 +554,12 @@ export function createDefaultContentTableBuilder(
                 const pending = bundledImporter(context.paths.contentRuntimeDir, tableName)
                 bundledCache.set(tableName, pending)
                 return pending
+            }
+            if (converterIds.has("opening-ability")) {
+                const openingAbilityConverter = dependencies.convertOpeningAbilityTables
+                    ?? convertOpeningAbilityTables
+                const openingOutput = await openingAbilityConverter(reader, converterContext)
+                addConverterOutput(values, "opening-ability", openingOutput.tables)
             }
             if (converterIds.has("additional-reward")) {
                 addConverterOutput(
@@ -659,12 +676,20 @@ export function createDefaultContentTableBuilder(
                     }
                     const depth = directOrderedMapDepth(definition.converterId)
                     if (depth === null) throw new Error(`invalid direct converter: ${definition.converterId}`)
-                    return [
-                        definition.tableName,
-                        convertOrderedMapJson(
+                    let parsed: unknown
+                    try {
+                        parsed = convertOrderedMapJson(
                             await reader.readDynamic(definition.sourceOrderedMaps[0]),
                             depth,
-                        ),
+                        )
+                    } catch (error) {
+                        throw new Error(
+                            `direct table ${definition.tableName} failed orderedmap parse: ${error instanceof Error ? error.message : String(error)}`,
+                        )
+                    }
+                    return [
+                        definition.tableName,
+                        parsed,
                     ] as const
                 },
             )

@@ -290,6 +290,14 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
             }
         }
     }
+    // opening-ability：三层嵌套空源（converter 展开为空表）
+    for (const definition of TABLE_SOURCES.filter(entry => entry.converterId === "opening-ability")) {
+        for (const logicalPath of definition.sourceOrderedMaps) {
+            if (!logicalEntries.has(logicalPath)) {
+                logicalEntries.set(logicalPath, serializeNestedOrderedMap([]))
+            }
+        }
+    }
     for (const definition of TABLE_SOURCES.filter(entry => entry.converterId === "item-equipment")) {
         for (const logicalPath of definition.sourceOrderedMaps) {
             if (!logicalEntries.has(logicalPath)) {

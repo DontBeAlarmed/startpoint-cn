@@ -23,6 +23,13 @@ export interface BattleSettlementValueQuest {
     readonly poolExpReward: number
 }
 
+/** 开局块加成（opening block）乘数；缺省 = 无加成（全部 1，逐字节基线不变） */
+export interface BattleSettlementOpeningBonus {
+    readonly manaMultiplier: number
+    /** 按角色 id 的经验乘数；缺键按 1 处理 */
+    readonly expMultiplierByCharacter: Readonly<Record<number, number>>
+}
+
 export interface BattleSettlementValuePlanInput {
     readonly player: BattleSettlementValuePlayer
     readonly quest: BattleSettlementValueQuest
@@ -32,6 +39,7 @@ export interface BattleSettlementValuePlanInput {
     readonly fieldMana: number
     readonly maxComboCount: number
     readonly rewardCampaignRates: RewardCampaignRates
+    readonly openingBonus?: BattleSettlementOpeningBonus
 }
 
 export interface BattleSettlementPlayerValues {
@@ -50,6 +58,8 @@ export interface BattleSettlementValuePlan {
     readonly fixedManaReward: number
     readonly fixedPoolExpReward: number
     readonly characterBattleExp: number
+    /** 按角色 id 的经验乘数（开局块 Myself/Ally 聚合；缺键 = 1） */
+    readonly expMultiplierByCharacter: Readonly<Record<number, number>>
     readonly fieldMana: number
     readonly manaObtained: number
     readonly beforeRankPoint: number
@@ -74,11 +84,14 @@ export function createBattleSettlementValuePlan(
 ): BattleSettlementValuePlan {
     const useBoostPoint = input.useBoostPoint || input.useBossBoostPoint
     const rates = Object.freeze({ ...input.rewardCampaignRates })
+    const openingManaMultiplier = input.openingBonus?.manaMultiplier ?? 1
     const fixedManaReward = input.questAccomplished
-        ? calculateFixedQuestMana(
-            input.quest.manaReward,
-            rates,
-            useBoostPoint,
+        ? Math.floor(
+            calculateFixedQuestMana(
+                input.quest.manaReward,
+                rates,
+                useBoostPoint,
+            ) * openingManaMultiplier + 2e-10,
         )
         : 0
     const fixedPoolExpReward = input.questAccomplished
@@ -105,6 +118,7 @@ export function createBattleSettlementValuePlan(
     return Object.freeze({
         useBoostPoint,
         rewardCampaignRates: rates,
+        expMultiplierByCharacter: input.openingBonus?.expMultiplierByCharacter ?? {},
         fixedManaReward,
         fixedPoolExpReward,
         characterBattleExp,

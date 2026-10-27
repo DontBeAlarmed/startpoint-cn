@@ -7,6 +7,7 @@ import {
     ensureActiveQuestResourceCostStorageSync,
     ensureActiveQuestRescueFragmentEligibilityStorageSync,
     ensureActiveQuestNewbieRescueEligibilityStorageSync,
+    ensureActiveQuestPartyCompositionStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
 import { ensureAttentionSchema } from "../social/attention-schema";
@@ -1338,4 +1339,5 @@ export default function init(
     ensureActiveQuestResourceCostStorageSync(database)
     ensureActiveQuestRescueFragmentEligibilityStorageSync(database)
     ensureActiveQuestNewbieRescueEligibilityStorageSync(database)
+    ensureActiveQuestPartyCompositionStorageSync(database)
 }

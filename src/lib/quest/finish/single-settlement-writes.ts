@@ -32,6 +32,12 @@ import {
 import { settleSingleEntryResources } from "./single-entry-resource-settlement"
 import { writeSingleQuestProgressWithinTransactionSync } from "./single-quest-progress-write"
 import { createSingleSettlementValuePlan } from "./single-settlement-value-plan"
+import { resolveOpeningBonus } from "../../opening-bonus"
+import {
+    buildOpeningPartyComposition,
+    parseOpeningPartyComposition,
+} from "../../opening-bonus-composition"
+import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import { createEventSettlementDescriptor } from "./event-settlement-descriptor"
 import { settleSingleBuiltInEvent } from "./single-event-settlement"
 import { resolveRushFinalOperationOverrideForSettings } from "../../rush-final-operation-policy"
@@ -55,12 +61,20 @@ export function executeSingleSettlementWrites(
             && Number.isSafeInteger(characterId)
             && characterId > 0) partyCharacterIds.push(characterId)
     }
+    // 开局块加成：优先用开战冻结的编队快照；旧行 fail-open 回退指针重读
+    const openingComposition = settlementActiveQuest.partyComposition
+        ?? parseOpeningPartyComposition(settlementActiveQuest.partyCompositionJson)
+        ?? buildOpeningPartyComposition(playerId, settlementPlayer.partySlot)
+    const openingBonus = openingComposition === null
+        ? undefined
+        : resolveOpeningBonus(getContentSnapshot().repository, openingComposition)
     const { settlementTime, valuePlan } = createSingleSettlementValuePlan({
         player: settlementPlayer,
         activeQuest: settlementActiveQuest,
         quest: questData,
         body,
         questAccomplished,
+        openingBonus,
     })
     const {
         beforeRankPoint,
@@ -219,6 +233,7 @@ export function executeSingleSettlementWrites(
         questData.fixedParty !== undefined,
         responseState.playerState.expPool,
         settlementTime,
+        valuePlan.expMultiplierByCharacter,
     )
     responseState.setExpPool(rewardCharacterExpResult.exp_pool)
 

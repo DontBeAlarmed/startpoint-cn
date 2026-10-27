@@ -56,6 +56,15 @@ export function ensureActiveQuestRescueFragmentEligibilityStorageSync(database: 
     `).run()
 }
 
+export function ensureActiveQuestPartyCompositionStorageSync(database: Database): void {
+    const columns = database.prepare(`PRAGMA table_info(players_active_quests)`).all() as { name: string }[]
+    if (columns.some(column => column.name === "party_composition_json")) return
+    database.prepare(`
+        ALTER TABLE players_active_quests
+        ADD COLUMN party_composition_json TEXT
+    `).run()
+}
+
 export function ensureActiveQuestNewbieRescueEligibilityStorageSync(database: Database): void {
     const columns = database.prepare(`PRAGMA table_info(players_active_quests)`).all() as { name: string }[]
     if (columns.some(column => column.name === "newbie_rescue_eligible")) return

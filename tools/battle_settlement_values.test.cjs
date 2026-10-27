@@ -56,6 +56,7 @@ test("shared settlement values preserve normal Single and Multi calculations", (
         oldDegreeId: 1,
         newDegreeId: 8,
         didLevelUp: true,
+            expMultiplierByCharacter: {},
         playerValues: {
             freeMana: 2_067,
             expPool: 130,

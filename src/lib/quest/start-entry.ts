@@ -1,4 +1,8 @@
 import type { WithEntryItemInventory } from "./entry-item-inventory"
+import {
+    buildOpeningPartyComposition,
+    type OpeningPartyComposition,
+} from "../opening-bonus-composition"
 
 export interface StartEntryCost {
     itemId: number
@@ -150,6 +154,10 @@ export function runStartEntryTransaction<TActiveQuest>(
         }
         const resourceCostQuest = input.activeQuest as { staminaCost?: number | null }
         resourceCostQuest.staminaCost = input.staminaCost
+        // 开局块加成：开战时按本局编队冻结组成快照（finish 结算依据）。
+        // 构建失败为 null（结算 fail-open 回退指针重读）；不阻断开战。
+        ; (input.activeQuest as { partyComposition?: OpeningPartyComposition | null }).partyComposition =
+            buildOpeningPartyComposition(input.playerId, input.partyId)
         if (input.staminaCost > 0) {
             playerUpdate.stamina = afterStamina
             playerUpdate.staminaHealTime = input.now
