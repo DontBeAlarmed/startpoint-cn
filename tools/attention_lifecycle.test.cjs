@@ -32,7 +32,8 @@ db = getDb()
 const {
     buildEstablisherSnapshot,
     closeRecruitmentForRoom,
-    deliverOpenRecruitmentsToViewer,
+    listUndeliveredOpenRecruitments,
+    recordDeliveries,
     findOpenRecruitmentByKey,
     getOrCreateRecruitmentForRoom,
     getRecruitmentLifetimeMs,
@@ -46,6 +47,14 @@ const HOST_PID = 101
 const ROOM = "123456"
 
 let nowMs = 1_000_000
+
+// 两步投递契约的"轮询"原语：取候选 + 记帐真下发行（与 check 路由同构）
+function poll(viewer, atMs = nowMs, limit = 3) {
+    const bells = listUndeliveredOpenRecruitments(viewer, atMs, limit)
+    recordDeliveries(viewer, bells.map(bell => bell.id))
+    return bells
+}
+
 
 function share(input = {}) {
     return getOrCreateRecruitmentForRoom({
@@ -93,7 +102,7 @@ function share(input = {}) {
 // ---- 读时惰性投递 ----
 {
     const viewerB = 9002
-    const bells = deliverOpenRecruitmentsToViewer(viewerB, nowMs, 3)
+    const bells = poll(viewerB, nowMs)
     assert.equal(bells.length, 1)
     assert.equal(bells[0].roomNumber, ROOM)
     assert.equal(bells[0].isNewbieHost, false, "投递携带最新冻结标记")
@@ -107,23 +116,23 @@ function share(input = {}) {
 
     // 再次轮询：不再重投（客户端 receive 按空槽插入、不按 key 去重——
     // 重投已投递条目会在弹框里堆叠同一房间的多个铃铛）
-    const again = deliverOpenRecruitmentsToViewer(viewerB, nowMs, 3)
+    const again = poll(viewerB, nowMs)
     assert.equal(again.length, 0, "已投递的铃铛不得重投")
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries WHERE viewer_id = ?").get(viewerB).n, 1)
 
     // 房主看不见自己的招募
-    assert.equal(deliverOpenRecruitmentsToViewer(HOST_VIEWER, nowMs, 3).length, 0)
+    assert.equal(poll(HOST_VIEWER, nowMs).length, 0)
 
     // 接受后不再出现在铃铛列表
     recordResponse(bells[0].id, viewerB, "accepted", nowMs + 1)
-    assert.equal(deliverOpenRecruitmentsToViewer(viewerB, nowMs + 2, 3).length, 0, "accepted 必须收敛")
+    assert.equal(poll(viewerB, nowMs + 2).length, 0, "accepted 必须收敛")
 }
 
 // ---- recordResponse 单向转移（仅 delivered 可变） ----
 {
     const viewerC = 9003
     share()
-    const bells = deliverOpenRecruitmentsToViewer(viewerC, nowMs, 3)
+    const bells = poll(viewerC, nowMs)
     assert.equal(bells.length, 1)
     const recruitmentId = bells[0].id
 
@@ -135,7 +144,7 @@ function share(input = {}) {
     assert.equal(declined.acted_at_ms, 5_555)
 
     // 拒绝后不复发：再次轮询不得重新投递已 declined 的招募
-    assert.equal(deliverOpenRecruitmentsToViewer(viewerC, nowMs, 3).length, 0,
+    assert.equal(poll(viewerC, nowMs).length, 0,
         "declined 必须收敛（不得重新投递）")
 
     // 对已响应状态重复写必须 no-op（不降级、不刷新 acted_at）
@@ -184,7 +193,7 @@ function share(input = {}) {
             nowMs: nowMs + i,
         })
     }
-    const limited = deliverOpenRecruitmentsToViewer(viewer, nowMs, 3)
+    const limited = poll(viewer, nowMs)
     assert.equal(limited.length, 3, "单次 check 最多 return_attention_max_num 个铃铛")
     // 最新招募优先（posted_at DESC）
     assert.equal(limited[0].roomNumber, "700004")
@@ -199,7 +208,7 @@ function share(input = {}) {
         nowMs: nowMs - getRecruitmentLifetimeMs() - 10,
     })
     assert.equal(stale.created, true)
-    assert.equal(deliverOpenRecruitmentsToViewer(9011, nowMs, 3).some(r => r.id === stale.id), false,
+    assert.equal(poll(9011, nowMs).some(r => r.id === stale.id), false,
         "过期招募不得出现在投递中")
 }
 
@@ -234,7 +243,7 @@ function share(input = {}) {
     // live 的过期时间必须落在 prune 时间之后，否则会被一并标记 expired
     const liveAtMs = nowMs + 120_000
     const live = share({ roomNumber: "910002", nowMs: liveAtMs })
-    deliverOpenRecruitmentsToViewer(9301, nowMs, 3)
+    poll(9301, nowMs)
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries").get().n, 2)
 
     // 过期即标记 expired，但保留期内行仍在（含投递历史）

@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { describeError } from "../describe-error";
 import { PrepareBody, SummonBody, RestoreRoomBody, ShareRoomBody } from "../types";
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, realSecondsToVirtual } from "../../utils";
 import { getRealNowMs } from "../../runtime/time/game-time";
 import { serializeRoomStatusConnection } from "../room/serializer";
 import { buildNpcMates } from "../npc/builder";
@@ -266,7 +266,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                 "data": {
                     application_update_url: "",
                     category_id: room.value.category,
-                    host_entry_time: room.value.hostEntryTime,
+                    host_entry_time: realSecondsToVirtual(room.value.hostEntryTime),
                     ip_address: "",
                     port: 0,
                     quest_id: room.value.questId,

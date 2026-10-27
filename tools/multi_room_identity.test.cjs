@@ -35,7 +35,10 @@ function stubModule(relativePath, exports) {
     }
 }
 
+// 展开真实 utils 再覆盖时间函数：utils 面随功能增长（如 realSecondsToVirtual），
+// 全量替换式 stub 会让新消费点在测试环境 undefined（与 game-time stub 同型）
 stubModule("../src/utils", {
+    ...require("../src/utils"),
     getServerTime: () => 1_725_000_000,
     generateDataHeaders: ({ viewer_id, result_code } = {}) => ({
         viewer_id: viewer_id ?? 0,

@@ -451,6 +451,16 @@ async function main() {
             1,
             "F-06 阳性对照：虚拟偏移下真实未过期行照常投递",
         )
+        // N5/B2：非零虚拟偏移下下发值必须是换算后的虚拟纪元秒——客户端把它
+        // 喂给加算报酬时刻表（timeToDecideReward，虚拟时间轴）。恒等域测试
+        // 钉不住这个语义，换算被回退成本函数也能过全套测试。
+        const liveBell = liveChecked.multi.find(bell => bell.attention_key === liveRecruitment.attentionKey)
+        assert.ok(liveBell, "前置：live 铃铛在投递列表")
+        assert.equal(
+            liveBell.quest_info.host_entry_time,
+            Math.floor((realNow - 2 * 365 * 24 * 3600 * 1000) / 1000),
+            "N5：非零偏移下 host_entry_time 必须换算为虚拟域",
+        )
     } finally {
         setServerTimeOffset(null)
     }

@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { describeError } from "../describe-error"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
 import { getQuestFromCategorySync } from "../../lib/quest-content"
-import { generateDataHeaders } from "../../utils"
+import { generateDataHeaders, realSecondsToVirtual } from "../../utils"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
@@ -15,6 +15,7 @@ import { listActiveRoomSharesSync } from "../../data/domains/social-room-shares"
 import { getSharedFollowRelationSync } from "../../data/domains/social-follow"
 import { parseEstablisherSnapshot } from "../../data/domains/attention"
 import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader"
+import { projectLobbyRaisingState } from "../room/lobby-projection"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
@@ -66,9 +67,9 @@ function buildFriendRoomLobby(viewerId: number, categoryId: number): Record<stri
             establisher_character: Number(snapshot.character) || 0,
             establisher_character_evolution_img_level: Number(snapshot.evolutionImgLevel) || 0,
             establisher_follow: relation === "mutual" ? 1 : 0,
-            host_entry_time: Number(snapshot.hostEntryTime) || 0,
+            host_entry_time: realSecondsToVirtual(Number(snapshot.hostEntryTime) || 0),
             mates: row.mates,
-            raising_state: row.raising_state,
+            raising_state: projectLobbyRaisingState(row.room_number, row.host_viewer_id, row.raising_state),
             is_pickup: false,
         })
     }

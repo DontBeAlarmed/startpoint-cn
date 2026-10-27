@@ -370,6 +370,24 @@ test("explicit Bye removes a pre-battle guest immediately", t => {
     assert.equal(getRoom(room.room_number), room)
 })
 
+test("explicit guest Bye rewrites room.mates from the host session (N6)", t => {
+    const { room, host, guests } = createLobbyRoom(t, 509, [609])
+    const guest = guests[0]
+    // 两人同房的 room.mates 投影（Enter 路径产物形态）：离席前含 guest
+    room.mates = [
+        { viewer_id: host.client.viewerId, com_id: 0 },
+        { viewer_id: guest.client.viewerId, com_id: 0 },
+    ]
+
+    handleMessage(guest.socket, [0, [1]])
+
+    // 好友大厅 mates 计数 / NPC one-shot 过滤 / hasLiveNpcRecruitment 都读
+    // 这个投影——不重写会把已离席成员留在计数里
+    assert.deepEqual(getRoom(room.room_number)?.mates, [
+        { viewer_id: host.client.viewerId, com_id: 0 },
+    ])
+})
+
 test("a guest reconnect before the grace expires keeps the persistent member", async t => {
     configureReconnectGraceMs(25)
     const { room, host, guests } = createLobbyRoom(t, 505, [605])

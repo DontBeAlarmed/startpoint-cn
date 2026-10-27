@@ -2,6 +2,7 @@ import { MultiRoom } from "../types"
 import type { RoomStatus } from "../coordinator/interface"
 import { resolveDisplayHost } from "../../runtime/network-host"
 import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract"
+import { realSecondsToVirtual } from "../../utils"
 
 export const getDisplayHost = resolveDisplayHost
 
@@ -55,7 +56,7 @@ export function serializeRoom(room: MultiRoom): SerializedRoom {
         access_token: room.access_token,
         category_id: room.category,
         clear_phase: 0,
-        host_entry_time: room.host_entry_time,
+        host_entry_time: realSecondsToVirtual(room.host_entry_time),
         host_main_character_id: room.host_main_character_id,
         host_player_id: room.host_player_id,
         host_viewer_id: room.host_viewer_id,
@@ -110,7 +111,7 @@ function serializeRoomConnectionFields(room: {
     return {
         application_update_url: "",
         category_id: room.category,
-        host_entry_time: room.hostEntryTime,
+        host_entry_time: realSecondsToVirtual(room.hostEntryTime),
         ip_address: displayHost,
         port: sessionPort,
         quest_id: room.questId,

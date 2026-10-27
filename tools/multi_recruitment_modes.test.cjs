@@ -49,7 +49,14 @@ const {
 } = require("../src/data/domains/attention")
 const { resolveSummonServeCandidates } = require("../src/multi/http/room")
 const { resolveBellRecruitmentForStart } = require("../src/multi/http/battle")
-const { deliverOpenRecruitmentsToViewer } = require("../src/data/domains/attention")
+const { listUndeliveredOpenRecruitments, recordDeliveries } = require("../src/data/domains/attention")
+
+// 模拟一次 guest 轮询：取候选 + 记帐真下发行（两步契约，与 check 路由同构）
+function pollBells(viewer, atMs, limit = 3) {
+    const bells = listUndeliveredOpenRecruitments(viewer, atMs, limit)
+    recordDeliveries(viewer, bells.map(bell => bell.id))
+    return bells
+}
 
 const HOST_VIEWER = 9701
 const ROOM = "135790"
@@ -152,7 +159,7 @@ function shareRoom(overrides = {}) {
     // hasActiveDelivery：delivered/accepted 持票，declined/缺失无票
     db.prepare("UPDATE attention_recruitments SET status = 'open' WHERE id = ?").run(a.id)
     const guest = 9800
-    const bells = deliverOpenRecruitmentsToViewer(guest, nowMs + 2, 3)
+    const bells = pollBells(guest, nowMs + 2)
     assert.equal(bells.length, 1)
     assert.equal(hasActiveDelivery(a.id, guest), true, "delivered 持票")
     assert.equal(hasActiveDelivery(a.id, 9999), false, "无投递行无票")
@@ -162,7 +169,7 @@ function shareRoom(overrides = {}) {
     // declined 需从 delivered 转移——accepted 行是单向终态，不能降级（设计语义）
     const c = shareRoom({ hostViewerId: 9703, hostPid: 703, roomNumber: "246803", nowMs: nowMs + 4 })
     const guestC = 9801
-    deliverOpenRecruitmentsToViewer(guestC, nowMs + 5, 3)
+    pollBells(guestC, nowMs + 5)
     recordResponse(c.id, guestC, "declined", nowMs + 6)
     assert.equal(hasActiveDelivery(c.id, guestC), false, "declined 无票")
 }
@@ -180,6 +187,36 @@ function shareRoom(overrides = {}) {
     assert.notEqual(revived.attentionKey, first.attentionKey, "复活不得复用旧 key")
     const row = db.prepare("SELECT posted_at_ms FROM attention_recruitments WHERE id = ?").get(revived.id)
     assert.equal(row.posted_at_ms, nowMs + 1000, "新行窗口起点必须刷新")
+}
+
+// ---- F4 两步投递契约：候选读取不烧行；只记帐真下发子集 ----
+{
+    db.prepare("DELETE FROM attention_recruitments").run()
+    db.prepare("DELETE FROM attention_deliveries").run()
+    // 三个不同房主的招募（同一房主同房间只会有一行）
+    for (let i = 0; i < 3; i++) {
+        shareRoom({ hostViewerId: 9750 + i, hostPid: 750 + i, roomNumber: `2469${i}1` })
+    }
+    const guestF = 9820
+
+    // 候选读取是纯读：不写投递行，反复读取结果恒定
+    const first = listUndeliveredOpenRecruitments(guestF, nowMs + 1, 9)
+    assert.equal(first.length, 3)
+    const again = listUndeliveredOpenRecruitments(guestF, nowMs + 1, 9)
+    assert.equal(again.length, 3, "候选读取不得消耗投递机会（F4）")
+
+    // 模拟 check 路由：T1 过滤 + top-N 截取后只记帐真下发的子集
+    // （此处以"只取第 1 行"模拟其余两行被过滤/截取）
+    const delivered = first.slice(0, 1)
+    recordDeliveries(guestF, delivered.map(bell => bell.id))
+
+    const second = listUndeliveredOpenRecruitments(guestF, nowMs + 2, 9)
+    assert.equal(second.length, 2, "落选行在后续轮询仍可送达")
+    assert.equal(
+        second.some(bell => bell.id === delivered[0].id),
+        false,
+        "已下发行不再出现（deliver-once 语义保持）",
+    )
 }
 
 // ---- summon 三模式语义纯函数 ----
@@ -215,7 +252,7 @@ function shareRoom(overrides = {}) {
         null,
         "无投递行的 key 是伪造票",
     )
-    deliverOpenRecruitmentsToViewer(guest, nowMs + 1, 3)
+    pollBells(guest, nowMs + 1)
     const matched = resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, guest)
     assert.ok(matched !== null && matched.id === recruitment.id, "delivered 持票进房")
     const { recordResponse } = require("../src/data/domains/attention")

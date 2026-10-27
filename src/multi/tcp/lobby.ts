@@ -639,12 +639,16 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     // guest left but the room lives on). If the room was disbanded (host left / went empty), the
     // [6, dismissed] broadcast already tore it down — pushing a stale/empty mate list here makes the
     // remaining client's refreshMates dereference undefined character-display data and crash (F1010).
-    if (getRoom(client.roomNumber) && hostClient && hostClient !== client) {
+    const survivedRoom = getRoom(client.roomNumber)
+    if (survivedRoom && hostClient && hostClient !== client) {
+        // N6：显式离席后 room.mates 以房主会话为权威重写（离席者已被上面的
+        // 过滤循环从 hostClient.mates 移除）。注册行 mates 计数、NPC one-shot
+        // 过滤与 hasLiveNpcRecruitment 都读这个投影，不重写会把已离席成员
+        // 留在好友大厅计数里。
+        survivedRoom.mates = hostClient.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
         sessionManager.broadcastMateListToRoom(client.roomNumber, hostClient.mates)
     }
-    // 显式离席（Bye）路径从不重写 room.mates（现存固有 staleness）——注册行
-    // 同步至少把 raising_state/expires_at 续上，mates 用当前内存值近似
-    if (getRoom(client.roomNumber)) syncShareRow(client.roomNumber)
+    if (survivedRoom) syncShareRow(client.roomNumber)
     try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client left: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
 }

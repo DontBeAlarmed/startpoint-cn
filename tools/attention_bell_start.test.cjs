@@ -34,7 +34,8 @@ db = getDb()
 const {
     buildEstablisherSnapshot,
     closeRecruitmentForRoom,
-    deliverOpenRecruitmentsToViewer,
+    listUndeliveredOpenRecruitments,
+    recordDeliveries,
     getOrCreateRecruitmentForRoom,
     recordResponse,
 } = require("../src/data/domains/attention")
@@ -61,7 +62,8 @@ const recruitment = getOrCreateRecruitmentForRoom({
 })
 
 // guest 轮询 check 领票（惰性投递造有效投递行）
-const delivered = deliverOpenRecruitmentsToViewer(GUEST_VIEWER, nowMs + 1, 3)
+const delivered = listUndeliveredOpenRecruitments(GUEST_VIEWER, nowMs + 1, 3)
+recordDeliveries(GUEST_VIEWER, delivered.map(bell => bell.id))
 assert.equal(delivered.length, 1, "guest 轮询即收到本房铃铛")
 
 // null / 空 key → null
@@ -95,7 +97,8 @@ const otherHost = getOrCreateRecruitmentForRoom({
 })
 assert.equal(resolveBellRecruitmentForStart(recruitment.attentionKey, "445566", 9502, GUEST_VIEWER), null)
 const otherGuest = 9503
-const otherDelivered = deliverOpenRecruitmentsToViewer(otherGuest, nowMs + 3, 3)
+const otherDelivered = listUndeliveredOpenRecruitments(otherGuest, nowMs + 3, 3)
+recordDeliveries(otherGuest, otherDelivered.map(bell => bell.id))
 assert.ok(otherDelivered.some(bell => bell.id === otherHost.id), "其他 guest 可领到 B 房铃铛")
 assert.ok(
     resolveBellRecruitmentForStart(otherHost.attentionKey, "445566", 9502, otherGuest) !== null,

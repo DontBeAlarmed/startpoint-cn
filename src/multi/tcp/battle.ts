@@ -4,7 +4,6 @@ import { QuestCategory } from "../../lib/types"
 import { getRoom } from "../room/manager"
 import { sessionManager, SessionClient } from "../state/SessionManager"
 import { relayToBattleRoom } from "./relay"
-import { getRealNowMs } from "../../runtime/time/game-time"
 
 const BATTLE_MEASUREMENT_WARNING_THRESHOLD_MS = 2000
 
@@ -94,11 +93,13 @@ export function handleBattleMessage(socket: net.Socket, data: unknown): void {
             handleBattleNotify(socket, data[1])
             break
         case 1: { // Broadcast → relay as BattleServer2Client.Messages(2, senderId, array)
+            // 中继后不回任何帧：CN 客户端把 BattleServerMessage[3] 一律解析为
+            // Measurement(frame, clientTime, threshold)，无差别记入 RTT 统计
+            // （BattleScenePlayingStateImpl.serverMessage_Measurement）。
             const client = findBattleClientBySocket(socket)
             if (client) {
                 const bcData = data[1]
                 relayToBattleRoom(client, [2, client.connectionId, bcData])
-                sessionManager.sendJson(socket, [1, [3, 0, 0, getRealNowMs()]])
             }
             break
         }
@@ -109,7 +110,6 @@ export function handleBattleMessage(socket: net.Socket, data: unknown): void {
                 if (sendMsg) {
                     relayToBattleRoom(client, [3, client.connectionId, sendMsg])
                 }
-                sessionManager.sendJson(socket, [1, [3, 0, 0, getRealNowMs()]])
             }
             break
         }

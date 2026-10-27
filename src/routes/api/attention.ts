@@ -3,13 +3,14 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import {
-    deliverOpenRecruitmentsToViewer,
+    listUndeliveredOpenRecruitments,
+    recordDeliveries,
     parseEstablisherSnapshot,
 } from "../../data/domains/attention"
 import { getLocalFollowRelationSync } from "../../data/domains/follow"
 import { touchPresence } from "../../multi/presence"
 import { isBellDeliveryEligible } from "../../multi/bell-gate"
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, realSecondsToVirtual } from "../../utils";
 import { getRealNowMs } from "../../runtime/time/game-time";
 
 // 与下方 config.return_attention_max_num 保持一致：单次 check 最多携带的铃铛数
@@ -69,18 +70,26 @@ const routes = async (fastify: FastifyInstance) => {
             console.warn("[ATTENTION] presence touch failed (degraded)", error)
         }
 
-        // 读时惰性投递：guest 轮询时才写入投递行（对齐官方"房主 15s 重发 × guest 轮询"）
+        // 读时惰性投递（两步契约）：guest 轮询时才取候选；投递行只对真正下发的
+        // 铃铛建——提前烧行会让瞬时 T1 不合格的房间在 45s 生命期内对该 viewer
+        // 永久消失（F4）。
+        // 不变量：响应里的每个铃铛必须有对应投递行（deliver-once 对抗客户端
+        // 无去重插槽）。所以取数与记帐一体成败——记帐失败则整个结果作废，
+        // 宁可本轮空响应也不发出没记账的铃铛（否则下轮轮询重投堆叠横幅）。
         // F-06：招募行 TTL（expires_at）写侧锚真实钟，读侧必须同域——虚拟钟会恒判未过期
         const nowMs = getRealNowMs()
-        let bells: ReturnType<typeof deliverOpenRecruitmentsToViewer> = []
+        let bells: ReturnType<typeof listUndeliveredOpenRecruitments> = []
         try {
             // T1 投递谓词（设计 §5）：本节点房间过房间态门（未开战/房主在线/真人未满员），
-            // 异节点房间放行；先过滤后下发，被滤房间的投递行已建（幂等无害）
+            // 异节点房间放行
             // 取数放大 3 倍再过滤补满：T1 被滤房间不得挤占 return_attention_max_num 名额
-            bells = deliverOpenRecruitmentsToViewer(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM * 3)
+            const candidates = listUndeliveredOpenRecruitments(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM * 3)
                 .filter(recruitment => isBellDeliveryEligible(recruitment.roomNumber))
                 .slice(0, RETURN_ATTENTION_MAX_NUM)
+            recordDeliveries(viewerId, candidates.map(recruitment => recruitment.id))
+            bells = candidates
         } catch (error) {
+            bells = []
             console.warn("[ATTENTION] delivery failed (empty multi)", error)
         }
         const multi = bells.map(recruitment => {
@@ -102,7 +111,9 @@ const routes = async (fastify: FastifyInstance) => {
                     "establisher_character_evolution_img_level": Number(snapshot.evolutionImgLevel) || 0,
                     "establisher_follow": establisherFollow,
                     "establisher_rank": snapshot.rankLevel,
-                    "host_entry_time": snapshot.hostEntryTime,
+                    // 快照存真实纪元秒；客户端把它喂给加算报酬时刻表判定
+                    // （timeToDecideReward，虚拟时间轴），必须以虚拟域下发
+                    "host_entry_time": realSecondsToVirtual(snapshot.hostEntryTime),
                     "is_newbie": recruitment.isNewbieHost,
                     "quest_id": recruitment.questId,
                     "room_number": recruitment.roomNumber,

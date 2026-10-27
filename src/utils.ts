@@ -36,6 +36,19 @@ export function realToVirtual(date: Date): number {
 }
 
 /**
+ * Convert real epoch seconds (as stored for multi room host_entry_time) to
+ * virtual epoch seconds for the client. CN 1.8.1 feeds this value into the
+ * additional-score-reward schedule lookup (timeToDecideReward), which runs on
+ * the game (virtual) timeline — a real-domain value lands outside every event
+ * window and silently disables co-op additional rewards.
+ * 0 = "无时间戳"（快照/旧行缺省约定），原样透传，不产生 1970+偏移的伪值。
+ */
+export function realSecondsToVirtual(seconds: number): number {
+    if (!seconds) return 0;
+    return realToVirtual(new Date(seconds * 1000));
+}
+
+/**
  * Sets a custom server time from an absolute date.
  * The offset (target - real time) is computed and stored.
  * Set to null to reset to system time.

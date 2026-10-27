@@ -287,3 +287,36 @@ test("establisher_follow 徽章与过滤同源：单向关注者的视图徽章�
     const oneWayEntry = findRoom(await getRooms(oneWayFriend.viewerId), room.roomNumber)
     assert.equal(oneWayEntry.establisher_follow, 0)
 })
+
+
+// N7/F2：本节点房间以活房间状态为权威 + 房主离线投影 2（战斗中 4 恒直通，
+// 异节点/内存外注册行信任注册值）。TCP 静默死亡的房主房间不得再以 1/Ready
+// 出现在大厅里把客人引进必败房间。
+test("房主离线的非战斗房在大厅投影为 raising_state=2（活状态权威）", async () => {
+    const { setRoomDisbandListener } = require("../src/multi/room/manager")
+    const { getDb } = require("../src/data/db")
+
+    const room = await makeRoom(host)
+    await shareAsHost(room, [1])
+
+    // 篡改注册行为 1/Ready（模拟钩子滞后），活房间实际是 2/Waiting 且房主
+    // 从未建立 TCP 会话（HTTP-only 测试环境即离线）
+    getDb().prepare("UPDATE social_room_shares SET raising_state = 1 WHERE room_number = ?")
+        .run(room.roomNumber)
+
+    const entry = findRoom(await getRooms(mutualFriend.viewerId), room.roomNumber)
+    assert.ok(entry, "房主离线房仍可见")
+    assert.equal(entry.raising_state, 2, "离线房主的非战斗房投影为 2（灰显）")
+
+    // 异节点/内存外注册行：信任注册值直通（此处以移除内存房间模拟）
+    setRoomDisbandListener(null)
+    try {
+        const { disbandRoom: silentDisband } = require("../src/multi/room/manager")
+        assert.equal(silentDisband(room.roomNumber), true, "前置：内存房间移除")
+        const orphan = findRoom(await getRooms(mutualFriend.viewerId), room.roomNumber)
+        assert.ok(orphan, "注册行仍在（无监听器不走清理钩子）")
+        assert.equal(orphan.raising_state, 1, "内存外注册行直通注册值")
+    } finally {
+        require("../src/multi/room/disband-listener").installDisbandLifecycleListener()
+    }
+})

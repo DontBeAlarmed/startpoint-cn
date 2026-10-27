@@ -30,7 +30,7 @@
 
 默认 `embedded` 把游戏 HTTP、Coordinator 和 TCP 放在同一服务进程中，普通用户无需额外配置。可选 `host` 在自身 `8001` 游戏 HTTP 外提供 `8003` Hub TCP 和 `8004` Hub control；`client` 只保留自己的 `8001`，通过 `8004` 控制房间，游戏客户端按房间响应直连 Host `8003`。三种模式都保持玩家 SQLite 与结算在所属服务端本地。
 
-Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。多人协议版本、`APP_VER`、多人战斗内容摘要或 Mod 摘要不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；`RES_VER` 与 CDN 目标版本参与比较，但不记录为拒绝，也不单独阻断同房。房间已满由 `select_room`/`prepare` 返回 `raising_state=3`，战斗已开始返回 `raising_state=4`；只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
+Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。多人协议版本、`APP_VER`、多人战斗内容摘要或 Mod 摘要不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；`RES_VER` 与 CDN 目标版本参与比较，但不记录为拒绝，也不单独阻断同房。房间已满由 `select_room` 返回 `raising_state=3`（`prepare` 满员走 `result_code=4507`：CN 1.8.1 的 prepare 解析只容忍 1/2/9），战斗已开始返回 `raising_state=4`；只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
 
 ### 2.1 房间准入与席位预留
 
@@ -156,7 +156,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 
 | 路由 | 当前职责 |
 |---|---|
-| `get_rooms` | 好友房间大厅：按 category 返回 `social_room_shares` 注册表中可见的招募房间（含 raising_state=2 满员/4 战斗中，客户端原生灰显）。可见性=房主 `share_room` 持久化的位掩码（bit1 双向关注房→仅互关；bit2 单向关注房→任一方向单向可见；纯 bit3 随机招募房不入表，只走铃铛）与请求者对房主的真实 follow 关系（`social_follows` 共享表，跨节点同权；fail-closed none）。条目 11 字段与客户端强校验一一对应，`establisher_follow` 徽章与过滤同源（mutual→1） |
+| `get_rooms` | 好友房间大厅：按 category 返回 `social_room_shares` 注册表中可见的招募房间（战斗中=4，客户端原生灰显；本节点房间以活房间状态为权威，房主 lobby socket 离线的非战斗房投影为 2 灰显——TCP 静默死亡不再以 Ready 引客进必败房）。可见性=房主 `share_room` 持久化的位掩码（bit1 双向关注房→仅互关；bit2 单向关注房→任一方向单向可见；纯 bit3 随机招募房不入表，只走铃铛）与请求者对房主的真实 follow 关系（`social_follows` 共享表，跨节点同权；fail-closed none）。条目 11 字段与客户端强校验一一对应，`establisher_follow` 徽章与过滤同源（mutual→1）。条目 `host_entry_time` 以虚拟纪元秒下发：客户端把它喂给加算报酬时刻表判定（timeToDecideReward，虚拟时间轴）；内部存储保持真实纪元秒 |
 | `create_room` | 校验玩家与关卡，创建进程内房间、room number 和房间级随机 access token |
 | `search_room` | 按 room number 返回房间是否存在及基础房主信息 |
 | `select_room` | 校验兼容性并预留真人席位，返回 TCP 地址、端口和房间状态；满员返回状态 3，战斗已开始返回状态 4，房间缺失时返回状态 9 |
@@ -165,11 +165,11 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 
 | 路由 | 当前职责 |
 |---|---|
-| `prepare` | 校验 viewer session、房间和关卡并预留真人席位后返回 TCP 连接信息；这是首次加入前入口，不要求已有成员资格；满员返回状态 3 |
+| `prepare` | 校验 viewer session、房间和关卡并预留真人席位后返回 TCP 连接信息；这是首次加入前入口，不要求已有成员资格；满员返回 `result_code=4507`（CN prepare 解析只容忍 raising_state 1/2/9） |
 | `summon` | 仅房主可请求 NPC mate 候选（`mate1`/`mate2` 双候选，候选 ≤1 客户端判 Faild 并重开铃铛）。三模式语义（`游戏设置-联机招募模式`）：发布关（NPC 快速）或 W=0（官服还原）恒发双候选；W>0（私服混合）招募行缺失或窗口未到回空（省略 mate 字段），NPC 由服务端释放点在 W 到点注入。合法房主+活房间恒 200——任何 4xx 会把客户端 summon 状态机永久卡死在 WaitRemote |
 | `restore_room` | 已记录成员可恢复仍在进程内的房间；陌生玩家返回状态 13，缺失房间返回状态 9 |
-| `share_room` | 仅房主可提交。双重门控：`share_type_list` 含 3（随机招募）**且** `游戏设置-联机招募模式` 的发布开关开启时，幂等创建/刷新铃铛招募行（房主客户端每 15s 重发、上限 20 次，同房间恒定 attention_key）并挂服务端 NPC 释放点（W>0 私服混合）；发布关闭（NPC 快速预设）时含 3 也不落行——按钮退化为纯 NPC 开关。投递经 `/attention/check` 下发（T1 房间态门：本节点未开战/房主在线/真人未满员，异节点放行）、guest 经 `start` 携 attention_key 进房（T2 门票：需持有效投递行，冻结 cond92 资格）；纯 1/2（互关/粉丝）分享不落招募行。成功响应不含业务字段（客户端忽略响应体），招募记账失败不影响 200。位 1/2 以 OR-merge 持久化到 `social_room_shares` 注册表（好友房间大厅数据源；勾选 [1,3]/[2,3] 时 [3] 的 15s 重发绝不触碰注册行，行回收只走 disband 钩子 + TTL 兜底），`raising_state`/mates 由房间权威节点生命周期钩子实时同步 |
-| `disband_room` | 房间存在时仅房主可广播 Disbanded 并删除房间；房间已不存在时幂等成功 |
+| `share_room` | 仅房主可提交。双重门控：`share_type_list` 含 3（随机招募）**且** `游戏设置-联机招募模式` 的发布开关开启时，幂等创建/刷新铃铛招募行（房主客户端每 15s 重发、上限 20 次，同房间恒定 attention_key）并挂服务端 NPC 释放点（W>0 私服混合）；发布关闭（NPC 快速预设）时含 3 也不落行——按钮退化为纯 NPC 开关。投递经 `/attention/check` 下发（T1 房间态门：本节点未开战/房主在线/真人未满员，异节点放行；投递行只对真下发的铃铛建立——候选读取不记帐，瞬时被滤房间在 45s 生命期内后续轮询仍可送达）、guest 经 `start` 携 attention_key 进房（T2 门票：需持有效投递行，冻结 cond92 资格）；纯 1/2（互关/粉丝）分享不落招募行。成功响应不含业务字段（客户端忽略响应体），招募记账失败不影响 200。位 1/2 以 OR-merge 持久化到 `social_room_shares` 注册表（好友房间大厅数据源；勾选 [1,3]/[2,3] 时 [3] 的 15s 重发绝不触碰注册行，行回收只走 disband 钩子 + TTL 兜底），`raising_state`/mates 由房间权威节点生命周期钩子实时同步 |
+| `disband_room` | 房间存在时仅房主可广播 Disbanded 并删除房间；房间已不存在时幂等成功。解散监听器统一关闭该房的招募行与注册行（覆盖计时器/宽限等全部解散路径，铃铛不再为死房投递） |
 
 ### 4.3 战斗生命周期
 
@@ -180,7 +180,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 | `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除并立即重判剩余成员是否全部 Finalize |
 | `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
 
-多人客户端会让每位真人分别请求 `start`，因此 active quest 是玩家级状态，不由房主记录替代成员记录。房主身份使用 Hub 内部的 `nodeSessionId + viewerId` 复合身份判断，不能由请求字段或节点本地 player ID 声明。成员 start 的入场成本固定为 0，但仍会保存自己的 `play_id`、房间号和关卡身份，以供 finish、abort、重连与多场景结束校验使用。
+多人客户端会让每位真人分别请求 `start`，因此 active quest 是玩家级状态，不由房主记录替代成员记录。房主身份使用 Hub 内部的 `nodeSessionId + viewerId` 复合身份判断，不能由请求字段或节点本地 player ID 声明。guest 成员的体力扣费遵循 start 行的 Follow 规则（互关/可信跨服为 0，其余折半后应用 Campaign；入场物品成本仅房主侧收取），但仍会保存自己的 `play_id`、房间号和关卡身份，以供 finish、abort、重连与多场景结束校验使用。
 
 `finish` 请求不要求携带 `room_number`；服务端从 active quest 恢复房间身份。`statistics` 必须是非空对象，`elapsed_time_ms` 必须为正安全整数，`add_mana`、`score` 和 `continue_count` 不得为负。Boost 点在 finish 时确认扣除，余额不足时整个结算拒绝，不会写成负数。
 
@@ -199,14 +199,15 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 `raising_state` 是国服客户端 HTTP 响应解析器要求的字段。下表中的 Ready、Waiting、Battle 等名称来自客户端各数值分支对应的输入类型；“当前语义”描述的是服务端在这些客户端分支约束下采用的状态机行为。
 
 当前房间内存状态仍只写入 1、2、4；`updateRoomState` 在运行时拒绝其余任何值
-（含 HTTP 投影 3/9/13），拒绝时不改动房间与状态机。3、9 和 13 是 HTTP 加入/恢复响应的客户端投影，不会写入房间状态。
+（含 HTTP 投影 3/7/9/13），拒绝时不改动房间与状态机。3、7、9 和 13 是 HTTP 加入/恢复响应的客户端投影，不会写入房间状态。
 
 | 值 | 当前语义 | 写入或返回时机 |
 |---:|---|---|
 | 1 | Ready | 房主进入 lobby；当局全部真人 Finalize 后由 coordinator 恢复为可重赛状态 |
 | 2 | Waiting | 新建房间初态；房主尚未进入时客人继续轮询 |
-| 3 | Full | `select_room` 或 `prepare` 发现真人成员与待入场 admission 已达到 3 人 |
+| 3 | Full | `select_room` 发现真人成员与待入场 admission 已达到 3 人（`prepare` 满员投影为 4507） |
 | 4 | Battle | TCP lobby 收到房主 StartBattle 并固化当局成员后进入战斗 |
+| 7 | NotPlayable | `select_room` 对兼容性摘要不符、关卡不可用或席位发放失败的投影 |
 | 9 | Missing | `select_room`、`prepare` 或 `restore_room` 找不到房间时返回 |
 | 13 | NotMate | `restore_room` 的 viewer 不是该房间已记录成员时返回 |
 
@@ -246,7 +247,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 | `[3, "HANDSHAKE_DENIED"]` | Exception(Fatal) | `serverError(Fatal)` 错误弹框 | 协议级参数错误与 battle 侧拒绝 |
 | `[4]` | Complete | 静默关闭，无任何 UI 回调 | 预留（"无声关门"场景，当前无使用） |
 
-cooperation_room 拒绝裁决（F-02，2026-10 用户定案）：**日常可恢复拒绝一律走 `[1]`**——房间不存在（`room_missing`，切出期间房主解散/宽限到期被清扫）、房间不在招募态（`room_state_*`）、类别/关卡不一致（`quest_mismatch`）、真人满员（`room_full`）、同 viewer 冲突连接（`viewer_conflict`）、准入券缺失/失效（`admission_unavailable`）与准入身份不符（`admission_viewer_mismatch`）。这些场景是联机日常而非异常，客户端语义里 `[1]` 是唯一"有软提示、能回大厅"的通道（`[4]` 无反馈、`[2]` 是转拨不是拒绝）。
+cooperation_room 拒绝裁决（F-02，2026-10 用户定案）：**日常可恢复拒绝一律走 `[1]`**——房间不存在（`room_missing`，切出期间房主解散/宽限到期被清扫）、房间不在招募态（`room_state_*`）、类别/关卡不一致（`quest_mismatch`）、真人满员（`room_full`）、同 viewer 冲突连接（`viewer_conflict`）、准入券缺失/失效（`admission_unavailable`）与准入身份不符（`admission_viewer_mismatch`）。这些场景是联机日常而非异常，客户端语义里 `[1]` 是唯一"有软提示、能回大厅"的通道（`[4]` 无反馈、`[2]` 是转拨不是拒绝）。同族可恢复拒绝还包括房主席位冲突（`host_seat_conflict`）、加入写入失败（`room_join_*`、`room_member_write_failed`）与未知 socklet。
 
 保留 Fatal `[3]`：握手协议参数错误（缺 room number / viewer 非法 / connection id 非法——正常客户端发不出来，出现即协议栈级异常）。cooperation_battle 分支整体保留 `[3]`：战斗期拒绝（房间未开战/未知参与者/重复连接）走 HTTP 兜底链，客户端战斗界面有独立处理，不动。
 
@@ -283,7 +284,7 @@ SceneReady 只统计已登记的 battle client。
 | Index | 名称 | 当前行为 |
 |---:|---|---|
 | 0 | Enter | 更新本人 party，发送 Welcome，并同步 Mates |
-| 1 | Bye | 客户端定义的通用 lobby 连接结束通知；服务端结合 `raising_state` 决定释放成员、解散房间或仅关闭连接 |
+| 1 | Bye | 客户端定义的通用 lobby 连接结束通知；服务端结合 `raising_state` 决定释放成员、解散房间或仅关闭连接。显式离席以存活房主会话为权威重写 `room.mates` 并同步注册行（离席者不再留在好友大厅 mates 计数里） |
 | 2 | ChangeParty | 更新当前 party 并广播 Mates |
 | 3 | Ready | 更新准备状态并广播 StateChanged |
 | 4 | Heartbeat | 回 AckHeartbeat |
@@ -302,6 +303,7 @@ SceneReady 只统计已登记的 battle client。
 | 5 | Start | 下发进入战斗的成员数据 |
 | 6 | Disbanded | 通知房间解散 |
 | 7 | RemainingTime | 非战斗房间过期前的剩余时间 |
+| 10 | StartRemainingTime | 全员就绪后自动开战的倒计时通知（CN 索引位移后为 10） |
 | 11 | AckHeartbeat | 回传当前 connection ID |
 
 Welcome 的成员列表必须包含客户端本人。Mates 在成员加入、离开、换队或 NPC roster 变化时更新。
@@ -441,7 +443,7 @@ Battle 顶层消息仍使用 Typepacker 数组：
 | 1 | Broadcast | 中继给同房其他 battle client |
 | 2 | Send | 中继定向消息结构 |
 
-普通 `Broadcast` 帧会被包装为带来源 connection ID 的服务端消息，并发送给同房其他 battle client。移动、技能、FEVER、协力球和自动战斗等普通帧可以沿这条路径中继。中继不等待 SceneReady 屏障：屏障完成前到达的 relay 帧会被 CN 客户端的等待态命令队列重新排队，待 BattleStart 开战后按序消费（依据 1.8.1 反编译 `BattleSceneWaitForMateStateImpl` 与 `CommandQueue_Impl_.tryProcessCommands`），因此服务端不在屏障前缓存或拒绝普通 relay 帧。
+普通 `Broadcast` 帧会被包装为带来源 connection ID 的服务端消息，并发送给同房其他 battle client。移动、技能、FEVER、协力球和自动战斗等普通帧可以沿这条路径中继。中继后服务端不回任何应答帧：CN 客户端把 `BattleServerMessage[3]` 一律解析为 Measurement(frame, clientTime, threshold) 并无差别记入 RTT 统计，对 Broadcast/Send 回帧会以 clientTime=0 污染统计（Measurement 回显只应答客户端自身的 Measurement 通知，见下）。中继不等待 SceneReady 屏障：屏障完成前到达的 relay 帧会被 CN 客户端的等待态命令队列重新排队，待 BattleStart 开战后按序消费（依据 1.8.1 反编译 `BattleSceneWaitForMateStateImpl` 与 `CommandQueue_Impl_.tryProcessCommands`），因此服务端不在屏障前缓存或拒绝普通 relay 帧。
 
 SceneReady 当前可用：
 

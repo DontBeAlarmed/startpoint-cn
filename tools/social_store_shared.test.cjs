@@ -26,7 +26,8 @@ const {
     createSqliteAttentionStore,
     getAttentionStore,
     getOrCreateRecruitmentForRoom,
-    deliverOpenRecruitmentsToViewer,
+    listUndeliveredOpenRecruitments,
+    recordDeliveries,
     findOpenRecruitmentByKey,
 } = require("../src/data/domains/attention")
 const {
@@ -97,7 +98,8 @@ process.once("exit", cleanup)
     assert.equal(created.created, true)
 
     // 进程 B（guest 节点）：轮询投递可见（读时惰性投递跨连接成立）
-    const bells = storeB.deliverOpenRecruitmentsToViewer(GUEST_VIEWER, t0 + 1, 3)
+    const bells = storeB.listUndeliveredOpenRecruitments(GUEST_VIEWER, t0 + 1, 3)
+    storeB.recordDeliveries(GUEST_VIEWER, bells.map(bell => bell.id))
     assert.equal(bells.length, 1, "进程 B 必须看到进程 A 创建的招募")
     assert.equal(bells[0].attentionKey, created.attentionKey)
     assert.equal(bells[0].roomNumber, "510001")
@@ -110,7 +112,7 @@ process.once("exit", cleanup)
     // 进程 B：accepted 后，进程 A 侧也收敛（投递状态共享）
     storeB.recordResponse(created.id, GUEST_VIEWER, "accepted", t0 + 3)
     assert.equal(
-        storeA.deliverOpenRecruitmentsToViewer(GUEST_VIEWER, t0 + 4, 3).length,
+        storeA.listUndeliveredOpenRecruitments(GUEST_VIEWER, t0 + 4, 3).length,
         0,
         "进程 B 的 accepted 必须对进程 A 可见（不再投递）",
     )
@@ -179,9 +181,10 @@ process.once("exit", cleanup)
         1,
         "兼容层函数必须写入共享库（getAttentionStore 走 env 工厂）",
     )
+    const compatBells = listUndeliveredOpenRecruitments(7302, t0 + 1, 3)
+    recordDeliveries(7302, compatBells.map(bell => bell.id))
     assert.ok(
-        deliverOpenRecruitmentsToViewer(7302, t0 + 1, 3)
-            .some(r => r.roomNumber === "530001"),
+        compatBells.some(r => r.roomNumber === "530001"),
         "兼容层投递必须读到共享库行",
     )
     touchPresence(8101, t0)

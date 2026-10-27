@@ -245,3 +245,73 @@ test("room number exhaustion fails without consuming or mutating room state", t 
     assert.equal(getRoom(existing.room_number), undefined)
     assert.equal(disbandRoom(next.room_number), true)
 })
+
+
+test("room disband closes the room's open recruitment rows (N4/F5; timer path funnels the same disbandRoom)", t => {
+    // F5：计时器解散此前只删注册行，招募行留 open → 死房铃铛（bell-gate 对
+    // 本节点缺房放行）最长存活到 45s TTL。解散监听器必须一并关行。
+    // 计时器路径经 cleanExpiredRooms → disbandRoom → 监听器，与本测试同一
+    // 提交边界，不再单独注入定时器。
+    const fs = require("node:fs")
+    const os = require("node:os")
+    const path = require("node:path")
+    const { installDisbandLifecycleListener } = require("../src/multi/room/disband-listener")
+    const {
+        getOrCreateRecruitmentForRoom,
+        findOpenRecruitmentForRoom,
+    } = require("../src/data/domains/attention")
+    const { getDb } = require("../src/data/db")
+    const { getRealNowMs } = require("../src/runtime/time/game-time")
+
+    // 本文件其余用例不触库；招募行用例需要独立临时库
+    const previousDataDirectory = process.env.WDFP_DATABASE_DIR
+    const tempDatabaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "cleanup-recruitment-"))
+    process.env.WDFP_DATABASE_DIR = tempDatabaseDirectory
+    const { initializeDatabase } = require("../src/data")
+    initializeDatabase()
+
+    installDisbandLifecycleListener()
+    t.after(() => {
+        require("../src/multi/room/manager").setRoomDisbandListener(null)
+        getDb().prepare("DELETE FROM attention_recruitments").run()
+        getDb().prepare("DELETE FROM attention_deliveries").run()
+        if (previousDataDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
+        else process.env.WDFP_DATABASE_DIR = previousDataDirectory
+        fs.rmSync(tempDatabaseDirectory, { recursive: true, force: true })
+    })
+
+    useRoomNumbers("641001")
+    const hostViewerId = 6410
+    const room = createRoom(
+        hostViewerId, hostViewerId + 1000, 1, 1, hostViewerId + 2000, 1, hostViewerId + 3000,
+        false,
+        { nodeSessionId: "embedded", viewerId: hostViewerId },
+    )
+    const recruitment = getOrCreateRecruitmentForRoom({
+        hostPid: hostViewerId + 1000,
+        hostViewerId,
+        category: 1,
+        questId: 1001001,
+        roomNumber: room.room_number,
+        isNewbieHost: false,
+        establisherJson: "{}",
+        nowMs: getRealNowMs(),
+    })
+    assert.equal(
+        findOpenRecruitmentForRoom(hostViewerId, room.room_number, getRealNowMs())?.id,
+        recruitment.id,
+        "前置：招募行 open",
+    )
+
+    assert.equal(disbandRoom(room.room_number), true)
+
+    assert.equal(
+        findOpenRecruitmentForRoom(hostViewerId, room.room_number, getRealNowMs()),
+        null,
+        "解散后招募行必须关闭",
+    )
+    assert.equal(
+        getDb().prepare("SELECT status FROM attention_recruitments WHERE id = ?").get(recruitment.id).status,
+        "closed",
+    )
+})

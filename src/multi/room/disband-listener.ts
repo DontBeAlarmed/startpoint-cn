@@ -1,5 +1,6 @@
 import { sessionManager } from "../state/SessionManager"
 import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
+import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import { describeError } from "../describe-error"
 import { setRoomDisbandListener } from "./manager"
 
@@ -10,7 +11,7 @@ import { setRoomDisbandListener } from "./manager"
  * a second dismissal before deleting the room.
  */
 export function installDisbandLifecycleListener(): void {
-    setRoomDisbandListener((roomNumber, hostPlayerId) => {
+    setRoomDisbandListener((roomNumber, hostPlayerId, hostViewerId) => {
         try {
             sessionManager.broadcastToRoom(roomNumber, [1, [6, "multibattle_room_dismissed"]])
         } catch (error) {
@@ -32,6 +33,14 @@ export function installDisbandLifecycleListener(): void {
             deleteRoomShareRowForDisband(roomNumber)
         } catch (error) {
             console.error(`[MULTI] room share disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
+        }
+        try {
+            // 铃铛招募行同样覆盖全部解散路径：此前只有 HTTP disband/开战/NPC
+            // 补位会关行，计时器解散留下 open 行 → 死房铃铛（bell-gate 对
+            // 本节点缺房放行）最长存活到 45s TTL。
+            closeRecruitmentForRoom(hostViewerId, roomNumber)
+        } catch (error) {
+            console.error(`[MULTI] recruitment disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
         }
     })
 }

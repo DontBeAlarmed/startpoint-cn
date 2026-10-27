@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { VerifyAccessTokenBody, MicroCommunityBody } from "../types"
-import { generateDataHeaders } from "../../utils"
+import { generateDataHeaders, realSecondsToVirtual } from "../../utils"
 import { getPlayerRankLevel } from "../player-context"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin } from "./join-result"
@@ -73,7 +73,7 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
                 establisher_follow: establisherFollow,
                 establisher_name: host?.player.name ?? `Player${room.value.host.viewerId}`,
                 establisher_rank: getPlayerRankLevel(host?.player.rankPoint ?? 0),
-                host_entry_time: room.value.hostEntryTime,
+                host_entry_time: realSecondsToVirtual(room.value.hostEntryTime),
                 quest_id: room.value.questId,
                 room_number: room.value.roomNumber,
             }

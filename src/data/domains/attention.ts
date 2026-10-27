@@ -52,11 +52,16 @@ export interface AttentionStore {
         establisherJson: string
         nowMs: number
     }): { id: number; attentionKey: string; created: boolean }
-    deliverOpenRecruitmentsToViewer(
+    /** 读未投递候选（不写投递行）：调用方过滤/截取后对真下发行调 recordDeliveries。
+     * 投递行只对 guest 真正看到的铃铛建——提前烧行会让瞬时 T1 不合格的房间
+     * 在 45s 生命期内对该 viewer 永久消失（F4）。 */
+    listUndeliveredOpenRecruitments(
         viewerId: number,
         nowMs: number,
         limit: number,
     ): AttentionRecruitment[]
+    /** 记帐真下发的投递行（INSERT OR IGNORE，幂等） */
+    recordDeliveries(viewerId: number, recruitmentIds: number[]): void
     findOpenRecruitmentByKey(attentionKey: string, nowMs: number): AttentionRecruitment | null
     /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null；
      * includeExpired=true 时不过滤过期（释放点服务端接管行寿命的兜底读） */
@@ -191,14 +196,15 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /**
-         * 读时惰性投递：guest 轮询 check 时才写入投递行（对齐官方
-         * "房主 15s 重发 × guest 轮询"节奏，晚上线玩家下次轮询自然收到）。
+         * 读时惰性投递（两步契约）：guest 轮询 check 时先取未投递候选，
+         * 调用方完成 T1 过滤与 top-N 截取后对**真下发**的行调 recordDeliveries。
          * **每个招募对每个 viewer 只投递一次**（客户端 receive 按空槽插入、
          * 不按 key 去重——重投已投递条目会在弹框里堆叠同一房间的多个铃铛）；
-         * 铃铛消失由客户端本地过期（随招募生命周期）处理。
-         * 已 accepted/declined 的不再出现；房主自己的招募对自己不可见。
+         * 候选阶段不烧行——瞬时 T1 不合格（满员/开战锁）或落选 top-N 的房间
+         * 在 45s 生命期内后续轮询仍可送达。已 accepted/declined 的不再出现；
+         * 房主自己的招募对自己不可见。
          */
-        deliverOpenRecruitmentsToViewer(viewerId, nowMs, limit) {
+        listUndeliveredOpenRecruitments(viewerId, nowMs, limit) {
             const rows = db.prepare(`
                 SELECT r.* FROM attention_recruitments r
                 LEFT JOIN attention_deliveries d
@@ -209,12 +215,15 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
                 ORDER BY r.posted_at_ms DESC
                 LIMIT ?
             `).all(viewerId, nowMs, viewerId, limit) as Array<Record<string, unknown>>
+            return rows.map(mapRecruitmentRow)
+        },
+
+        recordDeliveries(viewerId, recruitmentIds) {
             const insertDelivery = db.prepare(`
                 INSERT OR IGNORE INTO attention_deliveries (recruitment_id, viewer_id, state)
                 VALUES (?, ?, 'delivered')
             `)
-            for (const row of rows) insertDelivery.run(Number(row.id), viewerId)
-            return rows.map(mapRecruitmentRow)
+            for (const id of recruitmentIds) insertDelivery.run(id, viewerId)
         },
 
         /** quest/start（multi）携带 attention_key 时的招募解析；过期/关闭返回 null */
@@ -385,8 +394,12 @@ export function getOrCreateRecruitmentForRoom(input: Parameters<AttentionStore["
     return getAttentionStore().getOrCreateRecruitmentForRoom(input)
 }
 
-export function deliverOpenRecruitmentsToViewer(viewerId: number, nowMs: number, limit: number) {
-    return getAttentionStore().deliverOpenRecruitmentsToViewer(viewerId, nowMs, limit)
+export function listUndeliveredOpenRecruitments(viewerId: number, nowMs: number, limit: number) {
+    return getAttentionStore().listUndeliveredOpenRecruitments(viewerId, nowMs, limit)
+}
+
+export function recordDeliveries(viewerId: number, recruitmentIds: number[]) {
+    return getAttentionStore().recordDeliveries(viewerId, recruitmentIds)
 }
 
 export function findOpenRecruitmentByKey(attentionKey: string, nowMs: number) {
