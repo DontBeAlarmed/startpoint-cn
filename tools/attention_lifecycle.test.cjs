@@ -129,11 +129,11 @@ async function deliverAll(viewer, atMs, limit) {
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries WHERE viewer_id = ?").get(viewerB).n, 1)
 
     // 房主看不见自己的招募
-    assert.equal(await poll(HOST_VIEWER, nowMs).length, 0)
+    assert.equal((await poll(HOST_VIEWER, nowMs)).length, 0)
 
     // 接受后不再出现在铃铛列表
-    recordResponse(bells[0].id, viewerB, "accepted", nowMs + 1)
-    assert.equal(await poll(viewerB, nowMs + 2).length, 0, "accepted 必须收敛")
+    await recordResponse(bells[0].id, viewerB, "accepted", nowMs + 1)
+    assert.equal((await poll(viewerB, nowMs + 2)).length, 0, "accepted 必须收敛")
 }
 
 // ---- recordResponse 单向转移（仅 delivered 可变） ----
@@ -152,7 +152,7 @@ async function deliverAll(viewer, atMs, limit) {
     assert.equal(declined.acted_at_ms, 5_555)
 
     // 拒绝后不复发：再次轮询不得重新投递已 declined 的招募
-    assert.equal(await poll(viewerC, nowMs).length, 0,
+    assert.equal((await poll(viewerC, nowMs)).length, 0,
         "declined 必须收敛（不得重新投递）")
 
     // 对已响应状态重复写必须 no-op（不降级、不刷新 acted_at）
@@ -216,7 +216,7 @@ async function deliverAll(viewer, atMs, limit) {
         nowMs: nowMs - getRecruitmentLifetimeMs() - 10,
     })
     assert.equal(stale.created, true)
-    assert.equal(await poll(9011, nowMs).some(r => r.id === stale.id), false,
+    assert.equal((await poll(9011, nowMs)).some(r => r.id === stale.id), false,
         "过期招募不得出现在投递中")
 }
 

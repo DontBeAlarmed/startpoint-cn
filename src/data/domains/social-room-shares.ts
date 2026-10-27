@@ -105,6 +105,12 @@ export async function refreshRoomShareRowAsync(
 }
 
 /** 解散/清理钩子：删除注册行（幂等） */
+/** 启动清扫（startup-sweep）用：全量清空注册行（主任务 dc565e25 新增，保留 Sync 形状） */
+export function purgeAllRoomShareRowsSync(): number {
+    const result = getDb().prepare(`DELETE FROM social_room_shares`).run()
+    return result.changes
+}
+
 export async function deleteRoomShareRowAsync(roomNumber: string): Promise<void> {
 
     try {
