@@ -1,10 +1,10 @@
 import type { Pool, PoolClient } from "pg"
 import type { AttentionRecruitment, AttentionStore } from "../domains/attention"
-import { buildEstablisherSnapshot, parseEstablisherSnapshot } from "../domains/attention"
+import { buildEstablisherSnapshot, getRecruitmentLifetimeMs, parseEstablisherSnapshot } from "../domains/attention"
 
 /**
  * AttentionStore 的 PG 实现（W1b，跨物理机）。行为契约与共享 SQLite 版
- * 逐条等价（tools/social_store_contract.test.cjs 双后端矩阵锁定）：
+ * 与共享 SQLite 版行为等价（契约矩阵测试 W1c 落地）：
  * - 两步投递契约（listUndelivered 不烧行 + recordDeliveries 幂等记帐）
  * - 每招募每 viewer 只投递一次（d.state IS NULL 谓词）
  * - get-or-create 同 (node, 房主, 房间) 恒定 key，重发只刷新
@@ -53,25 +53,36 @@ export function createPgAttentionStore(nodeId: string, pool: Pool): AttentionSto
                              establisher_json = $4, expires_at_ms = $5
                          WHERE id = $6`,
                         [input.category, input.questId, input.isNewbieHost ? 1 : 0,
-                            input.establisherJson, input.nowMs + 45_000, row.id],
+                            input.establisherJson, input.nowMs + getRecruitmentLifetimeMs(), row.id],
                     )
                     await client.query("COMMIT")
                     return { id: Number(row.id), attentionKey: String(row.attention_key), created: false }
                 }
-                const key = `attention_${String(Math.floor(100000 + Math.random() * 900000))}_${nodeId}`
-                const inserted = await client.query(
-                    `INSERT INTO attention_recruitments
-                        (node_id, attention_key, room_number, host_pid, host_viewer_id,
-                         category, quest_id, is_newbie_host, establisher_json,
-                         posted_at_ms, expires_at_ms, status)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'open')
-                     RETURNING id`,
-                    [nodeId, key, input.roomNumber, input.hostPid, input.hostViewerId,
-                        input.category, input.questId, input.isNewbieHost ? 1 : 0,
-                        input.establisherJson, input.nowMs, input.nowMs + 45_000],
-                )
+                let key = ""
+                let inserted = null
+                // UNIQUE(node_id, attention_key) 碰撞：换随机数重试 ×3（对齐
+                // SQLite 版，避免历史残留 key 让当轮分享降级）
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    key = `attention_${String(Math.floor(100000 + Math.random() * 900000))}_${nodeId}`
+                    try {
+                        inserted = await client.query(
+                            `INSERT INTO attention_recruitments
+                                (node_id, attention_key, room_number, host_pid, host_viewer_id,
+                                 category, quest_id, is_newbie_host, establisher_json,
+                                 posted_at_ms, expires_at_ms, status)
+                             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'open')
+                             RETURNING id`,
+                            [nodeId, key, input.roomNumber, input.hostPid, input.hostViewerId,
+                                input.category, input.questId, input.isNewbieHost ? 1 : 0,
+                                input.establisherJson, input.nowMs, input.nowMs + getRecruitmentLifetimeMs()],
+                        )
+                        break
+                    } catch (error) {
+                        if (attempt === 2) throw error
+                    }
+                }
                 await client.query("COMMIT")
-                return { id: Number(inserted.rows[0].id), attentionKey: key, created: true }
+                return { id: Number(inserted!.rows[0].id), attentionKey: key, created: true }
             } catch (error) {
                 await client.query("ROLLBACK").catch(() => {})
                 throw error
@@ -224,11 +235,18 @@ export function createPgAttentionStore(nodeId: string, pool: Pool): AttentionSto
                  WHERE node_id = $1 AND status = 'open' AND expires_at_ms <= $2`,
                 [nodeId, nowMs],
             )
-            await pool.query(
+            const expired = await pool.query(
                 `DELETE FROM attention_recruitments
-                 WHERE node_id = $1 AND expires_at_ms < $2 AND status != 'open'`,
+                 WHERE node_id = $1 AND expires_at_ms < $2 AND status != 'open'
+                 RETURNING id`,
                 [nodeId, nowMs - retentionMs],
             )
+            for (const row of expired.rows) {
+                await pool.query(
+                    `DELETE FROM attention_deliveries WHERE recruitment_id = $1`,
+                    [row.id],
+                )
+            }
         },
     }
 }

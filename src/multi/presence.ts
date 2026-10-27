@@ -102,11 +102,15 @@ export function createPgPresenceStore(): PresenceStore {
     const pool = getPgPool()
     return {
         async touch(viewerId, nowMs = getRealNowMs()) {
+            // 30s 节流合并进单条 upsert：窗口内的 touch 走 DO NOTHING（无网络写放大）。
+            // 清理：行按 (node_id, viewer_id) 有界（曾上线 viewer 数），过期行由
+            // 窗口谓词天然失效；PG 侧可挂定期清扫（W1c 接线时一并）。
             await pool.query(`
                 INSERT INTO social_presence (node_id, viewer_id, last_seen_ms)
                 VALUES ($1, $2, $3)
                 ON CONFLICT (node_id, viewer_id) DO UPDATE SET
-                    last_seen_ms = GREATEST(social_presence.last_seen_ms, excluded.last_seen_ms)
+                    last_seen_ms = excluded.last_seen_ms
+                WHERE excluded.last_seen_ms > social_presence.last_seen_ms + ${PRESENCE_THROTTLE_MS}
             `, [nodeId, viewerId, nowMs])
         },
         async isOnline(viewerId, nowMs = getRealNowMs()) {
@@ -133,6 +137,9 @@ let configuredPresenceStore: PresenceStore | null = null
 export function getPresenceStore(): PresenceStore {
     if (configuredPresenceStore === null) {
         if (process.env.MULTI_SOCIAL_PG_URL !== undefined && process.env.MULTI_SOCIAL_PG_URL.trim() !== "") {
+            void ensurePgSocialSchema().catch(error => {
+                console.warn("[PRESENCE] PG schema bootstrap failed (degraded until retried)", error)
+            })
             configuredPresenceStore = createPgPresenceStore()
         } else {
             const shared = getSharedSocialDb()

@@ -10,11 +10,17 @@ import pg from "pg"
  * 的裸键会产生跨服假关联。所有共享表主键/谓词从第一天起携带 node_id
  * （部署侧为每个游戏服分配一个稳定的 node 标识，env MULTI_NODE_ID）。
  *
+ * 接线状态（W1b 分期）：presence 已切换 PG；attention/follows/room-shares
+ * 的 PG store 已实现（pg-*.ts / pg-attention-store.ts），env 接线与契约
+ * 测试矩阵属 W1c——设 MULTI_SOCIAL_PG_URL 当前只切 presence。
  * 连接纪律：单 Pool（PG 自带连接复用）+ 幂等 DDL + 无外键（与 SQLite
  * 形态一致）。写并发由 PG 的 MVCC 处理，无 busy_timeout 概念。
  */
 
-export const PG_POOL_MAX = Number(process.env.MULTI_SOCIAL_PG_POOL_MAX ?? 10)
+export const PG_POOL_MAX = (() => {
+    const parsed = Number(process.env.MULTI_SOCIAL_PG_POOL_MAX ?? "")
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 10
+})()
 
 let pgPool: pg.Pool | null = null
 
@@ -23,6 +29,11 @@ export function getPgPool(): pg.Pool {
         pgPool = new pg.Pool({
             connectionString: process.env.MULTI_SOCIAL_PG_URL,
             max: PG_POOL_MAX,
+        })
+        // 空闲连接出错（PG 重启/网络闪断）时 Pool emit "error"——无监听器
+        // 会作为 uncaught exception 打死整个游戏服进程
+        pgPool.on("error", error => {
+            console.warn("[SOCIAL-PG] idle client error (pool continues)", error.message)
         })
     }
     return pgPool

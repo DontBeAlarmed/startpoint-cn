@@ -468,7 +468,7 @@ export async function expireStaleRecruitments(nowMs: number): Promise<void> {
 }
 
 export async function pruneExpiredRecruitments(nowMs: number, retentionMs?: number): Promise<void> {
-    getAttentionStore().pruneExpiredRecruitments(nowMs, retentionMs)
+    await getAttentionStore().pruneExpiredRecruitments(nowMs, retentionMs)
 }
 
 function mapRecruitmentRow(row: Record<string, unknown>): AttentionRecruitment {

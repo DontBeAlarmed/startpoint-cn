@@ -29,7 +29,7 @@ const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const sqlite3 = require("better-sqlite3")
-const { getSharedFollowRelationSync } = require("../src/data/domains/social-follow")
+const { getSharedFollowRelationAsync } = require("../src/data/domains/social-follow")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 
@@ -56,13 +56,13 @@ function makeViewerPair(tag) {
     return { viewerId: 740000000 + playerId, playerId, account }
 }
 
-test("共享形态：本模块写共享文件，第二连接（模拟节点 B）读到同一行", () => {
+test("共享形态：本模块写共享文件，第二连接（模拟节点 B）读到同一行", async () => {
     console.error("[SF-DEBUG] enter: 共享形态：本模块写共享文件，第二连接（模拟节点 B）读到同一行")
     const a = makeViewerPair("a")
     const b = makeViewerPair("b")
-    const { upsertSharedFollowEdgeSync } = require("../src/data/domains/social-follow")
+    const { upsertSharedFollowEdgeAsync } = require("../src/data/domains/social-follow")
 
-    upsertSharedFollowEdgeSync(a.viewerId, b.viewerId, 1700000000000)
+    await upsertSharedFollowEdgeAsync(a.viewerId, b.viewerId, 1700000000000)
 
     // 节点 B：独立打开同一共享文件（不同连接句柄）
     const nodeB = new sqlite3(sharedDbPath)
@@ -75,23 +75,23 @@ test("共享形态：本模块写共享文件，第二连接（模拟节点 B）
     assert.equal(rows.length, 1)
 
     // 同进程读 API 判定 single
-    assert.equal(getSharedFollowRelationSync(a.viewerId, b.viewerId), "single")
+    assert.equal(await getSharedFollowRelationAsync(a.viewerId, b.viewerId), "single")
 })
 
-test("共享形态：双行 mutual / 单行 single / 零行 none", () => {
+test("共享形态：双行 mutual / 单行 single / 零行 none", async () => {
     console.error("[SF-DEBUG] enter: 共享形态：双行 mutual / 单行 single / 零行 none")
     const a = makeViewerPair("m")
     const b = makeViewerPair("n")
-    const { upsertSharedFollowEdgeSync, deleteSharedFollowEdgeSync } = require("../src/data/domains/social-follow")
+    const { upsertSharedFollowEdgeAsync, deleteSharedFollowEdgeAsync } = require("../src/data/domains/social-follow")
 
-    upsertSharedFollowEdgeSync(a.viewerId, b.viewerId, 1700000000000)
-    assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "single")
-    upsertSharedFollowEdgeSync(b.viewerId, a.viewerId, 1700000000000)
-    assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "mutual")
-    deleteSharedFollowEdgeSync(b.viewerId, a.viewerId)
-    assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "single")
-    deleteSharedFollowEdgeSync(a.viewerId, b.viewerId)
-    assert.equal(getSharedFollowRelationSync(b.viewerId, a.viewerId), "none")
+    await upsertSharedFollowEdgeAsync(a.viewerId, b.viewerId, 1700000000000)
+    assert.equal(await getSharedFollowRelationAsync(b.viewerId, a.viewerId), "single")
+    await upsertSharedFollowEdgeAsync(b.viewerId, a.viewerId, 1700000000000)
+    assert.equal(await getSharedFollowRelationAsync(b.viewerId, a.viewerId), "mutual")
+    await deleteSharedFollowEdgeAsync(b.viewerId, a.viewerId)
+    assert.equal(await getSharedFollowRelationAsync(b.viewerId, a.viewerId), "single")
+    await deleteSharedFollowEdgeAsync(a.viewerId, b.viewerId)
+    assert.equal(await getSharedFollowRelationAsync(b.viewerId, a.viewerId), "none")
 })
 
 test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本地权威不受影响）", async () => {
@@ -156,7 +156,7 @@ test("共享库不可用时 follow add 端点仍成功（双写降级 WARN，本
     }
 })
 
-test("共享库不可用时 relation fail-closed 为 none", () => {
+test("共享库不可用时 relation fail-closed 为 none", async () => {
     console.error("[SF-DEBUG] enter: 共享库不可用时 relation fail-closed 为 none")
     // 重置共享库单例并指向不可写路径，使连接打开失败
     const { resetSharedSocialDbForTest } = require("../src/data/social/shared-db")
@@ -170,7 +170,7 @@ test("共享库不可用时 relation fail-closed 为 none", () => {
     try {
         const a = 740000901
         const b = 740000902
-        assert.equal(getSharedFollowRelationSync(a, b), "none")
+        assert.equal(await getSharedFollowRelationAsync(a, b), "none")
     } finally {
         process.env.MULTI_SOCIAL_DB_PATH = previousPath
         resetSharedSocialDbForTest()

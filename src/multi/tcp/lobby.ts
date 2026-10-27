@@ -834,7 +834,7 @@ function beginBattle(client: SessionClient): boolean {
     // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底
     // W1a：异步形状——同步上下文 fire-and-forget（拒绝就地捕获，try/catch
     // 不接 async 拒绝）
-    closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber).catch(error => {
+    void closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber).catch(error => {
         console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, describeError(error))
     })
     // 关注奖励（v4）：每局恰好一次的本提交边界为计数点——局内真实成员间

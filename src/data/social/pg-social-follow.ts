@@ -4,7 +4,7 @@ import { getNodeNamespace } from "./pg"
 
 /**
  * social_follows 的 PG 实现（W1b，跨物理机）。行为契约与共享 SQLite 版
- * 等价（契约矩阵锁定）：mutual = 双行、single = 单行、none = 零行；
+ * 等价（契约矩阵测试 W1c 落地）：mutual = 双行、single = 单行、none = 零行；
  * 查询失败 fail-closed 为 none（好友大厅可见性过滤依据）。
  * 全部行携带 node_id 命名空间（W1c）。
  */

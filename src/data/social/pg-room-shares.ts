@@ -3,7 +3,7 @@ import { getNodeNamespace } from "./pg"
 
 /**
  * social_room_shares 的 PG 实现（W1b，跨物理机）。行为契约与共享 SQLite 版
- * 等价（契约矩阵锁定）：位掩码 OR-merge（已公开位永不收缩）、refresh 对
+ * 等价（契约矩阵测试 W1c 落地）：位掩码 OR-merge（已公开位永不收缩）、refresh 对
  * 不存在的行 no-op、list 按 updated_at DESC 且只含 (share_bits & 3) != 0 的
  * 未过期行。全部行携带 node_id 命名空间（W1c）。
  */
