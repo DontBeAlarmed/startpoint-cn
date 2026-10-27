@@ -380,9 +380,15 @@ async function executeTestGroups(groupNames, options = {}) {
     }
 
     const runItem = item => runTestFile({ ...item, cwd, activeChildren })
+    // 组级并行度覆盖（W1b 起 spawn 重组用）：spawn/编排重的组（protocol）
+    // 在并行 8 下互相挤压 ts-node 编译与子进程，4 是本机实测稳定值
+    const selectedTestGroup = testGroups[groupNames[0]]
+    const groupConcurrency = (groupNames.length === 1 && typeof selectedTestGroup?.maxParallelTests === "number")
+        ? Math.min(selectedTestGroup.maxParallelTests, maxParallelTests)
+        : maxParallelTests
     const parallelResults = (await runParallel(
         parallelItems,
-        maxParallelTests,
+        groupConcurrency,
         runItem,
         shouldStop,
     ))

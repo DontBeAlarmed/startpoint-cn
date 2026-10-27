@@ -182,12 +182,13 @@ const TEST_GROUPS = Object.freeze({
         // ts-node (~15-25s per probe; ts-node 10 has no persistent transpile
         // cache) and the lifecycle suites spawn servers, so 60s per file
         // flakes under group load (same rationale as integration:party).
+        // maxParallelTests=4：40 文件并行 8 会让 ts-node 编译 + 双进程编排
+        // 互相挤压（实测 load>100、结果随负载抖动），4 是本机稳定值。
         timeoutMs: 180_000,
+        maxParallelTests: 4,
         tests: [
             "tools/handshake_lifecycle.test.cjs",
             "tools/multi_reconnect_admission.test.cjs",
-            "tools/global_embedded_startup.test.cjs",
-            "tools/lobby_lifecycle.test.cjs",
             "tools/msgpack_compat.test.cjs",
             "tools/multi_admission.test.cjs",
             "tools/multi_battle_relay_snapshot.test.cjs",
@@ -214,7 +215,6 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_quest_availability.test.cjs",
             "tools/multi_reliable_send.test.cjs",
             "tools/multi_remote_coordinator.test.cjs",
-            "tools/multi_remote_settlement.test.cjs",
             "tools/multi_load_recovery.test.cjs",
             "tools/multi_room_handshake_identity.test.cjs",
             "tools/multi_room_identity.test.cjs",
@@ -745,6 +745,9 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_response_projection.test.cjs",
             "tools/multi_settlement_active_mission.test.cjs",
             "tools/multi_finish_idempotent.test.cjs",
+            "tools/global_embedded_startup.test.cjs",
+            "tools/lobby_lifecycle.test.cjs",
+            "tools/multi_remote_settlement.test.cjs",
             "tools/rescue_fragment_reward.test.cjs",
             "tools/rescue_counters.test.cjs",
             "tools/special_quest_party.test.cjs",
