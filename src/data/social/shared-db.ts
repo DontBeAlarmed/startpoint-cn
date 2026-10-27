@@ -36,6 +36,12 @@ export function openSharedSocialDb(path: string): Database {
 
 let sharedDb: Database | null | undefined
 
+/** 共享社交库是否已配置（多节点等权部署的判据；未配置 = 各节点本地库） */
+export function isSharedSocialDbConfigured(): boolean {
+    const path = process.env.MULTI_SOCIAL_DB_PATH
+    return path !== undefined && path !== ""
+}
+
 /** MULTI_SOCIAL_DB_PATH 单例连接；未设置时返回 null（调用方退回主库/内存实现） */
 export function getSharedSocialDb(): Database | null {
     if (sharedDb === undefined) {

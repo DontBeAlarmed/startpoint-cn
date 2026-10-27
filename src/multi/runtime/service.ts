@@ -57,6 +57,7 @@ import {
     startSessionServer,
     stopSessionServer,
 } from "../tcp/server"
+import { purgeOrphanedSocialRowsForLocalAuthority } from "./startup-sweep"
 import {
     freezeMultiRuntimeStatus,
     type MultiClientFallbackState,
@@ -252,6 +253,11 @@ class Service implements MultiRuntimeService {
         if (priorStop !== null) await priorStop
         if (generation !== this.generation) return
         this.config = config
+        // 本地权威部署（embedded/host）：启动时清扫上一进程遗留的孤儿
+        // 注册/招募行（房间随进程消亡，行会指向幽灵房直到 TTL）。
+        if (config.mode !== "client") {
+            purgeOrphanedSocialRowsForLocalAuthority()
+        }
         if (config.mode === "host") {
             this.remoteCoordinator = null
             const authenticationRejections = new AuthenticationRejectionBuffer()

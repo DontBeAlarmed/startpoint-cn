@@ -221,6 +221,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/npc_contributor_names.test.cjs",
             "tools/npc_nickname_pool.test.cjs",
             "tools/room_cleanup_lifecycle.test.cjs",
+            "tools/startup_sweep.test.cjs",
             "tools/room_dismissal_lifecycle.test.cjs",
             "tools/session_frame_order.test.cjs",
             "tools/session_server_lifecycle.test.cjs",
@@ -734,6 +735,10 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:party": {
         execution: "parallel",
+        // maxParallelTests=4：本组吸收了三个 spawn 重文件（全局启动/lobby
+        // 生命周期/双进程编排）与 perf 基线后，8 并行会让 ts-node 编译与
+        // 多进程编排互相挤压（实测 100-122s 超时成批出现），4 是本机稳定值。
+        maxParallelTests: 4,
         // Multi-finish settlement suites are heavyweight (real production
         // homes); 30s parallel default flakes under group load.
         timeoutMs: 120_000,

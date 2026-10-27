@@ -104,6 +104,13 @@ export function refreshRoomShareRowSync(
 }
 
 /** 解散/清理钩子：删除注册行（幂等） */
+/** 启动清扫：删除本地库全部注册行（仅本地权威启动态调用，见 startup-sweep.ts）。
+ * 返回删除行数。 */
+export function purgeAllRoomShareRowsSync(): number {
+    const result = getDb().prepare(`DELETE FROM social_room_shares`).run()
+    return result.changes
+}
+
 export function deleteRoomShareRowSync(roomNumber: string): void {
     try {
         roomSharesDatabase().prepare(`
