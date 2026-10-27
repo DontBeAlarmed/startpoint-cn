@@ -33,8 +33,8 @@ const { registerRoomRoutes } = require("../src/multi/http/room")
 const { registerFollowWriteRoutes: registerFollowRoutes } = require("../src/routes/api/follow/write-routes")
 const { createEmbeddedMultiHttpContext } = require("../src/multi/http/context")
 const { setRoomBattle, disbandRoom } = require("../src/multi/room/manager")
-const { getRoomShareRowSync: readRow } = require("../src/data/domains/social-room-shares")
-const { upsertSharedFollowEdgeSync } = require("../src/data/domains/social-follow")
+const { getRoomShareRowAsync: readRow } = require("../src/data/domains/social-room-shares")
+const { upsertSharedFollowEdgeAsync } = require("../src/data/domains/social-follow")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 
 data.initializeDatabase()
@@ -131,9 +131,9 @@ test.before(async () => {
     stranger = await createPlayer("stranger")
 
     // host ↔ mutualFriend 互关；oneWayFriend → host 单向；stranger 无关系
-    upsertSharedFollowEdgeSync(host.viewerId, mutualFriend.viewerId, Date.now())
-    upsertSharedFollowEdgeSync(mutualFriend.viewerId, host.viewerId, Date.now())
-    upsertSharedFollowEdgeSync(oneWayFriend.viewerId, host.viewerId, Date.now())
+    await await upsertSharedFollowEdgeAsync(host.viewerId, mutualFriend.viewerId, Date.now())
+    await await upsertSharedFollowEdgeAsync(mutualFriend.viewerId, host.viewerId, Date.now())
+    await await upsertSharedFollowEdgeAsync(oneWayFriend.viewerId, host.viewerId, Date.now())
 })
 
 test.after(async () => {
@@ -194,7 +194,7 @@ test("混合（[1,2]）：全关系可见；OR-merge 后 [1] 不被 [2] 收缩",
     await shareAsHost(room, [1])
     await shareAsHost(room, [2])
 
-    const row = readRow(room.roomNumber)
+    const row = await readRow(room.roomNumber)
     assert.equal(row.share_bits & 1, 1, "bit1 不得被后续 [2] 收缩")
     assert.equal(row.share_bits & 2, 2)
 
@@ -205,13 +205,13 @@ test("混合（[1,2]）：全关系可见；OR-merge 后 [1] 不被 [2] 收缩",
 test("纯随机招募 [3] 不进列表；[1] 后接 [3] 铃铛重发行仍在（P0 回归）", async () => {
     const randomOnly = await makeRoom(host)
     await shareAsHost(randomOnly, [3])
-    assert.equal(readRow(randomOnly.roomNumber), undefined, "[3] 不得触碰注册表")
+    assert.equal(await readRow(randomOnly.roomNumber), undefined, "[3] 不得触碰注册表")
     assert.equal(findRoom(await getRooms(mutualFriend.viewerId), randomOnly.roomNumber), undefined)
 
     const hybrid = await makeRoom(host)
     await shareAsHost(hybrid, [1])
     await shareAsHost(hybrid, [3])
-    const row = readRow(hybrid.roomNumber)
+    const row = await readRow(hybrid.roomNumber)
     assert.ok(row, "[3] 重发不得删除注册行")
     assert.equal(row.share_bits & 1, 1, "[3] 重发不得收缩位")
     assert.ok(findRoom(await getRooms(mutualFriend.viewerId), hybrid.roomNumber), "[1,3] 混合房仍对互关好友可见")
@@ -220,12 +220,12 @@ test("纯随机招募 [3] 不进列表；[1] 后接 [3] 铃铛重发行仍在（
     const emptyShare = await makeRoom(host)
     const emptyResponse = await shareAsHost(emptyShare, [])
     assert.equal(emptyResponse.statusCode, 200)
-    assert.equal(readRow(emptyShare.roomNumber), undefined)
+    assert.equal(await readRow(emptyShare.roomNumber), undefined)
 
     const unknownValue = await makeRoom(host)
     const unknownResponse = await shareAsHost(unknownValue, [7])
     assert.equal(unknownResponse.statusCode, 200)
-    assert.equal(readRow(unknownValue.roomNumber), undefined, "未知数值不得建行")
+    assert.equal(await readRow(unknownValue.roomNumber), undefined, "未知数值不得建行")
 })
 
 test("raising_state=4（战斗中）仍在列表（好友可见战斗中状态，客户端灰显）", async () => {
@@ -242,9 +242,9 @@ test("raising_state=4（战斗中）仍在列表（好友可见战斗中状态�
 test("解散后注册行消失", async () => {
     const room = await makeRoom(host)
     await shareAsHost(room, [1])
-    assert.ok(readRow(room.roomNumber), "分享后行存在")
+    assert.ok(await readRow(room.roomNumber), "分享后行存在")
     disbandRoom(room.roomNumber)
-    assert.equal(readRow(room.roomNumber), undefined, "解散删行")
+    assert.equal(await readRow(room.roomNumber), undefined, "解散删行")
 })
 
 test("category 不匹配不可见", async () => {

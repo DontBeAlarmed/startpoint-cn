@@ -128,7 +128,7 @@ const routes = async (fastify: FastifyInstance) => {
             && current.multiRandomRecruitmentPublishEnabled
             && !updated.multiRandomRecruitmentPublishEnabled) {
             try {
-                closeAllOpenRecruitments()
+                await closeAllOpenRecruitments()
             } catch (error) {
                 console.warn("[SETTINGS] close all open recruitments failed", error)
             }

@@ -51,7 +51,7 @@ export interface AttentionStore {
         isNewbieHost: boolean
         establisherJson: string
         nowMs: number
-    }): { id: number; attentionKey: string; created: boolean }
+    }): Promise<{ id: number; attentionKey: string; created: boolean }>
     /** 读未投递候选（不写投递行）：调用方过滤/截取后对真下发行调 recordDeliveries。
      * 投递行只对 guest 真正看到的铃铛建——提前烧行会让瞬时 T1 不合格的房间
      * 在 45s 生命期内对该 viewer 永久消失（F4）。 */
@@ -59,13 +59,13 @@ export interface AttentionStore {
         viewerId: number,
         nowMs: number,
         limit: number,
-    ): AttentionRecruitment[]
+    ): Promise<AttentionRecruitment[]>
     /** 记帐真下发的投递行（INSERT OR IGNORE，幂等） */
-    recordDeliveries(viewerId: number, recruitmentIds: number[]): void
-    findOpenRecruitmentByKey(attentionKey: string, nowMs: number): AttentionRecruitment | null
+    recordDeliveries(viewerId: number, recruitmentIds: number[]): Promise<void>
+    findOpenRecruitmentByKey(attentionKey: string, nowMs: number): Promise<AttentionRecruitment | null>
     /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null；
      * includeExpired=true 时不过滤过期（释放点服务端接管行寿命的兜底读） */
-    findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number, includeExpired?: boolean): AttentionRecruitment | null
+    findOpenRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number, includeExpired?: boolean): Promise<AttentionRecruitment | null>
     /** 房内即时刷新：房主切换编队时重建 open 招募的房主快照（角色+进化等级） */
     updateOpenRecruitmentSnapshotForRoom(
         hostPid: number,
@@ -73,24 +73,24 @@ export interface AttentionStore {
         roomNumber: string,
         nowMs: number,
         patch: { character: number; evolutionImgLevel: number },
-    ): void
+    ): Promise<void>
     /** 房主当前所有未过期 open 招募的房间号（房内即时刷新的定位用） */
-    listOpenRecruitmentRoomNumbersForHost(hostPid: number, hostViewerId: number, nowMs: number): string[]
+    listOpenRecruitmentRoomNumbersForHost(hostPid: number, hostViewerId: number, nowMs: number): Promise<string[]>
     /** T2 门票：投递行存在且未被拒绝（delivered/accepted 均持票） */
-    hasActiveDelivery(recruitmentId: number, viewerId: number): boolean
+    hasActiveDelivery(recruitmentId: number, viewerId: number): Promise<boolean>
     recordResponse(
         recruitmentId: number,
         viewerId: number,
         state: "accepted" | "declined",
         nowMs: number,
-    ): void
-    closeRecruitmentForRoom(hostViewerId: number, roomNumber: string): void
+    ): Promise<void>
+    closeRecruitmentForRoom(hostViewerId: number, roomNumber: string): Promise<void>
     /** keep-open 行寿命接管：NPC 进场后把 open 招募过期时间外推（服务端接管，客户端停铃不再依赖） */
-    refreshRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number, lifetimeMs: number): void
+    refreshRecruitmentForRoom(hostViewerId: number, roomNumber: string, nowMs: number, lifetimeMs: number): Promise<void>
     /** 热切换清扫：publishBell on→off 时全量关闭 open 招募（共享库下跨节点生效） */
-    closeAllOpenRecruitments(): void
-    expireStaleRecruitments(nowMs: number): void
-    pruneExpiredRecruitments(nowMs: number, retentionMs?: number): void
+    closeAllOpenRecruitments(): Promise<void>
+    expireStaleRecruitments(nowMs: number): Promise<void>
+    pruneExpiredRecruitments(nowMs: number, retentionMs?: number): Promise<void>
 }
 
 export function getRecruitmentLifetimeMs(): number {
@@ -142,7 +142,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
          * 客户端重发（每 15s）只刷新过期时间与快照，不产生新行/新 key。
          * 事务包裹 + attention_key UNIQUE 碰撞换随机数重试，避免历史残留 key 让分享 500。
          */
-        getOrCreateRecruitmentForRoom(input) {
+        async getOrCreateRecruitmentForRoom(input) {
             // BEGIN IMMEDIATE：开事务即取写锁（busy_timeout 正常排队），
             // 避免 deferred 事务在共享库多进程下 SELECT→写升级撞 SQLITE_BUSY_SNAPSHOT
             //（该错误不吃 busy_timeout；对齐参考服 BEGIN IMMEDIATE 纪律）
@@ -204,7 +204,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
          * 在 45s 生命期内后续轮询仍可送达。已 accepted/declined 的不再出现；
          * 房主自己的招募对自己不可见。
          */
-        listUndeliveredOpenRecruitments(viewerId, nowMs, limit) {
+        async listUndeliveredOpenRecruitments(viewerId, nowMs, limit) {
             const rows = db.prepare(`
                 SELECT r.* FROM attention_recruitments r
                 LEFT JOIN attention_deliveries d
@@ -218,7 +218,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
             return rows.map(mapRecruitmentRow)
         },
 
-        recordDeliveries(viewerId, recruitmentIds) {
+        async recordDeliveries(viewerId, recruitmentIds) {
             const insertDelivery = db.prepare(`
                 INSERT OR IGNORE INTO attention_deliveries (recruitment_id, viewer_id, state)
                 VALUES (?, ?, 'delivered')
@@ -227,7 +227,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /** quest/start（multi）携带 attention_key 时的招募解析；过期/关闭返回 null */
-        findOpenRecruitmentByKey(attentionKey, nowMs) {
+        async findOpenRecruitmentByKey(attentionKey, nowMs) {
             const row = db.prepare(`
                 SELECT * FROM attention_recruitments
                 WHERE attention_key = ? AND status = 'open' AND expires_at_ms > ?
@@ -237,7 +237,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
 
         /** summon 释放判定用：按 (房主, 房间) 读 open 招募；过期/关闭返回 null；
          * includeExpired=true 时不过滤过期（释放点服务端接管行寿命的兜底读） */
-        findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs, includeExpired = false) {
+        async findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs, includeExpired = false) {
             const expiryFilter = includeExpired ? "" : "AND expires_at_ms > ?"
             const params = includeExpired
                 ? [hostViewerId, roomNumber]
@@ -253,7 +253,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /** T2 门票：投递行存在且未被拒绝（delivered/accepted 均持票） */
-        hasActiveDelivery(recruitmentId, viewerId) {
+        async hasActiveDelivery(recruitmentId, viewerId) {
             const row = db.prepare(`
                 SELECT state FROM attention_deliveries
                 WHERE recruitment_id = ? AND viewer_id = ?
@@ -262,7 +262,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /** 仅 delivered → accepted/declined 单向转移（幂等，不降级已响应状态） */
-        recordResponse(recruitmentId, viewerId, state, nowMs) {
+        async recordResponse(recruitmentId, viewerId, state, nowMs) {
             db.prepare(`
                 UPDATE attention_deliveries SET state = ?, acted_at_ms = ?
                 WHERE recruitment_id = ? AND viewer_id = ? AND state = 'delivered'
@@ -270,7 +270,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /** 解散房间时关闭该房间仍 open 的招募（开战/满员依赖过期收敛，不在此处理） */
-        closeRecruitmentForRoom(hostViewerId, roomNumber) {
+        async closeRecruitmentForRoom(hostViewerId, roomNumber) {
             db.prepare(`
                 UPDATE attention_recruitments SET status = 'closed'
                 WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
@@ -278,7 +278,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /** keep-open 行寿命接管：仅 open 行生效；过期/关闭行不复活 */
-        refreshRecruitmentForRoom(hostViewerId, roomNumber, nowMs, lifetimeMs) {
+        async refreshRecruitmentForRoom(hostViewerId, roomNumber, nowMs, lifetimeMs) {
             db.prepare(`
                 UPDATE attention_recruitments SET expires_at_ms = ?
                 WHERE host_viewer_id = ? AND room_number = ? AND status = 'open'
@@ -289,7 +289,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         /** 房内即时刷新：房主切换编队（party/edit 或 TCP Enter 帧）时重建 open
          * 招募的房主快照。patch 只覆盖角色与进化等级；rank/name/hostEntryTime
          * 保留原值（15s 重发会带全新快照，这里只做即时补丁）。无 open 行则空操作。 */
-        updateOpenRecruitmentSnapshotForRoom(
+        async updateOpenRecruitmentSnapshotForRoom(
             hostPid: number,
             hostViewerId: number,
             roomNumber: string,
@@ -319,7 +319,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
             immediate()
         },
 
-        listOpenRecruitmentRoomNumbersForHost(hostPid: number, hostViewerId: number, nowMs: number): string[] {
+        async listOpenRecruitmentRoomNumbersForHost(hostPid: number, hostViewerId: number, nowMs: number): Promise<string[]> {
             const rows = db.prepare(`
                 SELECT room_number FROM attention_recruitments
                 WHERE host_pid = ? AND host_viewer_id = ? AND status = 'open'
@@ -329,7 +329,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /** 热切换清扫：publishBell on→off 时全量关闭 open 招募（共享库下跨节点生效） */
-        closeAllOpenRecruitments() {
+        async closeAllOpenRecruitments() {
             db.prepare(`
                 UPDATE attention_recruitments SET status = 'closed'
                 WHERE status = 'open'
@@ -337,7 +337,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
         },
 
         /** 卫生兜底：把过期招募标记为 expired（读路径本就按 expires_at_ms 过滤，可选调用） */
-        expireStaleRecruitments(nowMs) {
+        async expireStaleRecruitments(nowMs) {
             db.prepare(`
                 UPDATE attention_recruitments SET status = 'expired'
                 WHERE status = 'open' AND expires_at_ms <= ?
@@ -349,7 +349,7 @@ export function createSqliteAttentionStore(db: Database): AttentionStore {
          * （否则 attention_recruitments/attention_deliveries 只增不减，且 6 位随机
          * attention_key 的碰撞概率随历史行数单调上升）。挂在房主重发节奏上调用。
          */
-        pruneExpiredRecruitments(nowMs, retentionMs = PRUNE_RETENTION_MS) {
+        async pruneExpiredRecruitments(nowMs, retentionMs = PRUNE_RETENTION_MS) {
             const immediate = db.transaction(() => {
                 db.prepare(`
                     UPDATE attention_recruitments SET status = 'expired'
@@ -390,84 +390,84 @@ export function getAttentionStore(): AttentionStore {
 
 // ---- 兼容层：保持 A1 的模块级函数导出（调用点与既有测试零改动） ----
 
-export function getOrCreateRecruitmentForRoom(input: Parameters<AttentionStore["getOrCreateRecruitmentForRoom"]>[0]) {
+export async function getOrCreateRecruitmentForRoom(input: Parameters<AttentionStore["getOrCreateRecruitmentForRoom"]>[0]): Promise<{ id: number; attentionKey: string; created: boolean }> {
     return getAttentionStore().getOrCreateRecruitmentForRoom(input)
 }
 
-export function listUndeliveredOpenRecruitments(viewerId: number, nowMs: number, limit: number) {
+export async function listUndeliveredOpenRecruitments(viewerId: number, nowMs: number, limit: number): Promise<AttentionRecruitment[]> {
     return getAttentionStore().listUndeliveredOpenRecruitments(viewerId, nowMs, limit)
 }
 
-export function recordDeliveries(viewerId: number, recruitmentIds: number[]) {
+export async function recordDeliveries(viewerId: number, recruitmentIds: number[]): Promise<void> {
     return getAttentionStore().recordDeliveries(viewerId, recruitmentIds)
 }
 
-export function findOpenRecruitmentByKey(attentionKey: string, nowMs: number) {
+export async function findOpenRecruitmentByKey(attentionKey: string, nowMs: number): Promise<AttentionRecruitment | null> {
     return getAttentionStore().findOpenRecruitmentByKey(attentionKey, nowMs)
 }
 
-export function findOpenRecruitmentForRoom(
+export async function findOpenRecruitmentForRoom(
     hostViewerId: number,
     roomNumber: string,
     nowMs: number,
     includeExpired = false,
-) {
+): Promise<AttentionRecruitment | null> {
     return getAttentionStore().findOpenRecruitmentForRoom(hostViewerId, roomNumber, nowMs, includeExpired)
 }
 
-export function hasActiveDelivery(recruitmentId: number, viewerId: number): boolean {
+export async function hasActiveDelivery(recruitmentId: number, viewerId: number): Promise<boolean> {
     return getAttentionStore().hasActiveDelivery(recruitmentId, viewerId)
 }
 
-export function closeAllOpenRecruitments(): void {
-    getAttentionStore().closeAllOpenRecruitments()
+export async function closeAllOpenRecruitments(): Promise<void> {
+    await getAttentionStore().closeAllOpenRecruitments()
 }
 
-export function refreshRecruitmentForRoom(
+export async function refreshRecruitmentForRoom(
     hostViewerId: number,
     roomNumber: string,
     nowMs: number,
     lifetimeMs: number,
-): void {
-    getAttentionStore().refreshRecruitmentForRoom(hostViewerId, roomNumber, nowMs, lifetimeMs)
+): Promise<void> {
+    await getAttentionStore().refreshRecruitmentForRoom(hostViewerId, roomNumber, nowMs, lifetimeMs)
 }
 
-export function updateOpenRecruitmentSnapshotForRoom(
+export async function updateOpenRecruitmentSnapshotForRoom(
     hostPid: number,
     hostViewerId: number,
     roomNumber: string,
     nowMs: number,
     patch: { character: number; evolutionImgLevel: number },
-): void {
-    getAttentionStore().updateOpenRecruitmentSnapshotForRoom(hostPid, hostViewerId, roomNumber, nowMs, patch)
+): Promise<void> {
+    await getAttentionStore().updateOpenRecruitmentSnapshotForRoom(hostPid, hostViewerId, roomNumber, nowMs, patch)
 }
 
-export function listOpenRecruitmentRoomNumbersForHost(
+export async function listOpenRecruitmentRoomNumbersForHost(
     hostPid: number,
     hostViewerId: number,
     nowMs: number,
-): string[] {
+): Promise<string[]> {
     return getAttentionStore().listOpenRecruitmentRoomNumbersForHost(hostPid, hostViewerId, nowMs)
 }
 
-export function recordResponse(
+export async function recordResponse(
     recruitmentId: number,
     viewerId: number,
     state: "accepted" | "declined",
     nowMs: number,
-): void {
-    getAttentionStore().recordResponse(recruitmentId, viewerId, state, nowMs)
+): Promise<void> {
+    await getAttentionStore().recordResponse(recruitmentId, viewerId, state, nowMs)
 }
 
-export function closeRecruitmentForRoom(hostViewerId: number, roomNumber: string): void {
-    getAttentionStore().closeRecruitmentForRoom(hostViewerId, roomNumber)
+export async function closeRecruitmentForRoom(hostViewerId: number, roomNumber: string): Promise<void> {
+    await getAttentionStore().closeRecruitmentForRoom(hostViewerId, roomNumber)
 }
 
-export function expireStaleRecruitments(nowMs: number): void {
-    getAttentionStore().expireStaleRecruitments(nowMs)
+export async function expireStaleRecruitments(nowMs: number): Promise<void> {
+    await getAttentionStore().expireStaleRecruitments(nowMs)
 }
 
-export function pruneExpiredRecruitments(nowMs: number, retentionMs?: number): void {
+export async function pruneExpiredRecruitments(nowMs: number, retentionMs?: number): Promise<void> {
     getAttentionStore().pruneExpiredRecruitments(nowMs, retentionMs)
 }
 

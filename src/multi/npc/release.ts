@@ -63,6 +63,16 @@ export function resetNpcReleaseState(): void {
 }
 
 function fireOrReschedule(lifecycle: LobbyLifecycleGuard, roomNumber: string): void {
+    // W1a：招募行读取走异步 Store——计时器回调是同步上下文，内部 fire-and-forget
+    //（失败 WARN，NPC 注入由下一次重发/重挂兜底）
+    void (async () => {
+        await fireOrRescheduleAsync(lifecycle, roomNumber)
+    })().catch(error => {
+        console.warn(`[MULTI] npc release failed: room=${roomNumber}`, describeError(error))
+    })
+}
+
+async function fireOrRescheduleAsync(lifecycle: LobbyLifecycleGuard, roomNumber: string): Promise<void> {
     const settings = getServerGameplaySettingsSync()
     if (!settings.multiRandomRecruitmentPublishEnabled || settings.multiNpcReleaseSeconds <= 0) return
     const room = getRoom(roomNumber)
@@ -70,9 +80,9 @@ function fireOrReschedule(lifecycle: LobbyLifecycleGuard, roomNumber: string): v
     const nowMs = getRealNowMs() // R-15=B 招募/交付 TTL 锚真实时间
     // 活性重锚：优先取未过期 open 行；仅 status='open' 但已过期（客户端重发停摆，
     // 而非招募关闭）时服务端接管——视为到点继续注入（双审 B-3 退化分支）
-    let recruitment = findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs)
+    let recruitment = await findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs)
     if (recruitment === null) {
-        recruitment = findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs, true)
+        recruitment = await findOpenRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs, true)
     }
     if (recruitment === null) return // 行关闭/缺失（解散/开战/清扫）：放弃
 
@@ -107,17 +117,18 @@ function fireOrReschedule(lifecycle: LobbyLifecycleGuard, roomNumber: string): v
  * 由 handleEnterComs 提交点调用（双审定案：挂 commit 而非 summon 响应）。
  */
 export function applyNpcPostFill(roomNumber: string): void {
-    try {
+    // W1a：提交点在 TCP 同步上下文——招募行处置 fire-and-forget（失败 WARN）
+    void (async () => {
         const settings = getServerGameplaySettingsSync()
         const room = getRoom(roomNumber)
         if (!room) return
         const nowMs = getRealNowMs() // R-15=B 招募/交付 TTL 锚真实时间
         if (settings.multiNpcCloseRecruitmentAfterFill) {
-            closeRecruitmentForRoom(room.host_viewer_id, roomNumber)
+            await closeRecruitmentForRoom(room.host_viewer_id, roomNumber)
         } else if (settings.multiRandomRecruitmentPublishEnabled) {
-            refreshRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs, getRecruitmentLifetimeMs())
+            await refreshRecruitmentForRoom(room.host_viewer_id, roomNumber, nowMs, getRecruitmentLifetimeMs())
         }
-    } catch (error) {
+    })().catch(error => {
         console.warn(`[MULTI] npc post-fill bookkeeping failed: room=${roomNumber}`, describeError(error))
-    }
+    })
 }

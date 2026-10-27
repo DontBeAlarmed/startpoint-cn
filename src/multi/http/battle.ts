@@ -94,21 +94,21 @@ export function cleanupAbortedMultiBattle(
  * attention_key 只经 check 下发，无票即伪造）；任何失败（含 DB 异常）fail-open
  * 为 null 退回实时 isNewbieHostSync 判定。导出供回归测试直接锁定语义。
  */
-export function resolveBellRecruitmentForStart(
+export async function resolveBellRecruitmentForStart(
     attentionKey: string | null,
     roomNumber: string,
     hostViewerId: number,
     viewerId: number,
-): AttentionRecruitment | null {
+): Promise<AttentionRecruitment | null> {
     if (attentionKey === null) return null;
     try {
         // F-06：招募行 TTL 写侧锚真实钟，过期判定与响应记账必须同域（虚拟钟会恒判未过期）
-        const recruitment = findOpenRecruitmentByKey(attentionKey, getRealNowMs());
+        const recruitment = await findOpenRecruitmentByKey(attentionKey, getRealNowMs());
         if (recruitment === null) return null;
         if (recruitment.roomNumber !== roomNumber || recruitment.hostViewerId !== hostViewerId) {
             return null;
         }
-        return hasActiveDelivery(recruitment.id, viewerId) ? recruitment : null;
+        return (await hasActiveDelivery(recruitment.id, viewerId)) ? recruitment : null;
     } catch {
         return null;
     }
@@ -278,7 +278,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         // 发起者本人不计数（官方口径）；总开关关闭时一律不计。
         // 铃铛进房（quest/start 携 attention_key）以招募行的 is_newbie_host 冻结
         // 资格（房主开铃时的状态），并记录 accepted 响应；无 key/无效 key 走实时判定。
-        const bellRecruitment = resolveBellRecruitmentForStart(
+        const bellRecruitment = await resolveBellRecruitmentForStart(
             typeof body.attention_key === "string" && body.attention_key.length > 0
                 ? body.attention_key
                 : null,
@@ -297,7 +297,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         if (bellRecruitment !== null && !isRoomHost) {
             // 铃铛响应记账尽力而为：开战主流程不得被投递行 UPDATE 失败阻断
             try {
-                recordResponse(bellRecruitment.id, viewer_id, "accepted", getRealNowMs());
+                await recordResponse(bellRecruitment.id, viewer_id, "accepted", getRealNowMs());
             } catch (error) {
                 console.warn("[MULTI] bell accepted bookkeeping failed", describeError(error));
             }

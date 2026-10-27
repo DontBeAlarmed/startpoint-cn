@@ -12,6 +12,7 @@ import { ensureSocialFollowsSchema } from "../social/social-follows-schema"
  *
  * 写入是本地 players_follows 的尽力而为副本（调用方负责 WARN 降级）；
  * 读取是好友房间大厅可见性过滤的依据，fail-closed（查不到=无关系）。
+ * W1a：API 异步形状（接口级，SQLite 实现为微任务直返）；PG 后端 W1b。
  */
 
 export type SharedFollowRelation = "mutual" | "single" | "none"
@@ -24,12 +25,13 @@ function socialFollowsDatabase() {
     return main
 }
 
-/** 单边 upsert（follower → followed）；失败由调用方降级 WARN */
-export function upsertSharedFollowEdgeSync(
+/** 单边 upsert（follower → followed）；失败由调用方降级 WARN。
+ * W1a 起异步形状（PG 后端 W1b 接入前提）；同步上下文写路径 fire-and-forget。 */
+export async function upsertSharedFollowEdgeAsync(
     followerViewerId: number,
     followedViewerId: number,
     followedAtMs: number,
-): void {
+): Promise<void> {
     if (followerViewerId === followedViewerId) return
     socialFollowsDatabase().prepare(`
         INSERT INTO social_follows (follower_viewer_id, followed_viewer_id, followed_at_ms)
@@ -84,10 +86,11 @@ export function incrementCoopBonusCountsSync(
 }
 
 /** 单边删除；不存在时静默（幂等）。取关同时清除该方向行的关注奖励计数（行即记录） */
-export function deleteSharedFollowEdgeSync(
+export async function deleteSharedFollowEdgeAsync(
+
     followerViewerId: number,
     followedViewerId: number,
-): void {
+): Promise<void> {
     if (followerViewerId === followedViewerId) return
     socialFollowsDatabase().prepare(`
         DELETE FROM social_follows
@@ -99,10 +102,10 @@ export function deleteSharedFollowEdgeSync(
  * 双向关系判定（好友房间大厅可见性过滤依据）：
  * 两行=mutual，恰一行=single，零行=none。查询失败 fail-closed 为 none。
  */
-export function getSharedFollowRelationSync(
+export async function getSharedFollowRelationAsync(
     followerViewerId: number,
     followedViewerId: number,
-): SharedFollowRelation {
+): Promise<SharedFollowRelation> {
     if (followerViewerId === followedViewerId) return "none"
     try {
         const rows = socialFollowsDatabase().prepare(`

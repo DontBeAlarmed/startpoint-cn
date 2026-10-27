@@ -1,5 +1,5 @@
 import {
-    refreshRoomShareRowSync,
+    refreshRoomShareRowAsync,
 } from "../../data/domains/social-room-shares"
 import { describeError } from "../describe-error"
 
@@ -14,19 +14,21 @@ import { describeError } from "../describe-error"
  * 会形成 manager → share-sync → manager 循环。
  */
 export function syncRoomShareRow(roomNumber: string): void {
-    try {
+    // W1a：内部异步、对外 fire-and-forget——调用点（TCP 断连/房间钩子）是
+    // 同步上下文，注册表是显示/发现数据，失败 WARN 不阻断主流程
+    void (async () => {
         const { getRoom } = require("./manager") as typeof import("./manager")
         const room = getRoom(roomNumber)
         if (!room) return
-        refreshRoomShareRowSync(
+        await refreshRoomShareRowAsync(
             roomNumber,
             room.raising_state,
             Math.max(1, room.mates.length),
             getShareNowMs(),
         )
-    } catch (error) {
+    })().catch(error => {
         console.warn("[SOCIAL-SHARE] room share sync failed", roomNumber, describeError(error))
-    }
+    })
 }
 
 /**
@@ -42,11 +44,13 @@ export function openRoomShareRow(input: {
     readonly shareBits: number
     readonly establisherJson: string
 }): void {
-    try {
+    // W1a：fire-and-forget 同上（HTTP 调用方为 async handler，但门面保持
+    // 同步签名让 TCP/HTTP 两侧调用点形状统一）
+    void (async () => {
         const { getRoom } = require("./manager") as typeof import("./manager")
-        const { upsertRoomShareRowSync } = require("../../data/domains/social-room-shares") as typeof import("../../data/domains/social-room-shares")
+        const { upsertRoomShareRowAsync } = require("../../data/domains/social-room-shares") as typeof import("../../data/domains/social-room-shares")
         const room = getRoom(input.roomNumber)
-        upsertRoomShareRowSync({
+        await upsertRoomShareRowAsync({
             roomNumber: input.roomNumber,
             hostViewerId: input.hostViewerId,
             categoryId: input.categoryId,
@@ -57,19 +61,19 @@ export function openRoomShareRow(input: {
             establisherJson: input.establisherJson,
             nowMs: getShareNowMs(),
         })
-    } catch (error) {
+    })().catch(error => {
         console.warn("[SOCIAL-SHARE] room share open failed", input.roomNumber, describeError(error))
-    }
+    })
 }
 
 /** 解散钩子：删除注册行（尽力而为，不阻断解散主流程） */
 export function deleteRoomShareRowForDisband(roomNumber: string): void {
-    try {
-        const { deleteRoomShareRowSync } = require("../../data/domains/social-room-shares") as typeof import("../../data/domains/social-room-shares")
-        deleteRoomShareRowSync(roomNumber)
-    } catch (error) {
+    void (async () => {
+        const { deleteRoomShareRowAsync } = require("../../data/domains/social-room-shares") as typeof import("../../data/domains/social-room-shares")
+        await deleteRoomShareRowAsync(roomNumber)
+    })().catch(error => {
         console.warn("[SOCIAL-SHARE] room share disband cleanup failed", roomNumber, describeError(error))
-    }
+    })
 }
 
 function getShareNowMs(): number {

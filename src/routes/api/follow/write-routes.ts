@@ -9,8 +9,8 @@ import {
 } from "../../../data/domains/follow"
 import { resolveFollowTarget, resolveFollowViewer } from "./context"
 import {
-    deleteSharedFollowEdgeSync,
-    upsertSharedFollowEdgeSync,
+    deleteSharedFollowEdgeAsync,
+    upsertSharedFollowEdgeAsync,
 } from "../../../data/domains/social-follow"
 
 // 共享 follow 边副本（social_follows）的尽力而为双写：本地 players_follows
@@ -22,16 +22,18 @@ function mirrorSharedFollowEdge(
     action: "add" | "delete",
     followedAtMs: number,
 ): void {
+    // W1a：fire-and-forget——镜像写入是本地边的尽力而为副本，调用点为
+    // async handler 但镜像失败不得影响关注主流程（WARN 降级语义保持）
     if (viewerId === targetViewerId) return
-    try {
+    void (async () => {
         if (action === "add") {
-            upsertSharedFollowEdgeSync(viewerId, targetViewerId, followedAtMs)
+            await upsertSharedFollowEdgeAsync(viewerId, targetViewerId, followedAtMs)
         } else {
-            deleteSharedFollowEdgeSync(viewerId, targetViewerId)
+            await deleteSharedFollowEdgeAsync(viewerId, targetViewerId)
         }
-    } catch (error) {
+    })().catch(error => {
         console.warn("[SOCIAL-FOLLOW] shared edge mirror failed", { viewerId, targetViewerId, action }, error)
-    }
+    })
 }
 
 // F0 冻结：add 的 A-error 1451=我方关注超限（FollowCountOver）、

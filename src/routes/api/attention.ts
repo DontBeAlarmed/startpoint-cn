@@ -6,6 +6,7 @@ import {
     listUndeliveredOpenRecruitments,
     recordDeliveries,
     parseEstablisherSnapshot,
+    type AttentionRecruitment,
 } from "../../data/domains/attention"
 import { getLocalFollowRelationSync } from "../../data/domains/follow"
 import { touchPresence } from "../../multi/presence"
@@ -65,7 +66,7 @@ const routes = async (fastify: FastifyInstance) => {
         // presence 是 advisory 数据、multi 空数组对客户端合法（ReceiveMulti([])），
         // 降级容错：任一失败不拖垮这条最热轮询端点（每在线玩家每 ~10s 一次）
         try {
-            touchPresence(viewerId)
+            await touchPresence(viewerId)
         } catch (error) {
             console.warn("[ATTENTION] presence touch failed (degraded)", error)
         }
@@ -78,16 +79,15 @@ const routes = async (fastify: FastifyInstance) => {
         // 宁可本轮空响应也不发出没记账的铃铛（否则下轮轮询重投堆叠横幅）。
         // F-06：招募行 TTL（expires_at）写侧锚真实钟，读侧必须同域——虚拟钟会恒判未过期
         const nowMs = getRealNowMs()
-        let bells: ReturnType<typeof listUndeliveredOpenRecruitments> = []
+        let bells: AttentionRecruitment[] = []
         try {
             // T1 投递谓词（设计 §5）：本节点房间过房间态门（未开战/房主在线/真人未满员），
             // 异节点房间放行
             // 取数放大 3 倍再过滤补满：T1 被滤房间不得挤占 return_attention_max_num 名额
-            const candidates = listUndeliveredOpenRecruitments(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM * 3)
+            bells = (await listUndeliveredOpenRecruitments(viewerId, nowMs, RETURN_ATTENTION_MAX_NUM * 3))
                 .filter(recruitment => isBellDeliveryEligible(recruitment.roomNumber))
                 .slice(0, RETURN_ATTENTION_MAX_NUM)
-            recordDeliveries(viewerId, candidates.map(recruitment => recruitment.id))
-            bells = candidates
+            await recordDeliveries(viewerId, bells.map(recruitment => recruitment.id))
         } catch (error) {
             bells = []
             console.warn("[ATTENTION] delivery failed (empty multi)", error)

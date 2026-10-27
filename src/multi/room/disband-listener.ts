@@ -48,13 +48,10 @@ export function installDisbandLifecycleListener(): void {
         } catch (error) {
             console.error(`[MULTI] room share disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
         }
-        try {
-            // 铃铛招募行同样覆盖全部解散路径：此前只有 HTTP disband/开战/NPC
-            // 补位会关行，计时器解散留下 open 行 → 死房铃铛（bell-gate 对
-            // 本节点缺房放行）最长存活到 45s TTL。
-            closeRecruitmentForRoom(hostViewerId, roomNumber)
-        } catch (error) {
+        // W1a：closeRecruitmentForRoom 为异步形状——同步 listener 内
+        // fire-and-forget（拒绝就地捕获，不得成为 unhandled rejection）
+        void closeRecruitmentForRoom(hostViewerId, roomNumber).catch(error => {
             console.error(`[MULTI] recruitment disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
-        }
+        })
     })
 }

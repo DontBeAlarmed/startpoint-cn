@@ -542,7 +542,9 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
                 ? ed.party.characterIds.find((id: unknown) => typeof id === "number" && id > 0) ?? 0
                 : 0
             if (hostPlayerId !== undefined && leaderId > 0) {
-                updateOpenRecruitmentSnapshotForRoom(
+                // 异步形状的拒绝必须就地捕获——try/catch 不接 async 拒绝，
+                // unhandled rejection 会被 node:test 记到当前用例头上
+                void updateOpenRecruitmentSnapshotForRoom(
                     hostPlayerId,
                     client.viewerId,
                     client.roomNumber,
@@ -551,7 +553,9 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
                         character: leaderId,
                         evolutionImgLevel: safeEvolutionImgLevel(hostPlayerId, leaderId),
                     },
-                )
+                ).catch(error => {
+                    console.warn(`[LOBBY] recruitment snapshot refresh rejected: room=${client.roomNumber}`, describeError(error))
+                })
             }
         } catch (error) {
             console.warn(`[LOBBY] in-room bell snapshot refresh failed room=${client.roomNumber}`, describeError(error))
@@ -828,11 +832,11 @@ function beginBattle(client: SessionClient): boolean {
         return false
     }
     // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底
-    try {
-        closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber)
-    } catch (error) {
+    // W1a：异步形状——同步上下文 fire-and-forget（拒绝就地捕获，try/catch
+    // 不接 async 拒绝）
+    closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber).catch(error => {
         console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, describeError(error))
-    }
+    })
     // 关注奖励（v4）：每局恰好一次的本提交边界为计数点——局内真实成员间
     // 每条已存在的关注方向行 +10（单事务）。失败仅告警，不回滚开战。
     try {
