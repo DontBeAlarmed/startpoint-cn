@@ -54,7 +54,8 @@ import { resolveRoomEstablisherFollowStateSync } from "../follow-policy";
 import { getLocalFollowRelationSync } from "../../data/domains/follow";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
 import { cacheFinishResponse, getCachedFinishResponse } from "../finish-response-cache";
-import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import { buildFollowBonusInfo } from "../../lib/follow-bonus";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import {
@@ -352,12 +353,28 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             }
             throw error;
         }
+        // 关注奖励（v4）：本局真实队友中与请求者存在关注方向的条目，
+        // 值 = 累计计数 + 10（预支本局，StartBattle 增量在之后提交）。
+        // 无任何关注边 → 字段整体省略（客户端可选，语义 = 无加成）。
+        const followBonusInfo = buildFollowBonusInfo(
+            viewer_id,
+            room.value.members
+                .map(member => member.viewerId)
+                .filter(memberViewerId => memberViewerId !== viewer_id),
+        )
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id }),
             "data": {
                 "is_multi": "multi",
                 "play_id": play_id,
+                ...(followBonusInfo === null ? {} : {
+                    "follow_bonus_info": [{
+                        "viewer_id": followBonusInfo.viewerId,
+                        "follow_bonus_list": followBonusInfo.followBonusList,
+                        "total_follow_bonus": followBonusInfo.totalFollowBonus,
+                    }],
+                }),
                 ...mergeCommonResponseFragments([{
                     "user_info": {
                         "stamina": startResult.afterStamina,

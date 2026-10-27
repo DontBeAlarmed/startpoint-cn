@@ -35,11 +35,55 @@ export function upsertSharedFollowEdgeSync(
         INSERT INTO social_follows (follower_viewer_id, followed_viewer_id, followed_at_ms)
         VALUES (?, ?, ?)
         ON CONFLICT(follower_viewer_id, followed_viewer_id) DO UPDATE SET
+            coop_bonus_count = 0,
             followed_at_ms = excluded.followed_at_ms
     `).run(followerViewerId, followedViewerId, followedAtMs)
 }
 
-/** 单边删除；不存在时静默（幂等） */
+/**
+ * 关注奖励计数读取（v4）：viewer 对 followedIds 中已存在方向行的累计奖励分。
+ * 行不存在 = 无关注边 = 无奖励（返回值缺键）。行即记录：取关删行即清零。
+ */
+export function getCoopBonusCountsSync(
+    followerViewerId: number,
+    followedViewerIds: readonly number[],
+): Record<number, number> {
+    const out: Record<number, number> = {}
+    if (followedViewerIds.length === 0) return out
+    const placeholders = followedViewerIds.map(() => "?").join(", ")
+    const rows = socialFollowsDatabase().prepare(`
+    SELECT followed_viewer_id, coop_bonus_count
+    FROM social_follows
+    WHERE follower_viewer_id = ? AND followed_viewer_id IN (${placeholders})
+    `).all(followerViewerId, ...followedViewerIds) as Array<{
+        followed_viewer_id: number
+        coop_bonus_count: number
+    }>
+    for (const row of rows) out[row.followed_viewer_id] = row.coop_bonus_count ?? 0
+    return out
+}
+
+/** 开战配对增量：单事务批量 +10（钳 1e6）；方向行不存在时静默跳过（无关注边不记账） */
+export function incrementCoopBonusCountsSync(
+    pairs: readonly { readonly followerViewerId: number; readonly followedViewerId: number }[],
+): void {
+    if (pairs.length === 0) return
+    const database = socialFollowsDatabase()
+    const increment = database.prepare(`
+    UPDATE social_follows
+    SET coop_bonus_count = MIN(coop_bonus_count + 10, 1000000)
+    WHERE follower_viewer_id = ? AND followed_viewer_id = ?
+    `)
+    const run = database.transaction(() => {
+        for (const pair of pairs) {
+            if (pair.followerViewerId === pair.followedViewerId) continue
+            increment.run(pair.followerViewerId, pair.followedViewerId)
+        }
+    })
+    run()
+}
+
+/** 单边删除；不存在时静默（幂等）。取关同时清除该方向行的关注奖励计数（行即记录） */
 export function deleteSharedFollowEdgeSync(
     followerViewerId: number,
     followedViewerId: number,

@@ -12,6 +12,7 @@ import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { applyNpcPostFill } from "../npc/release"
 import { closeRecruitmentForRoom, updateOpenRecruitmentSnapshotForRoom } from "../../data/domains/attention"
+import { incrementFollowBonusForBattle } from "../../lib/follow-bonus"
 import { safeEvolutionImgLevel } from "../safe-display-fields"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import type { MultiRoom } from "../../lib/types"
@@ -815,6 +816,13 @@ function beginBattle(client: SessionClient): boolean {
         closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber)
     } catch (error) {
         console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, describeError(error))
+    }
+    // 关注奖励（v4）：每局恰好一次的本提交边界为计数点——局内真实成员间
+    // 每条已存在的关注方向行 +10（单事务）。失败仅告警，不回滚开战。
+    try {
+        incrementFollowBonusForBattle(realMembers.map(mate => Number(mate.viewerId)))
+    } catch (error) {
+        console.warn(`[LOBBY] follow bonus increment failed: room=${client.roomNumber}`, describeError(error))
     }
     client.enterData = null
     return true
