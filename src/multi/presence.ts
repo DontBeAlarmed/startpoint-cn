@@ -20,6 +20,7 @@
 import type { Database } from "better-sqlite3"
 import { getRealNowMs } from "../runtime/time/game-time"
 import { getSharedSocialDb } from "../data/social/shared-db"
+import { ensurePgSocialSchema, getNodeNamespace, getPgPool } from "../data/social/pg"
 
 export const PRESENCE_THROTTLE_MS = 30_000
 export const PRESENCE_WINDOW_MS = 5 * 60_000
@@ -93,15 +94,52 @@ export function createSqlitePresenceStore(db: Database): PresenceStore {
     }
 }
 
+/** PG 实现（W1b，跨物理机）：social_presence 表 + 节点命名空间。
+ * touch 30s 节流合并进单条 upsert（无 SELECT 前置）；清扫由 PG 侧定期
+ * 维护或依赖窗口判定（查询永远带 last_seen 窗口谓词，过期行无害）。 */
+export function createPgPresenceStore(): PresenceStore {
+    const nodeId = getNodeNamespace()
+    const pool = getPgPool()
+    return {
+        async touch(viewerId, nowMs = getRealNowMs()) {
+            await pool.query(`
+                INSERT INTO social_presence (node_id, viewer_id, last_seen_ms)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (node_id, viewer_id) DO UPDATE SET
+                    last_seen_ms = GREATEST(social_presence.last_seen_ms, excluded.last_seen_ms)
+            `, [nodeId, viewerId, nowMs])
+        },
+        async isOnline(viewerId, nowMs = getRealNowMs()) {
+            const result = await pool.query(
+                "SELECT 1 FROM social_presence WHERE node_id = $1 AND viewer_id = $2 AND last_seen_ms > $3",
+                [nodeId, viewerId, nowMs - PRESENCE_WINDOW_MS],
+            )
+            return result.rowCount !== 0
+        },
+        async onlineViewerIds(nowMs = getRealNowMs()) {
+            const result = await pool.query(
+                "SELECT viewer_id FROM social_presence WHERE node_id = $1 AND last_seen_ms > $2 ORDER BY viewer_id",
+                [nodeId, nowMs - PRESENCE_WINDOW_MS],
+            )
+            return result.rows.map((row: { viewer_id: string | number }) => Number(row.viewer_id))
+        },
+    }
+}
+
 let configuredPresenceStore: PresenceStore | null = null
 
-/** 进程级单例：MULTI_SOCIAL_DB_PATH 设置 → 共享表；否则内存 Map */
+/** 进程级单例：MULTI_SOCIAL_PG_URL → PG；MULTI_SOCIAL_DB_PATH → 共享表；
+ * 都未设置 → 内存 Map */
 export function getPresenceStore(): PresenceStore {
     if (configuredPresenceStore === null) {
-        const shared = getSharedSocialDb()
-        configuredPresenceStore = shared !== null
-            ? createSqlitePresenceStore(shared)
-            : createMemoryPresenceStore()
+        if (process.env.MULTI_SOCIAL_PG_URL !== undefined && process.env.MULTI_SOCIAL_PG_URL.trim() !== "") {
+            configuredPresenceStore = createPgPresenceStore()
+        } else {
+            const shared = getSharedSocialDb()
+            configuredPresenceStore = shared !== null
+                ? createSqlitePresenceStore(shared)
+                : createMemoryPresenceStore()
+        }
     }
     return configuredPresenceStore
 }
