@@ -67,8 +67,8 @@ function edge(follower, followed, count = 0) {
     const forA = buildFollowBonusInfo(A, [B, C])
     assert.ok(forA !== null)
     assert.equal(forA.viewerId, A)
-    assert.deepEqual(forA.followBonusList, { [String(B)]: 10 }, "首局预支 +10 → 10")
-    assert.equal(forA.totalFollowBonus, 10)
+    assert.deepEqual(forA.followBonusList, { [String(B)]: 0 }, "无增量时显示计数 0")
+    assert.equal(forA.totalFollowBonus, 0)
 
     const forB = buildFollowBonusInfo(B, [A, C])
     assert.equal(forB, null, "B 未关注 A：B 视角无条目")
@@ -76,7 +76,7 @@ function edge(follower, followed, count = 0) {
     // B 回关 → 互关：双方各自独立计数（都从 0 起，各显示 10）
     edge(B, A)
     const forB2 = buildFollowBonusInfo(B, [A])
-    assert.deepEqual(forB2.followBonusList, { [String(A)]: 10 }, "互关后 B 视角独立计数 10")
+    assert.deepEqual(forB2.followBonusList, { [String(A)]: 0 }, "互关后 B 视角独立计数 0")
 }
 
 // ---- 共斗增量：配对只覆盖已存在的方向行 ----
@@ -89,15 +89,15 @@ function edge(follower, followed, count = 0) {
     assert.equal(getCoopBonusCountsSync(A, [C])[C] ?? 0, 0, "无边不记账")
     assert.equal(getCoopBonusCountsSync(C, [A])[A] ?? 0, 0)
 
-    // 第二局预支：计数 10 + 预支 10 = 显示 20（即第 2 把）
+    // 一局已计：显示 10（第 1 把）
     const forA = buildFollowBonusInfo(A, [B])
-    assert.equal(forA.followBonusList[String(B)], 20, "一局已计 + 本局预支 = 20")
-    assert.equal(forA.totalFollowBonus, 20)
+    assert.equal(forA.followBonusList[String(B)], 10, "一局已计 → 显示 10")
+    assert.equal(forA.totalFollowBonus, 10)
 
-    // 第二局开战：计数 20 → 第三局预支 30（第 3 把）
+    // 第二局开战：计数 20 → 显示 20（第 2 把）
     incrementFollowBonusForBattle([A, B, C])
     const forA2 = buildFollowBonusInfo(A, [B])
-    assert.equal(forA2.followBonusList[String(B)], 30, "两局已计 + 本局预支 = 30")
+    assert.equal(forA2.followBonusList[String(B)], 20, "两局已计 → 显示 20")
 }
 
 // ---- 取关清零：删行即清；重关注从 0 起 ----
@@ -109,7 +109,7 @@ function edge(follower, followed, count = 0) {
     edge(A, B)
     assert.equal(getCoopBonusCountsSync(A, [B])[B], 0, "重关注新行从 0 起")
     const forA = buildFollowBonusInfo(A, [B])
-    assert.equal(forA.followBonusList[String(B)], 10, "重关注首局预支 10")
+    assert.equal(forA.followBonusList[String(B)], 0, "重关注未开战显示 0")
 }
 
 // ---- 上限双钳：计数 1e6 → 增量封顶；显示值与合计各自钳 1e6 ----
@@ -127,18 +127,18 @@ function edge(follower, followed, count = 0) {
     edge(A, B)
     edge(A, C)
     const forA = buildFollowBonusInfo(A, [B, C])
-    assert.deepEqual(forA.followBonusList, { [String(B)]: 10, [String(C)]: 10 })
-    assert.equal(forA.totalFollowBonus, 20, "合计 = Σ逐人")
+    assert.deepEqual(forA.followBonusList, { [String(B)]: 0, [String(C)]: 0 })
+    assert.equal(forA.totalFollowBonus, 0, "合计 = Σ逐人")
 
     // 自我配对被 increment 跳过（无 A→A 行，亦不抛错）
     assert.doesNotThrow(() => incrementFollowBonusForBattle([A]))
 }
 
-// ---- 败局/放弃局时序瑕疵（已接受残留）：仅显示层，计数以 StartBattle 为准 ----
+// ---- start 早于 StartBattle 的非主流时序：显示上一把的值（滞后一局，自愈） ----
 {
-    // StartBattle 前放弃：计数未增，但本局 start 已预支——下一局显示回正确值
+    // 此块时 A→B 计数为 0（前面已 DELETE 重建）：无增量时 start 显示 0
     const before = buildFollowBonusInfo(A, [B]).followBonusList[String(B)]
-    assert.equal(before, 10, "未开战：仅预支 10")
+    assert.equal(before, 0, "无增量时 start 显示计数 0")
 }
 
 console.log("follow bonus: all assertions passed")

@@ -17,11 +17,13 @@ import {
  * key = 十进制字符串）。分数链路自洽：加成进 score 上报 finish，
  * 服务端分数报酬逻辑自动包含，无二次计算。
  *
- * 时序：start 响应先于 TCP StartBattle（增量点），故显示值 = 计数 + 10
- * 预支本局；全员 StartBattle 前放弃的局显示多记一次——纯显示级瑕疵。
+ * 时序（实测修正）：CN 客户端先发 TCP StartBattle（增量点，服务端进入
+ * 战斗态并广播 Start 后客户端才进入战斗场景、发出 HTTP start）——因此
+ * start 响应构造时本局增量已落库，显示值直接读计数即"第几把×10"，
+ * 同局双方显示同值。若 start 早于 StartBattle（非主流时序），显示为
+ * 上一把的值，纯显示层滞后且自愈。
  */
 
-const FOLLOW_BONUS_PER_BATTLE = 10
 const FOLLOW_BONUS_VALUE_CAP = 1_000_000
 
 export interface FollowBonusInfo {
@@ -36,6 +38,7 @@ export interface FollowBonusInfo {
 /**
  * 构建 start 响应的 follow_bonus_info 条目；无任何关注边时返回 null
  * （整个字段省略——客户端 Option.None → 0，与无功能时完全一致）。
+ * 显示值 = 当前计数（本局增量已由 StartBattle 先行落库，不再预支）。
  * 读取/构建失败 fail-open 为 null（纯奖励字段不得影响开战）。
  */
 export function buildFollowBonusInfo(
@@ -49,7 +52,7 @@ export function buildFollowBonusInfo(
         for (const mateId of mateViewerIds) {
             const count = counts[mateId]
             if (count === undefined) continue // 无关注边：不显示、不计数
-            const value = Math.min(count + FOLLOW_BONUS_PER_BATTLE, FOLLOW_BONUS_VALUE_CAP)
+            const value = Math.min(count, FOLLOW_BONUS_VALUE_CAP)
             list[String(mateId)] = value
             total += value
         }
