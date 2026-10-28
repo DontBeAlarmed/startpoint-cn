@@ -118,7 +118,7 @@ import {
 import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
-import { ensureActivityPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync, recoverActivityPeriodicRewardPointsSync } from "./campaign";
+import { ensureActivityPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, insertPlayerSpecialExchangeCampaignsSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync, recoverActivityPeriodicRewardPointsSync } from "./campaign";
 import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "../../lib/mission/mission-catalog"
 
@@ -568,6 +568,10 @@ export function insertMergedPlayerDataSync(
     insertPlayerBoxGachasSync(playerId, toInsert.boxGachaList)
     insertPlayerStartDashExchangeCampaignsSync(playerId, toInsert.startDashExchangeCampaignList)
     insertPlayerMultiSpecialExchangeCampaignsSync(playerId, toInsert.multiSpecialExchangeCampaignList)
+    insertPlayerSpecialExchangeCampaignsSync(
+        playerId,
+        toInsert.specialExchangeCampaignList ?? [],
+    )
     insertPlayerOptionsSync(playerId, toInsert.userOption)
     insertCarnivalSaveStateSync(getDb(), playerId, toInsert)
 
@@ -1091,6 +1095,10 @@ export function insertDefaultPlayerSync(
             status: 1
         }
     ])
+
+    // insert the special exchange campaign list (no rows: campaigns start
+    // un-entered with status 0 until the client calls enter_campaign)
+    insertPlayerSpecialExchangeCampaignsSync(playerId, [])
 
         initializePeriodicMissionSnapshots(playerId, player, {
             countCurrentLoginDay: true,

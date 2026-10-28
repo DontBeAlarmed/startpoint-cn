@@ -47,6 +47,11 @@ export interface SocialCapacityPolicy {
     readonly maxDisplayFollowers: number
 }
 
+export interface WildcardTicketPolicy {
+    readonly tenTimesCharacterTicketItemId: number
+    readonly tenTimesEquipmentTicketItemId: number
+}
+
 const rawByRepository = new WeakMap<ReadonlyContentRepository, RawConfig>()
 const currencyByRepository = new WeakMap<ReadonlyContentRepository, CurrencyCapacityPolicy>()
 const staminaByRepository = new WeakMap<ReadonlyContentRepository, StaminaContentPolicy>()
@@ -55,6 +60,7 @@ const singleContinueByRepository = new WeakMap<ReadonlyContentRepository, Single
 const multiRewardByRepository = new WeakMap<ReadonlyContentRepository, MultiRewardPolicy>()
 const crazyGachaByRepository = new WeakMap<ReadonlyContentRepository, CrazyGachaPolicy>()
 const socialCapacityByRepository = new WeakMap<ReadonlyContentRepository, SocialCapacityPolicy>()
+const wildcardTicketByRepository = new WeakMap<ReadonlyContentRepository, WildcardTicketPolicy>()
 
 function invalid(field: string): never {
     throw new TypeError(`invalid config content field: ${field}`)
@@ -201,5 +207,26 @@ export function getCrazyGachaPolicySync(
         tenDrawMaxCount: nonNegativeSafeInteger(rawConfig(selected), "gacha_crazy_ten_max_count"),
     })
     crazyGachaByRepository.set(selected, policy)
+    return policy
+}
+
+export function getWildcardTicketPolicySync(
+    repository?: ReadonlyContentRepository,
+): WildcardTicketPolicy {
+    const selected = selectedRepository(repository)
+    const cached = wildcardTicketByRepository.get(selected)
+    if (cached !== undefined) return cached
+    const raw = rawConfig(selected)
+    const policy = deepFreeze({
+        tenTimesCharacterTicketItemId: nonNegativeSafeInteger(
+            raw,
+            "wildcard_ten_times_character_ticket_item_id",
+        ),
+        tenTimesEquipmentTicketItemId: nonNegativeSafeInteger(
+            raw,
+            "wildcard_ten_times_equipment_ticket_item_id",
+        ),
+    })
+    wildcardTicketByRepository.set(selected, policy)
     return policy
 }

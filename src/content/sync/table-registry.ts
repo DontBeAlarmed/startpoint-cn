@@ -8,6 +8,11 @@ import { EVENT_FAMILY_SOURCE_PATHS } from "../converters/event-family"
 import { PERIODIC_REWARD_TABLE_SOURCES } from "../converters/periodic-reward"
 import { LOGIN_BONUS_SOURCE } from "../converters/login-bonus"
 import {
+    SPECIAL_EXCHANGE_CAMPAIGN_CHARACTER_PATH,
+    SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_PATH,
+    SPECIAL_EXCHANGE_CAMPAIGN_PATH,
+} from "../converters/special-exchange"
+import {
     QUEST_AUXILIARY_SOURCES,
     QUEST_TABLE_SOURCES,
     type QuestDerivedTableName,
@@ -130,6 +135,10 @@ const REWARD_TABLES = [
 ] as const
 
 const REWARD_CAMPAIGN_SOURCE = "master/campaign/reward_campaign.orderedmap"
+
+const SPECIAL_EXCHANGE_CAMPAIGN_SOURCE = SPECIAL_EXCHANGE_CAMPAIGN_PATH
+const SPECIAL_EXCHANGE_CAMPAIGN_CHARACTER_SOURCE = SPECIAL_EXCHANGE_CAMPAIGN_CHARACTER_PATH
+const SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_SOURCE = SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_PATH
 
 const GAMEPLAY_TABLES = [
     [
@@ -514,6 +523,30 @@ const definitionInputs: TableSourceInput[] = [
         converterId: "reward-campaign",
         converterVersion: 2,
         outputShapeVersion: 2,
+    },
+    {
+        tableName: "special_exchange_campaign.json",
+        scope: "cdn",
+        sourceOrderedMaps: [SPECIAL_EXCHANGE_CAMPAIGN_SOURCE],
+        converterId: "special-exchange",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "special_exchange_campaign_character.json",
+        scope: "cdn",
+        sourceOrderedMaps: [SPECIAL_EXCHANGE_CAMPAIGN_CHARACTER_SOURCE],
+        converterId: "special-exchange",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "special_exchange_campaign_equipment.json",
+        scope: "cdn",
+        sourceOrderedMaps: [SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_SOURCE],
+        converterId: "special-exchange",
+        converterVersion: 1,
+        outputShapeVersion: 1,
     },
     {
         tableName: "login_bonus.json",

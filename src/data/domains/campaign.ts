@@ -3,8 +3,10 @@ import {
     PlayerPeriodicRewardPoint,
     PlayerStartDashExchangeCampaign,
     PlayerMultiSpecialExchangeCampaign,
+    PlayerSpecialExchangeCampaign,
     RawPlayerStartDashExchangeCampaign,
     RawPlayerMultiSpecialExchangeCampaign,
+    RawPlayerSpecialExchangeCampaign,
 } from "../types";
 import {
     getActivityPeriodicRewardPointDefinitions,
@@ -215,4 +217,76 @@ export function insertPlayerMultiSpecialExchangeCampaignsSync(
             insertPlayerMultiSpecialExchangeCampaignSync(playerId, campaign)
         }
     })()
+}
+
+// ─── Special Exchange Campaign ───
+
+/**
+ * Gets the progress of a player's special exchange campaigns.
+ *
+ * @param playerId The player's ID.
+ * @returns The status of the player's special exchange campaigns.
+ */
+export function getPlayerSpecialExchangeCampaignsSync(
+    playerId: number
+): PlayerSpecialExchangeCampaign[] {
+    const db = getDb();
+    const rawCampaigns = db.prepare(`
+    SELECT campaign_id, status
+    FROM players_special_exchange_campaigns
+    WHERE player_id = ?
+    `).all(playerId) as RawPlayerSpecialExchangeCampaign[]
+
+    return rawCampaigns.map(raw => ({
+        campaignId: raw.campaign_id,
+        status: raw.status
+    }))
+}
+
+export function getPlayerSpecialExchangeCampaignStatusSync(
+    playerId: number,
+    campaignId: number
+): number {
+    const row = getDb().prepare(`
+    SELECT status
+    FROM players_special_exchange_campaigns
+    WHERE player_id = ? AND campaign_id = ?
+    `).get(playerId, campaignId) as { status: number } | undefined
+    // Missing row means the campaign was never entered (status 0).
+    return row?.status ?? 0
+}
+
+function insertPlayerSpecialExchangeCampaignSync(
+    playerId: number,
+    campaign: PlayerSpecialExchangeCampaign
+) {
+    const db = getDb();
+    db.prepare(`
+    INSERT INTO players_special_exchange_campaigns (campaign_id, status, player_id)
+    VALUES (?, ?, ?)
+    `).run(campaign.campaignId, campaign.status, playerId)
+}
+
+export function insertPlayerSpecialExchangeCampaignsSync(
+    playerId: number,
+    campaigns: PlayerSpecialExchangeCampaign[]
+) {
+    const db = getDb();
+    db.transaction(() => {
+        for (const campaign of campaigns) {
+            insertPlayerSpecialExchangeCampaignSync(playerId, campaign)
+        }
+    })()
+}
+
+export function upsertPlayerSpecialExchangeCampaignStatusSync(
+    playerId: number,
+    campaignId: number,
+    status: number
+): void {
+    getDb().prepare(`
+    INSERT INTO players_special_exchange_campaigns (campaign_id, status, player_id)
+    VALUES (?, ?, ?)
+    ON CONFLICT (campaign_id, player_id) DO UPDATE SET status = excluded.status
+    `).run(campaignId, status, playerId)
 }

@@ -488,6 +488,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         quest: 0,
         periodicReward: 0,
         rewardCampaign: 0,
+        specialExchange: 0,
     }
     let bundledImports = 0
     const bundledRoots = new Set()
@@ -565,6 +566,10 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.rewardCampaign++
             return converterOutput("reward-campaign")
         },
+        convertSpecialExchangeTables: async () => {
+            converterCalls.specialExchange++
+            return converterOutput("special-exchange")
+        },
         importBundledTable: async (root, tableName) => {
             bundledRoots.add(root)
             bundledImports++
@@ -596,6 +601,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         quest: 1,
         periodicReward: 1,
         rewardCampaign: 1,
+        specialExchange: 1,
     })
     assert.equal(
         bundledImports,
@@ -693,6 +699,7 @@ test("default release builder rejects an incomplete converter output", async () 
         convertRewards: async () => converterOutput("reward"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
+        convertSpecialExchangeTables: async () => converterOutput("special-exchange"),
         importBundledTable: async (_root, tableName) => ({ imported: tableName }),
     })
 
@@ -774,6 +781,7 @@ test("default release builder bounds parallel reads and imports while preserving
         convertRewards: async () => converterOutput("reward"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
+        convertSpecialExchangeTables: async () => converterOutput("special-exchange"),
         importBundledTable: async (_root, tableName) => {
             activeImports++
             maxImports = Math.max(maxImports, activeImports)

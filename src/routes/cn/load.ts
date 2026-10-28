@@ -140,7 +140,7 @@ export function wrapOptionFields(
     d.fund_receive_list = [];
     d.login_info = {};
     d.tower_dungeon_list = [];
-    d.special_exchange_campaign_list = [];
+    d.special_exchange_campaign_list ??= [];
     d.win_lottery_active_mission_list = [];
     d.stars_gacha_campaign_list ??= [];
     // favorite_party_group_list is assigned after wrapOptionFields from

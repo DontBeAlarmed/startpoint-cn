@@ -60,6 +60,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
     table("players_box_gacha_drawn_rewards", "events"),
     table("players_start_dash_exchange_campaigns", "events"),
     table("players_multi_special_exchange_campaigns", "events"),
+    table("players_special_exchange_campaigns", "events", 31),
     table("players_rush_events", "events"),
     table("players_rush_events_cleared_folders", "events"),
     table("players_rush_events_played_parties", "events"),

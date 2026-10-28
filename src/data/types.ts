@@ -408,6 +408,16 @@ export interface PlayerMultiSpecialExchangeCampaign {
     status: number
 }
 
+export interface RawPlayerSpecialExchangeCampaign {
+    campaign_id: number
+    status: number
+}
+
+export interface PlayerSpecialExchangeCampaign {
+    campaignId: number
+    status: number
+}
+
 // rush event
 export interface UserRushEvent {
     active_rush_battle_folder_id: number | null
@@ -776,6 +786,11 @@ export interface UserMultiSpecialExchangeCampaignList {
     status: number
 }
 
+export interface UserSpecialExchangeCampaignList {
+    campaign_id: number
+    status: number
+}
+
 export type UserRushEventPlayedPartyList = Record<string, Record<RushEventBattleType, Record<string, UserRushEventPlayedParty>>>
 
 export interface ClientPlayerData {
@@ -814,6 +829,7 @@ export interface ClientPlayerData {
     purchased_times_list: Object
     start_dash_exchange_campaign_list: UserStartDashCampaignList[]
     multi_special_exchange_campaign_list: UserMultiSpecialExchangeCampaignList[]
+    special_exchange_campaign_list?: UserSpecialExchangeCampaignList[]
     associate_token: string
     config: Object,
     // rush event data
@@ -848,6 +864,7 @@ export interface MergedPlayerData {
     purchasedTimesList: Record<string, number>,
     startDashExchangeCampaignList: PlayerStartDashExchangeCampaign[],
     multiSpecialExchangeCampaignList: PlayerMultiSpecialExchangeCampaign[],
+    specialExchangeCampaignList: PlayerSpecialExchangeCampaign[],
     userOption: Record<string, boolean>,
     // rush event data
     rushEventList?: PlayerRushEvent[],

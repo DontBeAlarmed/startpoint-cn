@@ -89,6 +89,11 @@ import {
     type RewardCampaignSourceReader,
 } from "../converters/reward-campaign"
 import {
+    convertSpecialExchangeTables,
+    type SpecialExchangeConversionOutput,
+    type SpecialExchangeSourceReader,
+} from "../converters/special-exchange"
+import {
     convertQuests,
     type QuestConversionCompatibility,
     type QuestConversionOutput,
@@ -132,6 +137,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "periodic-reward",
     "reward",
     "reward-campaign",
+    "special-exchange",
     "quest",
     "bundled-json",
     "server-json",
@@ -212,6 +218,9 @@ export interface DefaultContentTableBuilderDependencies {
         reader: RewardCampaignSourceReader,
         context: ContentConverterContext,
     ) => RewardCampaignConversionOutput | Promise<RewardCampaignConversionOutput>
+    readonly convertSpecialExchangeTables?: (
+        reader: SpecialExchangeSourceReader,
+    ) => SpecialExchangeConversionOutput | Promise<SpecialExchangeConversionOutput>
     readonly convertQuests?: (
         reader: QuestSourceReader,
         compatibility: QuestConversionCompatibility,
@@ -252,7 +261,7 @@ class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader,
     AdditionalRewardSourceReader, CharacterManaAdmissionSourceReader,
     ItemEquipmentSourceReader, ManaNodeSourceReader,
     LoginBonusSourceReader, ShopSourceReader, RewardSourceReader,
-    QuestSourceReader, PeriodicRewardSourceReader {
+    QuestSourceReader, PeriodicRewardSourceReader, SpecialExchangeSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
     private readonly rawCache = new Map<string, Buffer>()
@@ -499,6 +508,8 @@ export function createDefaultContentTableBuilder(
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
     const rewardConverter = dependencies.convertRewards ?? convertRewards
     const rewardCampaignConverter = dependencies.convertRewardCampaigns ?? convertRewardCampaigns
+    const specialExchangeConverter = dependencies.convertSpecialExchangeTables
+        ?? convertSpecialExchangeTables
     const questConverter = dependencies.convertQuests ?? convertQuests
     const periodicRewardConverter = dependencies.convertPeriodicRewards ?? convertPeriodicRewards
     const loginBonusConverter = dependencies.convertLoginBonuses ?? convertLoginBonuses
@@ -530,6 +541,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "skill-effects"
                     || definition.converterId === "reward"
                     || definition.converterId === "reward-campaign"
+                    || definition.converterId === "special-exchange"
                     || definition.converterId === "quest"
                     || definition.converterId === "periodic-reward"
                     || directOrderedMapDepth(definition.converterId) !== null
@@ -645,6 +657,13 @@ export function createDefaultContentTableBuilder(
                     values,
                     "reward-campaign",
                     await rewardCampaignConverter(reader, converterContext),
+                )
+            }
+            if (converterIds.has("special-exchange")) {
+                addConverterOutput(
+                    values,
+                    "special-exchange",
+                    await specialExchangeConverter(reader),
                 )
             }
             if (converterIds.has("quest")) {

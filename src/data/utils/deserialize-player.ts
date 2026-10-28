@@ -1,7 +1,7 @@
 import { deserializeClientDate } from "./date"
 import { getCharacterFacts } from "../../lib/character-content"
 import { getDateFromServerTime, getServerTime, getServerDate, realDateFromServerTime, realToVirtual } from "../../utils"
-import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
+import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerSpecialExchangeCampaign, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
 import { getPlayerActiveMissionsSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
 import { getPlayerBoxGachasSync } from "../domains/boxGacha"
@@ -417,7 +417,26 @@ export function deserializePlayerData(
                 }
             })
         }
-        
+
+        // deserialize special exchange campaign list
+        const userSpecialExchangeCampaignList = toDeserialize['special_exchange_campaign_list']
+
+        let specialExchangeCampaignList: PlayerSpecialExchangeCampaign[] = []
+        if (userSpecialExchangeCampaignList !== undefined) {
+            specialExchangeCampaignList = userSpecialExchangeCampaignList.map(campaign => {
+                const campaignId = campaign['campaign_id']
+                const status = campaign['status']
+
+                if (isNaN(campaignId) || isNaN(status))
+                    throw new Error("Invalid or missing fields for 'special_exchange_campaign_list' field.");
+
+                return {
+                    campaignId: campaignId,
+                    status: status
+                }
+            })
+        }
+
         // deserialize rush event data
         const userRushEventList = toDeserialize['user_rush_event_list']
         const rushEventList: PlayerRushEvent[] = []
@@ -477,6 +496,7 @@ export function deserializePlayerData(
             purchasedTimesList: {},
             startDashExchangeCampaignList: startDashExchangeCampaignList,
             multiSpecialExchangeCampaignList: multiSpecialExchangeCampaignList,
+            specialExchangeCampaignList: specialExchangeCampaignList,
             userOption: userOption,
             rushEventList: rushEventList.length === 0 ? undefined : rushEventList,
             rushEventClearedFolderList: toDeserialize['user_rush_event_cleared_folder_list'],

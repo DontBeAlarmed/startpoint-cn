@@ -367,6 +367,12 @@ export function serializePlayerData(
                 "status": campaign.status
             }
         }),
+        "special_exchange_campaign_list": (toSerialize.specialExchangeCampaignList ?? []).map(campaign => {
+            return {
+                "campaign_id": campaign.campaignId,
+                "status": campaign.status
+            }
+        }),
         "associate_token": "associate_token",
         "config": {
             "summon_com_seconds": options?.summonComSeconds ?? 5,
