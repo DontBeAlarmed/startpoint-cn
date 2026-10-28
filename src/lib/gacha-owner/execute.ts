@@ -45,7 +45,6 @@ import type {
 } from "./model"
 import { getPlayerGachaExecutionStateSync } from "./player-period"
 import { getPlayerGachaDetailSync, upsertPlayerGachaDetailSync } from "../../data/domains/gacha-state"
-import { getGachaCurrencyCapacityLimits } from "./daily-limits"
 
 function rejected(message: string): GachaExecRejected {
     return { ok: false, kind: "badRequest", message }
@@ -125,30 +124,14 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     return rejected("Crazy Gacha requires the candidate lifecycle.")
                 }
 
-                // 每日抽卡上限（官方语义：计数按池、上限全局、真实业务日重置）。
-                // 客户端 GachaSceneViewBase 显示 剩余 = max - 该池计数；预检读
-                // gacha_info_list 的 daily_one/ten_count。超额走既有 A-error 通道。
-                const dailyLimits = getGachaCurrencyCapacityLimits()
-                // 十连判定仅看 execType：可缩放单抽（type=3/10/12）一次用 N 张券
-                // 仍是 N 次单抽，numberOfExec>1 不构成十连。
-                const isTenDraw = command.execType === GACHA_EXEC_TYPES.VMONEY_MULTI
-                    || command.execType === GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET
-                    || command.execType === GACHA_EXEC_TYPES.MULTI_TICKET
-                    || command.execType === GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET
-                    || command.execType === GACHA_EXEC_TYPES.CAMPAIGN_MULTI
-                    || command.execType === GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI
+                // 每日 one/ten 计数机制已关闭（2026-10-29 裁定）：官服实际卡池的
+                // 99/99 恒定不递减——该计数是为特殊卡池保留的设计（客户端
+                // GachaPageKind 含 WithoutDaily），普通卡池不设限不递增。
+                // 机制保留（daily-limits.ts、isTenDraw 路由修复 a74f1e6e），
+                // crazy 的 crazy_draw_count 独立上限不受影响。
                 const gachaDetail = getPlayerGachaDetailSync(command.playerId, command.gachaId)
-                const currentOne = gachaDetail?.dailyOneCount ?? 0
-                const currentTen = gachaDetail?.dailyTenCount ?? 0
-                if (isTenDraw) {
-                    if (currentTen + 1 > dailyLimits.maxTenPerDay) {
-                        return rejected("Daily ten-draw limit reached for this banner.")
-                    }
-                } else if (currentOne + command.numberOfExec > dailyLimits.maxOnePerDay) {
-                    return rejected("Daily draw limit reached for this banner.")
-                }
-                const afterDailyOneCount = isTenDraw ? currentOne : currentOne + command.numberOfExec
-                const afterDailyTenCount = isTenDraw ? currentTen + 1 : currentTen
+                const afterDailyOneCount = gachaDetail?.dailyOneCount ?? 0
+                const afterDailyTenCount = gachaDetail?.dailyTenCount ?? 0
 
                 const insertPlayerGachaData = playerGachaData === null
                 playerGachaData = playerGachaData ?? {

@@ -1,7 +1,8 @@
 "use strict";
 
-// R-daily 反例回归：
-// ① 扭蛋每日上限——计数按池、上限全局（99/99）、真实业务日重置、响应带计数；
+// R-daily 回归：
+// ① 扭蛋每日 one/ten 计数机制——已关闭（2026-10-29 裁定：官服实际卡池 99/99 恒定
+//    不递减，该计数为特殊卡池保留设计；普通卡池不设限不递增，crazy 独立上限不受影响）；
 // ② 星导石邮件——合并钱包余额+附件 > 999999 统一拒绝（带内 2001 ReceiveError），admin 发送端同口径拦截；
 // ③ search_twitter 空响应（合法 200，防 404 踢人）。
 
@@ -75,115 +76,58 @@ function post(fastify, url, payload) {
 }
 const decode = r => unpack(Buffer.from(r.body, "base64"))
 
-// ---------- ① 扭蛋每日上限 ----------
+// ---------- ① 扭蛋每日计数机制：关闭态 ----------
 
-test("gacha daily counts increment and the limit rejects the 100th draw", async () => {
+test("gacha daily counters are closed: draws never count and never reject", async () => {
     const { executeGachaDrawSync } = require("../src/lib/gacha-owner/execute")
-    const { getGachaCurrencyCapacityLimits } = require("../src/lib/gacha-owner/daily-limits")
     const { getPlayerGachaDetailSync } = require("../src/data/domains/gacha-state")
 
-    const { playerId } = await createPlayer("gacha-limit")
-    updatePlayerSync({ id: playerId, freeVmoney: 999999, vmoney: 0 })
-
-    const limits = getGachaCurrencyCapacityLimits()
-    assert.equal(limits.maxOnePerDay, 99, "官方单抽每日上限 99")
-    assert.equal(limits.maxTenPerDay, 99, "官方十连每日上限 99")
+    const { playerId } = await createPlayer("gacha-daily-closed")
+    updatePlayerSync({ id: playerId, freeVmoney: 9999999, vmoney: 0 })
 
     const gachaId = 1638 // bundled 已知活跃角色池（同 gacha_write_transaction）
     const nowMs = Date.parse("2024-08-14T12:00:00.000Z")
 
-    // 连续单抽 99 次全部成功（vmoney 单抽）
-    let lastResult = null
-    for (let i = 0; i < limits.maxOnePerDay; i++) {
-        lastResult = executeGachaDrawSync({
+    // 跨过旧"上限"（100 次）也必须全部成功——机制已关闭
+    for (let i = 0; i < 100; i++) {
+        const r = executeGachaDrawSync({
             playerId, gachaId,
             paymentType: 1, execType: 1, numberOfExec: 1, nowMs,
         })
-        assert.equal(lastResult.ok, true, `第 ${i + 1} 抽必须成功: ${lastResult.ok ? "" : lastResult.message}`)
+        assert.equal(r.ok, true, `第 ${i + 1} 抽必须成功: ${r.ok ? "" : r.message}`)
     }
     const detail = getPlayerGachaDetailSync(playerId, gachaId)
-    assert.equal(detail.dailyOneCount, 99, "99 次后 daily_one_count = 99")
-    assert.equal(lastResult.dailyOneCount, 99, "响应必须带最新计数")
-    assert.equal(lastResult.dailyTenCount, 0)
+    assert.equal(detail?.dailyOneCount ?? 0, 0, "单抽计数恒 0（不递增）")
+    assert.equal(detail?.dailyTenCount ?? 0, 0, "十连计数恒 0")
 
-    // 第 100 次：必须拒绝
-    const rejected = executeGachaDrawSync({
-        playerId, gachaId,
-        paymentType: 1, execType: 1, numberOfExec: 1, nowMs,
-    })
-    assert.equal(rejected.ok, false)
-    assert.match(rejected.message, /Daily draw limit/)
-})
-
-test("gacha ten-draw limit rejects after 99 ten-draws", async () => {
-    const { executeGachaDrawSync } = require("../src/lib/gacha-owner/execute")
-    const { getGachaCurrencyCapacityLimits } = require("../src/lib/gacha-owner/daily-limits")
-    const { resetPlayerGachaDailyStateSync } = require("../src/data/domains/gacha-state")
-
-    const { playerId } = await createPlayer("gacha-ten-limit")
-    updatePlayerSync({ id: playerId, freeVmoney: 9999999, vmoney: 0 })
-
-    const gachaId = 1638
-    const nowMs = Date.parse("2024-08-14T12:00:00.000Z")
-    for (let i = 0; i < getGachaCurrencyCapacityLimits().maxTenPerDay; i++) {
-        const r = executeGachaDrawSync({
-            playerId, gachaId,
-            paymentType: 1, execType: 2, numberOfExec: 1, nowMs,
-        })
-        assert.equal(r.ok, true, `第 ${i + 1} 次十连: ${r.ok ? "" : r.message}`)
-    }
-    const rejected = executeGachaDrawSync({
+    const ten = executeGachaDrawSync({
         playerId, gachaId,
         paymentType: 1, execType: 2, numberOfExec: 1, nowMs,
     })
-    assert.equal(rejected.ok, false)
-    assert.match(rejected.message, /Daily ten-draw limit/)
-
-    // 真实业务日重置：计数归零后可再抽
-    resetPlayerGachaDailyStateSync(playerId)
-    const afterReset = executeGachaDrawSync({
-        playerId, gachaId,
-        paymentType: 1, execType: 1, numberOfExec: 1, nowMs,
-    })
-    assert.equal(afterReset.ok, true, "日切重置后必须可再抽")
+    assert.equal(ten.ok, true, "十连不受限")
+    assert.equal(ten.dailyOneCount, 0, "响应单抽计数恒 0")
+    assert.equal(ten.dailyTenCount, 0, "响应十连计数恒 0")
 })
 
-test("batch single tickets count as N single draws, never as a ten-draw", async () => {
+test("batch single tickets are unlimited: 10 tickets in one exec pass with counters untouched", async () => {
     const { executeGachaDrawSync } = require("../src/lib/gacha-owner/execute")
-    const { getPlayerGachaDetailSync, upsertPlayerGachaDetailSync } = require("../src/data/domains/gacha-state")
+    const { getPlayerGachaDetailSync } = require("../src/data/domains/gacha-state")
     const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 
-    const { playerId } = await createPlayer("gacha-batch-single")
+    const { playerId } = await createPlayer("gacha-batch-unlimited")
     const gachaId = 1638
     const nowMs = Date.parse("2024-08-14T12:00:00.000Z")
 
-    // 通用单抽券 ×10，一次 exec 批量用 5 张（type=10）：5 次单抽，不进十连计数
     grantInventoryFixtureItemSync(playerId, 999003, 10)
     const batch = executeGachaDrawSync({
-        playerId, gachaId, paymentType: 3, execType: 10, numberOfExec: 5, nowMs,
-    })
-    assert.equal(batch.ok, true, `批量单抽券必须成功: ${batch.ok ? "" : batch.message}`)
-    const detail = getPlayerGachaDetailSync(playerId, gachaId)
-    assert.equal(detail.dailyOneCount, 5, "5 张单抽券 = 5 次单抽")
-    assert.equal(detail.dailyTenCount, 0, "十连计数不动")
-    assert.equal(batch.dailyOneCount, 5, "响应带最新单抽计数")
-    assert.equal(batch.dailyTenCount, 0)
-
-    // 预检按单抽上限口径：98+5>99 拒绝（票不扣），98+1=99 放行
-    upsertPlayerGachaDetailSync({
         playerId, gachaId,
-        dailyOneCount: 98, dailyTenCount: 0,
-        comebackPeriodStartTime: null, comebackPeriodEndTime: null,
+        paymentType: 3, execType: 10, numberOfExec: 10, nowMs,
     })
-    const overLimit = executeGachaDrawSync({
-        playerId, gachaId, paymentType: 3, execType: 10, numberOfExec: 5, nowMs,
-    })
-    assert.equal(overLimit.ok, false)
-    assert.match(overLimit.message, /Daily draw limit/)
-    const withinLimit = executeGachaDrawSync({
-        playerId, gachaId, paymentType: 3, execType: 10, numberOfExec: 1, nowMs,
-    })
-    assert.equal(withinLimit.ok, true, "98+1=99 仍在单抽上限内")
+    assert.equal(batch.ok, true, `10 张批量单抽券必须成功: ${batch.ok ? "" : batch.message}`)
+    assert.equal(batch.dailyOneCount, 0, "响应单抽计数恒 0")
+    assert.equal(batch.dailyTenCount, 0, "响应十连计数恒 0")
+    const detail = getPlayerGachaDetailSync(playerId, gachaId)
+    assert.equal(detail?.dailyOneCount ?? 0, 0, "库内单抽计数恒 0")
 })
 
 // ---------- ② 星导石邮件容量 ----------
