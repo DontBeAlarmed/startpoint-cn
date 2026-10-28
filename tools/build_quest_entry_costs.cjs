@@ -13,7 +13,7 @@
 
 const fs = require("node:fs")
 const path = require("node:path")
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const {
     buildQuestEntryCosts,

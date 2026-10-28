@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 const util = require("node:util")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const Fastify = require("fastify")
 const { unpack } = require("msgpackr")

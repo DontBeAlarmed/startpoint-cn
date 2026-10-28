@@ -33,7 +33,7 @@
 // reward rollback atomicity, town character claims) so it stays green while
 // the focused category 7/10 cases run.
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")

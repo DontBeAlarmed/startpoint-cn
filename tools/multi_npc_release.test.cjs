@@ -6,7 +6,7 @@
 // - postFill：close（官服）关招募 / keep-open（私服）服务端接管行寿命
 // - T1：本节点房间态门（未开战/房主在线/真人未满员），异节点放行
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const { EventEmitter } = require("node:events")

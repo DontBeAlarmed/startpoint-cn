@@ -5,7 +5,7 @@
 // ② 星导石邮件——合并钱包余额+附件 > 999999 统一拒绝（带内 2001 ReceiveError），admin 发送端同口径拦截；
 // ③ search_twitter 空响应（合法 200，防 404 踢人）。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")

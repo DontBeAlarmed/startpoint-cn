@@ -9,7 +9,7 @@ const test = require("node:test")
 const Fastify = require("fastify")
 const Sqlite = require("better-sqlite3")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
 const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema

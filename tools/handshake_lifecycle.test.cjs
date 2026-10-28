@@ -5,7 +5,7 @@ const path = require("node:path")
 const test = require("node:test")
 const ts = require("typescript")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)

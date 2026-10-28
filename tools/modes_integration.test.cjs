@@ -5,7 +5,7 @@
 // coordinator, the production played-party read path, and a real transaction.
 // Fixture modules live in temp dirs — modes.d/ ships empty.
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()

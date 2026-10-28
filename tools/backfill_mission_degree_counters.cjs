@@ -15,7 +15,7 @@
 //   node tools/backfill_mission_degree_counters.cjs --apply    # 实际写入
 //   WDFP_DATABASE_DIR=... 可指向副本先行验证
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 const restore = require("./helpers/install-bundled-gameplay-snapshot.cjs").installBundledGameplaySnapshot()
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")

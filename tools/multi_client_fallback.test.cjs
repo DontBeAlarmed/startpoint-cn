@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { MULTI_PROTOCOL_VERSION } = require("../src/multi/coordinator/contracts")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")

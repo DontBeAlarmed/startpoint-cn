@@ -11,7 +11,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "handshake-grade-"))
 const previousDataDirectory = process.env.DATA_DIR

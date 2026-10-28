@@ -11,7 +11,7 @@ const os = require("node:os")
 const path = require("node:path")
 const { createHash } = require("node:crypto")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const registry = require("../src/modes/registry")
 const { loadModes } = require("../src/modes/loader")

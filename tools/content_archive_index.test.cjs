@@ -9,7 +9,7 @@ const { spawnSync } = require("node:child_process")
 const test = require("node:test")
 const unzipper = require("unzipper")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { buildCdnCatalog, CatalogValidationError } = require("../src/content/cdn/catalog-builder")
 const { createArchiveSourceManifest } = require("../src/content/cdn/archive-sources")

@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { EMBEDDED_NODE_SESSION_ID } = require("../src/multi/coordinator/embedded")
 const { buildSessionServerOptions } = require("../src/multi/runtime/session-options")

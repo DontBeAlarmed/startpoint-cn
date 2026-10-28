@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")

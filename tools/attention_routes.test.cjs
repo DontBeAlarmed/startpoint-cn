@@ -7,7 +7,7 @@
 // - 读时惰性投递：guest 首次轮询即收到 open 招募，accepted 后收敛；
 // - /attention/action 是"参加优先度评分"端点（非 accept/decline）。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

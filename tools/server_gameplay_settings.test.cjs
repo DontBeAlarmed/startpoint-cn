@@ -10,7 +10,7 @@ const Fastify = require("fastify")
 const importSandbox = fs.mkdtempSync(path.join(os.tmpdir(), "server-gameplay-settings-import-"))
 process.env.DATA_DIR = path.join(importSandbox, "data")
 process.on("exit", () => fs.rmSync(importSandbox, { recursive: true, force: true }))
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()

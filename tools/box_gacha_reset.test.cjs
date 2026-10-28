@@ -190,7 +190,7 @@ assert.deepEqual(settings["28"]["5"], {
 });
 assert.equal(settings["28"]["4"].resetKind, 0);
 
-require("ts-node/register/transpile-only");
+require("./test-workflow/bootstrap.cjs").bootstrap();
 const {
     BoxGachaContentError,
     buildBoxGachaContentCatalog,

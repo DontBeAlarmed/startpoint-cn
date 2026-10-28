@@ -8,7 +8,7 @@ const { spawnSync } = require("node:child_process")
 const test = require("node:test")
 const Fastify = require("fastify")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const {
     characterFullShotPath,

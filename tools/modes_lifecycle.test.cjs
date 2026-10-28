@@ -10,7 +10,7 @@
 //
 // Snapshot, HTTP listen and multiplayer start are spies, so no port is bound.
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const test = require("node:test")

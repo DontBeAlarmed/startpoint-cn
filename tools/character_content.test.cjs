@@ -5,7 +5,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const projectRoot = path.resolve(__dirname, "..")
 

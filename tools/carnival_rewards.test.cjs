@@ -4,7 +4,7 @@ const fs = require("node:fs")
 const { after } = require("node:test")
 const os = require("node:os")
 const path = require("node:path")
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "carnival-rewards-db-"))
 const previousDataDirectory = process.env.DATA_DIR

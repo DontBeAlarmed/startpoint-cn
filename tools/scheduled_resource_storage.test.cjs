@@ -9,7 +9,7 @@ const test = require("node:test")
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "scheduled-resource-storage-"))
 process.env.DATA_DIR = databaseDirectory
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()

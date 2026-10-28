@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict")
 const test = require("node:test")
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const {
     DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES,

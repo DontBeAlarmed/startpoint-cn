@@ -4,7 +4,7 @@
 // 阶梯值)与等级称号(3000/3010/3020)——不得延迟到下次进关/任务页。
 // 背景:用户实测「角色达到 N 级」任务在进关时才提示完成(经验注入路径无结算)。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

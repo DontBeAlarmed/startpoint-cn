@@ -4,7 +4,7 @@
 //（planManaCapacity，与 item-sell/event-trade/reward-grant 引擎一致）——
 // 越顶部分转 FREE_MANA 溢出邮件，钱包封顶，响应投影封顶后值。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const test = require("node:test")

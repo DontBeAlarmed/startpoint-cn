@@ -4,7 +4,7 @@
 const fs = require("node:fs")
 const path = require("node:path")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 const { extractOpeningRow } = require("../src/content/converters/opening-ability")
 
 const [root, outDir] = process.argv.slice(2)

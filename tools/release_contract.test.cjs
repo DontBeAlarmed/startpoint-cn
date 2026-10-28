@@ -67,7 +67,7 @@ test("release contract adapters reject inverted schema ranges and freeze results
         defaultPorts: { http: 8001, tcp: 8003, hub: 8004 },
     }))
 
-    require("ts-node/register/transpile-only")
+    require("./test-workflow/bootstrap.cjs").bootstrap()
     const { parseServerReleaseContract } = require("../src/runtime/release-contract")
     const contract = loadServerReleaseContract(root)
     const invalidContract = { ...contract, minimumDataSchema: 1, currentDataSchema: 0 }
@@ -91,7 +91,7 @@ test("release contract adapters require the same fixed path and version values",
         path.join(tempRoot, "assets/server_release_contract.json"),
     )
 
-    require("ts-node/register/transpile-only")
+    require("./test-workflow/bootstrap.cjs").bootstrap()
     const { parseServerReleaseContract } = require("../src/runtime/release-contract")
     const validContract = loadServerReleaseContract(tempRoot)
     const mutations = [

@@ -4,7 +4,7 @@ const path = require("node:path")
 const test = require("node:test")
 const { pack, unpack, Packr } = require("msgpackr")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { fixUint32Tags } = require("../src/lib/msgpack-compat")
 const Fastify = require("fastify")

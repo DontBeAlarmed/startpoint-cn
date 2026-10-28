@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 let convertEventFamilies
 let EVENT_FAMILY_SOURCE_PATHS

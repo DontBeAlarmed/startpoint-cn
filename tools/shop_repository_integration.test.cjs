@@ -6,7 +6,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { ContentRepository } = require("../src/content/runtime/content-repository")
 const {

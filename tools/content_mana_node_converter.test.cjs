@@ -5,7 +5,7 @@ const test = require("node:test")
 
 const officialRows = require("./fixtures/content-mana-node/official-1.4.54-rows.json")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const {
     serializeNestedOrderedMap,

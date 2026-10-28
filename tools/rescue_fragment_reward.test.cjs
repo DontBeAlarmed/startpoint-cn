@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict")
 const test = require("node:test")
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const adventEventQuests = require("../assets/advent_event_quest.json")
 const additionalRewardRules = require("../assets/additional_reward_rules.json")

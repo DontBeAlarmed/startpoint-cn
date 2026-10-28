@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict")
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { handleCarnivalEventFinish } = require("../src/lib/quest/finish/carnival-handler")
 const { handleRaidEventFinish } = require("../src/lib/quest/finish/raid-handler")

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const crypto = require("node:crypto")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const {
     CONTENT_GENERATOR_VERSION,

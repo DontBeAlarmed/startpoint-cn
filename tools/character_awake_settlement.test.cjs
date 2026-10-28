@@ -1,4 +1,4 @@
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const { spawnSync } = require("node:child_process")
@@ -45,7 +45,7 @@ function testTopLevelFailureRestoresBundledCharacterSnapshot() {
     const markerDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-snapshot-restore-"))
     const markerPath = path.join(markerDirectory, "restored")
     const childSource = `
-        require("ts-node/register/transpile-only")
+        require("./test-workflow/bootstrap.cjs").bootstrap()
         const assert = require("node:assert/strict")
         const fs = require("node:fs")
         const {

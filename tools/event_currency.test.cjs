@@ -1,4 +1,4 @@
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { after } = require("node:test")
 const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")

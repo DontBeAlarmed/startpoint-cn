@@ -5,7 +5,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const Fastify = require("fastify")
 const { readAdminApiToken, requireAdminApiToken } = require("../src/runtime/admin-auth")

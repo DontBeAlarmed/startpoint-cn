@@ -5,7 +5,7 @@
 // 非扭蛋路径；扭蛋批量已在自身奖励流内结算）必须当场结算；同种类叠加
 // （stack 增长）不改变种类数、不得重复结算。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { MailType } = require("../src/data/domains/mail")
 const { RewardType } = require("../src/lib/types")

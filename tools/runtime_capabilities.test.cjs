@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const Fastify = require("fastify")
 const { canonicalJsonBuffer, sha256Object } = require("../src/content/sync/canonical-json")

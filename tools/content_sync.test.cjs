@@ -8,7 +8,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { buildCdnCatalog } = require("../src/content/cdn/catalog-builder")
 const { hashContentResourcePath } = require("../src/content/resource-path")
@@ -1402,8 +1402,10 @@ test("lock waits, times out clearly, releases by token and identity, and leaves 
         timeoutMs: 100,
         pollIntervalMs: 5,
     })
+    // staleThresholdMs 注入：持有者存活时轮询实际上界是 stale 阈值而非
+    // timeoutMs（实测 20ms 请求会等满默认 60s）——测试必须注入毫秒级阈值
     await assert.rejects(
-        acquireContentSyncLock(paths.contentStateDir, { timeoutMs: 20, pollIntervalMs: 5 }),
+        acquireContentSyncLock(paths.contentStateDir, { timeoutMs: 20, pollIntervalMs: 5, staleThresholdMs: 200 }),
         error => error instanceof ContentSyncLockError
             && error.code === "CONTENT_SYNC_LOCK_TIMEOUT"
             && /remove.*manually|人工删除/i.test(error.message),
@@ -1480,6 +1482,7 @@ test("lock waits through the owner's create/write window and diagnoses legacy fi
     const secondPromise = acquireContentSyncLock(paths.contentStateDir, {
         timeoutMs: 500,
         pollIntervalMs: 5,
+        staleThresholdMs: 200,
     })
     await new Promise(resolve => setTimeout(resolve, 20))
     finishWrite()
@@ -1491,7 +1494,7 @@ test("lock waits through the owner's create/write window and diagnoses legacy fi
     fs.writeFileSync(path.join(paths.contentStateDir, "sync.lock"), "old lock")
     // S2（stale-guard 自愈）：垃圾内容锁=崩溃残留，超时后接管而非 fail-closed
     const takeover = await acquireContentSyncLock(paths.contentStateDir, {
-        timeoutMs: 10, pollIntervalMs: 2,
+        timeoutMs: 10, pollIntervalMs: 2, staleThresholdMs: 200,
     })
     await takeover.release()
     assert.equal(fs.existsSync(path.join(paths.contentStateDir, "sync.lock")), false)
@@ -1605,8 +1608,8 @@ test("package and quick workflow expose content sync", () => {
         "node tools/content_sync.cjs",
     )
     assert.ok(TEST_GROUPS["quick:content"].tests.includes("tools/content_sync.test.cjs"))
-    // 180s：opening 块四表入册后全注册表 fixture 构建加重（groups.cjs 同步注释）
-    assert.equal(TEST_GROUPS["quick:content"].timeoutMs, 180_000)
+    // 90s：锁用例注入毫秒级 stale 阈值后文件回到 ~13s（groups.cjs 同步注释）
+    assert.equal(TEST_GROUPS["quick:content"].timeoutMs, 90_000)
     assert.ok(fs.existsSync(path.join(projectRoot, "tools", "content_sync.cjs")))
 })
 

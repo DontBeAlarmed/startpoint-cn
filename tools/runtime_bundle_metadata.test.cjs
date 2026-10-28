@@ -6,7 +6,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
 const releaseContract = loadServerReleaseContract(path.resolve(__dirname, ".."))

@@ -3,7 +3,7 @@ const Database = require("better-sqlite3")
 const Fastify = require("fastify")
 const { pack } = require("msgpackr")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)

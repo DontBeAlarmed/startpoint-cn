@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 let convertCharacters
 try {

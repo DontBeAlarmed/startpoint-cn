@@ -4,7 +4,7 @@
 // 本段，不得裸 return 跳过后续 v18/v22 迁移——调用方会无条件推进 user_version，
 // 裸 return 会留下"版本号已达标但迁移没跑"的半迁移库。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

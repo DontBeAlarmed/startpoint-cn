@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 const Fastify = require("fastify")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const serverRoutes = require("../src/routes/web_api/server").default
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")

@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const roomManager = require("../src/multi/room/manager")
 const { addRoomMember, createRoom, disbandRoom, updateRoomState } = roomManager

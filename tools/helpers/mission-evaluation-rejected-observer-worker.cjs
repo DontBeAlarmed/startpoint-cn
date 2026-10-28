@@ -1,6 +1,6 @@
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 const { MissionFactLoaderRegistry } = require("../../src/lib/mission")
 const { createSession } = require("./mission-evaluation-session-fixture.cjs")

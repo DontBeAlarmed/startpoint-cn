@@ -9,7 +9,7 @@ const path = require("node:path")
 const test = require("node:test")
 const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const projectRoot = path.resolve(__dirname, "..")
 const releaseContract = loadServerReleaseContract(projectRoot)

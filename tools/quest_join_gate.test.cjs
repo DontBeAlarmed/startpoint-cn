@@ -5,7 +5,7 @@
 // 真实数据链：boss 1001002 ← 主线 6010004、1001003 ← boss 1001002；
 // 降临 100004002 ← 降临 100004001（风神·雷神中级←初级）；1001001/1001005 无门。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

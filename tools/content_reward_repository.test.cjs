@@ -5,7 +5,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const questContent = require("../src/lib/quest-content")

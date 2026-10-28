@@ -10,7 +10,7 @@ const Fastify = require("fastify")
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "admin-news-"))
 process.env.DATA_DIR = databaseDirectory
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const data = require("../src/data")
 const newsDomain = require("../src/data/domains/news")

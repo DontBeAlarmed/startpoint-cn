@@ -7,7 +7,7 @@ const path = require("node:path")
 const { spawn, spawnSync } = require("node:child_process")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const projectRoot = path.resolve(__dirname, "..")
 const {
@@ -33,7 +33,7 @@ function fixture(t, options = {}) {
 const concurrentWorker = String.raw`
 const fs = require("node:fs")
 const { randomBytes } = require("node:crypto")
-require("ts-node/register/transpile-only")
+require("./tools/test-workflow/bootstrap.cjs").bootstrap()
 const { MultiHubCredentialStore } = require("./src/multi/hub/credential-store")
 const [credentialsPath, action, value, readyPath, goPath] = process.argv.slice(1)
 const sleep = milliseconds => Atomics.wait(

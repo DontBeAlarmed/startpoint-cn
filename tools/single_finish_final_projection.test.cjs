@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const clearRewards = require("../assets/clear_reward.json")
 const itemInventoryPolicy = require("../assets/item_inventory_policy.json")

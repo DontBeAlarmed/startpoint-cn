@@ -1,6 +1,6 @@
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 const entryCosts = require("../../assets/quest_entry_costs.json")
 const { getStaminaCost } = require("../../src/lib/stamina-cost")

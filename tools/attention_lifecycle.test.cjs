@@ -5,7 +5,7 @@
 // 官方契约依据：房主客户端每 15s 重发 share_room（上限 20 次），
 // guest 轮询 /attention/check 拉取 multi[]（AttentionCheckRealRemoteService）。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

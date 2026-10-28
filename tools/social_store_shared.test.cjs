@@ -6,7 +6,7 @@
 // 语义基线：读时惰性投递、accepted 单向收敛、close 跨连接可见、
 // presence touch 30s 节流 + 5min 窗口 + 惰性清扫。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

@@ -5,7 +5,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const { pack, unpack } = require("msgpackr")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { after } = require("node:test")
 const {

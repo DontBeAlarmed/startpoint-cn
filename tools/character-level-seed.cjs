@@ -4,7 +4,7 @@
 const fs = require("node:fs")
 const crypto = require("node:crypto")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const {
     canonicalizeCharacterLevelBundledSeed,

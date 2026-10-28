@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 const { AsyncLocalStorage } = require("node:async_hooks")
 const fs = require("node:fs")

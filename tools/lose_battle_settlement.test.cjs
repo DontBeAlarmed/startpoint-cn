@@ -9,7 +9,7 @@
 //
 // 双因子触发:客户端 is_lose=true + 服务端 questKind=2,缺一即普通失败。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

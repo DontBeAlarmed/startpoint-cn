@@ -7,7 +7,7 @@ const path = require("node:path")
 const { pack, unpack } = require("msgpackr")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { HubClient } = require("../src/multi/hub/client")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")

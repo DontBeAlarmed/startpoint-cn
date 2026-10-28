@@ -4,7 +4,7 @@
 // shop 目录（campaign/lineup 结构）与任务表族（/load 直达面）。
 // 每族一个坏内容反例：apply 预检必须以 ContentSmokeValidationError 拦下。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const test = require("node:test")

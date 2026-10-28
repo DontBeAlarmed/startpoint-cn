@@ -6,7 +6,7 @@
 // - S4：multi:token rebuild——损坏表改名留存 + 空表重建（显式确认，不做自动重建）
 // - S6：迁移 tmp 唯一名 + 残留 tmp 清理失败降级 WARN 不阻塞启动
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

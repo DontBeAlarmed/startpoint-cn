@@ -1,6 +1,6 @@
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 const path = require("node:path")
 const { loadServerReleaseContract } = require("../server-bundle/release-contract.cjs")

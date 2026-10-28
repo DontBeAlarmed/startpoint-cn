@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const contentSnapshotPath = require.resolve("../src/content/runtime/content-snapshot")
 let requestedTable = null

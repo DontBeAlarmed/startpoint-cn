@@ -1,6 +1,6 @@
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const fs = require("node:fs")
 const os = require("node:os")

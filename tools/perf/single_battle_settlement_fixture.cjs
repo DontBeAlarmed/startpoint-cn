@@ -1,6 +1,6 @@
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 const { getDb } = require("../../src/data/db")
 const { insertAccountSync } = require("../../src/data/domains/account")

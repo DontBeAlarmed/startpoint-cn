@@ -26,7 +26,7 @@ function runGlobalEntryProbe(t, envOverrides) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "global-embedded-startup-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     const probe = String.raw`
-require("ts-node/register/transpile-only")
+require("./tools/test-workflow/bootstrap.cjs").bootstrap()
 let installedSnapshot = null
 class ContentSnapshotError extends Error {
     constructor(code, message) {

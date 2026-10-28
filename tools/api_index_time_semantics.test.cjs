@@ -9,7 +9,7 @@ const test = require("node:test")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "api-index-time-semantics-"))
 const previousDataDirectory = process.env.DATA_DIR

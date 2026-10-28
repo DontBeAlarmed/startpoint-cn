@@ -2,7 +2,7 @@ const assert = require("node:assert/strict")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 // singleBattleQuest reads the challenge point map at route registration.
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")

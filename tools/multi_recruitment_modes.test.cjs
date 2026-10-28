@@ -10,7 +10,7 @@
 // - summon 三模式语义纯函数 resolveSummonServeCandidates
 // - T2 门票：resolveBellRecruitmentForStart 要求有效投递行
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

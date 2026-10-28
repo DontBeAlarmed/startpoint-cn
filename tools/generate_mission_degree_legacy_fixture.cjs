@@ -62,7 +62,7 @@ process.stdout.write("__DEGREE_COMPUTE__" + JSON.stringify({
 
 const settlementProbe = `
 "use strict"
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")

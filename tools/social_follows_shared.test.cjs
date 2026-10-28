@@ -7,7 +7,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 console.error("[SF-DEBUG] module: before snapshot install")
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")

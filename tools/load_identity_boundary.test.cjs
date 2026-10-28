@@ -1,6 +1,6 @@
 "use strict"
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 // Pin the host timezone to UTC for this whole test process: the load response
 // must format numeric last_login_time through the game calendar policy, not

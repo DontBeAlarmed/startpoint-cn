@@ -5,7 +5,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { buildCdnCatalog, CatalogValidationError } = require("../src/content/cdn/catalog-builder")
 const { PatchOverlayError, scanPatchOverlay } = require("../src/content/cdn/patch-overlay")

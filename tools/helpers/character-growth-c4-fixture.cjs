@@ -5,7 +5,7 @@ const os = require("node:os")
 const path = require("node:path")
 const { randomUUID } = require("node:crypto")
 
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 const { installBundledGameplaySnapshot } = require("./install-bundled-gameplay-snapshot.cjs")
 

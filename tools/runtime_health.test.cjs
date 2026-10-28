@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 const path = require("node:path")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
 const releaseContract = loadServerReleaseContract(path.resolve(__dirname, ".."))

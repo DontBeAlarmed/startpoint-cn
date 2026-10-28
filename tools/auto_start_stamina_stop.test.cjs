@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict")
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 const {
     AUTO_START_STOP_RESULT_CODE,
     shouldStopAutoStartForStamina,

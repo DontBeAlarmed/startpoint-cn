@@ -8,7 +8,7 @@ const path = require("node:path")
 const test = require("node:test")
 const { pack, unpack } = require("msgpackr")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const databaseRoot = fs.mkdtempSync(path.join(os.tmpdir(), "load-event-trade-expiry-"))
 const previousDataDirectory = process.env.DATA_DIR

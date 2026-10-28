@@ -6,7 +6,7 @@
 // 并落进度/发奖——而不是延迟到下一次任意任务评估（如点满 mana 板）才补发。
 // 前置：任务板行需已播种（生产由 /load 初始化，与线上一致）。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

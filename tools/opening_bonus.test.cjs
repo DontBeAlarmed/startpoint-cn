@@ -8,7 +8,7 @@
 // - 队长能力（仅 1 号位）= 0 觉 power1 / ≥1 觉 first_max
 // - ManaBoost → 玛纳乘数；MyselfExpBoost → 携带者经验乘数；未知 kind 跳过
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

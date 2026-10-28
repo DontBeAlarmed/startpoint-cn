@@ -262,10 +262,10 @@ const TEST_GROUPS = Object.freeze({
     },
     "quick:content": {
         execution: "parallel",
-        // 180s：opening 块解析引入三张能力窄行表 + 原始嵌套 mana_node 后，
-        // content_sync 的全注册表 fixture 构建单文件即需 ~135s（60s 预算下
-        // 组内必超时），与 protocol/party 的预算调整同理。
-        timeoutMs: 180_000,
+        // 90s：opening 块解析引入四张表后 content_sync 全注册表构建加重
+        //（实测 ~135s，其中两个锁用例硬吃默认 60s stale 窗口）——测试已注入
+        // staleThresholdMs 消除真实等待，回到 ~13s；60s 预算余量不足，取 90s。
+        timeoutMs: 90_000,
         tests: [
             "tools/character_content.test.cjs",
             "tools/content_character_converter.test.cjs",

@@ -1,4 +1,4 @@
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 // Route-level proof that the seam is reachable through the real HTTP
 // handlers: an installed module must be able to veto /start and, when it

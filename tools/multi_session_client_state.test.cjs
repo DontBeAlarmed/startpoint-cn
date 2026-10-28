@@ -3,7 +3,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { EventEmitter } = require("node:events")
 const { sessionManager } = require("../src/multi/state/SessionManager")

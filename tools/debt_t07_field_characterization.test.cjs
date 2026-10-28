@@ -15,7 +15,7 @@
 //   - GlobalLogic.as:1399-1445/1735-1773 mission_info 与 over_max 是有序 Toast 事件。
 // 只覆盖官方客户端真实 response merge 可达的形状，不构造不可达笛卡尔积。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const test = require("node:test")

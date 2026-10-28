@@ -9,7 +9,7 @@ const crypto = require("node:crypto")
 const test = require("node:test")
 const zlib = require("node:zlib")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { canonicalJsonBuffer } = require("../src/content/sync/canonical-json")
 const { serializeNestedOrderedMap, serializeOrderedMap } = require("./orderedmap_serializer.cjs")

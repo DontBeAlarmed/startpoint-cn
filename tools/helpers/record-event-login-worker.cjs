@@ -1,4 +1,4 @@
-require("ts-node/register/transpile-only")
+require("../test-workflow/bootstrap.cjs").bootstrap()
 
 delete process.env.WDFP_DATABASE_DIR
 

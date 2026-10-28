@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const { performance } = require("node:perf_hooks")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const {
     getCrazyGachaPolicySync,

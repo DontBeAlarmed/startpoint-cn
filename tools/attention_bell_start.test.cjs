@@ -7,7 +7,7 @@
 // 防伪 key / 跨房间 key / 过期 / 关闭一律 fail-open 为 null
 // （退回实时 isNewbieHostSync 判定，不影响正常开战）。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

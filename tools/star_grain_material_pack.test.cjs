@@ -92,7 +92,7 @@ for (const productId of COMBINATION_REWARD_IDS) {
     );
 }
 
-require("ts-node/register/transpile-only");
+require("./test-workflow/bootstrap.cjs").bootstrap();
 const { parseRewardSlots } = require("./rebuild_star_grain_shop.ts");
 
 const malformedSlots = Array(43).fill("");

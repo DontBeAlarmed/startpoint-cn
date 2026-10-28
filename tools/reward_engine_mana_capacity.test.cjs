@@ -4,7 +4,7 @@
 // 越顶部分转 FREE_MANA 溢出邮件（type=8）——与 item-sell/event-trade/single-finish
 // 同政。两个载体：引擎直发（计划级）+ 礼包码兑换（真实生产者，经引擎）。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

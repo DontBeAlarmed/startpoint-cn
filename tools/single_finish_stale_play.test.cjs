@@ -6,7 +6,7 @@
 // 背景(2026-10-05 查证):原实现按 playerId 取活跃任务、从不校验 play_id,
 // 旧 body 会把新一局提前结算;参考服同型事故即 H400/重复发奖源头之一。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")

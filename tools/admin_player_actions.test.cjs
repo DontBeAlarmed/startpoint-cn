@@ -7,7 +7,7 @@ const path = require("node:path")
 const test = require("node:test")
 const Sqlite = require("better-sqlite3")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()

@@ -5,7 +5,7 @@
 // roomClient 投影过滤、room.mates 重算、advanceRecruitmentGeneration、全量 mates 广播；
 // 设置在事件点读取（默认 persistent no-op）；hostClient 缺席降级；releaseBattle 挂点触发。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const { EventEmitter } = require("node:events")

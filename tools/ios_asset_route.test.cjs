@@ -7,7 +7,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const Fastify = require("fastify")
 const assetPlugin = require("../src/routes/cn/asset").default

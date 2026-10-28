@@ -7,7 +7,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const mission = require("../src/lib/mission")
 const { getFactKeyId, normalizeFactKey } = require("../src/lib/mission/facts/fact-key")

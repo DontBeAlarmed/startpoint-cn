@@ -4,7 +4,7 @@
 // 误判方向论证（任务书 §二 S1，写进测试注释）：pid 被复用为无关进程时 ESRCH 不出现
 // → 不接管，不会误删活锁；接管失败回落既有超时语义。symlink/非普通文件保持 fail-closed。
 
-require("ts-node/register/transpile-only")
+require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
