@@ -14,6 +14,15 @@ const sourceRoot = path.join(projectRoot, "src")
 const reviewedRawTableCalls = new Map([
     ["src/content/runtime/table-access.ts", ["tableName"]], // strict infrastructure accessor
     ["src/lib/additional-reward.ts", ["additional_reward_rules.json"]], // Additional Reward catalog
+    // Opening 块解析：三张能力窄行表 + 原始嵌套 mana_node + 角色/装备主数据
+    ["src/lib/opening-bonus.ts", [
+        "cdndata/character.json",
+        "ability.json",
+        "leader_ability.json",
+        "ability_soul.json",
+        "mana_node_raw.json",
+        "equipment_dissolve.json",
+    ]],
     ["src/lib/admin-activity.ts", ["event_activity.json"]], // Admin activity timeline catalog
     ["src/routes/web_api/content.ts", ["cdndata/character.json"]], // Admin character avatar adapter (col0 string_id)
     ["src/lib/bond-token-exchange/catalog.ts", ["bond_token_exchange.json"]], // Bond exchange catalog

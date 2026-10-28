@@ -10,8 +10,8 @@
  * 列（c5，先于文本列），opening 三值取行末 3 列（c123-125 / c121-123 /
  * c120-122，行尾数值）——多行描述文本的中段逗号不影响两端切分。非 opening
  * 行 kind 为 null。消费方 src/lib/opening-bonus.ts 按此窄行读取；
- * assets/ 下同名窄行资产由 tools/gen_opening_assets.cjs 从
- * wf-assets-cn 全量行生成。
+ * assets/ 下同名窄行资产由 tools/gen_opening_assets.cjs 从 CDN 全量行
+ * 提取物生成（与本地 orderedmap 提取目录同构）。
  */
 import type { ContentConverterContext } from "./context"
 import { parseNestedOrderedMapRows, parseTextOrderedMap } from "../sync/ordered-map"

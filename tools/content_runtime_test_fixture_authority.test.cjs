@@ -28,6 +28,9 @@ const LOW_LEVEL_PROVIDER = new Set([
     "tools/config_content.test.cjs",
     // Pre-init fail-closed contract for the exchange/ex/election catalogs.
     "tools/exchange_content_boundary.test.cjs",
+    // Opening 块解析的 fail-open 契约（表缺失/快照异常 → 乘数 1）需要
+    // 直接控制 provider 快照与 repository 注入。
+    "tools/opening_bonus.test.cjs",
     // Null-snapshot lazy-import contract plus the pre-init fail-closed subtest
     // of the character/race adapters (provider boundary verification).
     "tools/character_content.test.cjs",
