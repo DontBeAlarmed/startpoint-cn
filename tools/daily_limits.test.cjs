@@ -148,6 +148,44 @@ test("gacha ten-draw limit rejects after 99 ten-draws", async () => {
     assert.equal(afterReset.ok, true, "日切重置后必须可再抽")
 })
 
+test("batch single tickets count as N single draws, never as a ten-draw", async () => {
+    const { executeGachaDrawSync } = require("../src/lib/gacha-owner/execute")
+    const { getPlayerGachaDetailSync, upsertPlayerGachaDetailSync } = require("../src/data/domains/gacha-state")
+    const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
+
+    const { playerId } = await createPlayer("gacha-batch-single")
+    const gachaId = 1638
+    const nowMs = Date.parse("2024-08-14T12:00:00.000Z")
+
+    // 通用单抽券 ×10，一次 exec 批量用 5 张（type=10）：5 次单抽，不进十连计数
+    grantInventoryFixtureItemSync(playerId, 999003, 10)
+    const batch = executeGachaDrawSync({
+        playerId, gachaId, paymentType: 3, execType: 10, numberOfExec: 5, nowMs,
+    })
+    assert.equal(batch.ok, true, `批量单抽券必须成功: ${batch.ok ? "" : batch.message}`)
+    const detail = getPlayerGachaDetailSync(playerId, gachaId)
+    assert.equal(detail.dailyOneCount, 5, "5 张单抽券 = 5 次单抽")
+    assert.equal(detail.dailyTenCount, 0, "十连计数不动")
+    assert.equal(batch.dailyOneCount, 5, "响应带最新单抽计数")
+    assert.equal(batch.dailyTenCount, 0)
+
+    // 预检按单抽上限口径：98+5>99 拒绝（票不扣），98+1=99 放行
+    upsertPlayerGachaDetailSync({
+        playerId, gachaId,
+        dailyOneCount: 98, dailyTenCount: 0,
+        comebackPeriodStartTime: null, comebackPeriodEndTime: null,
+    })
+    const overLimit = executeGachaDrawSync({
+        playerId, gachaId, paymentType: 3, execType: 10, numberOfExec: 5, nowMs,
+    })
+    assert.equal(overLimit.ok, false)
+    assert.match(overLimit.message, /Daily draw limit/)
+    const withinLimit = executeGachaDrawSync({
+        playerId, gachaId, paymentType: 3, execType: 10, numberOfExec: 1, nowMs,
+    })
+    assert.equal(withinLimit.ok, true, "98+1=99 仍在单抽上限内")
+})
+
 // ---------- ② 星导石邮件容量 ----------
 
 test("free vmoney mail over capacity is rejected in-band (2001 ReceiveError), aligned with client wallet", async () => {

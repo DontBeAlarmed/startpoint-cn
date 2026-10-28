@@ -129,8 +129,9 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 // 客户端 GachaSceneViewBase 显示 剩余 = max - 该池计数；预检读
                 // gacha_info_list 的 daily_one/ten_count。超额走既有 A-error 通道。
                 const dailyLimits = getGachaCurrencyCapacityLimits()
-                const isTenDraw = command.numberOfExec > 1
-                    || command.execType === GACHA_EXEC_TYPES.VMONEY_MULTI
+                // 十连判定仅看 execType：可缩放单抽（type=3/10/12）一次用 N 张券
+                // 仍是 N 次单抽，numberOfExec>1 不构成十连。
+                const isTenDraw = command.execType === GACHA_EXEC_TYPES.VMONEY_MULTI
                     || command.execType === GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET
                     || command.execType === GACHA_EXEC_TYPES.MULTI_TICKET
                     || command.execType === GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET

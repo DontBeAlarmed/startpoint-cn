@@ -30,6 +30,8 @@
 | 联机 `/micro_community` | 返回空对象，不发布到外部社区 | 外部社区关闭；本地房间不依赖该入口 |
 | 联机 `/publish_room` | 返回 `success: false` | 客户端会读取该布尔值，不能用空对象伪造发布成功 |
 | 联机 `/share_room` | 仅房主可调用并返回空成功对象 | 客户端成功回调不读取业务字段；本地 room number 和随机 token 由房间模块维护 |
+| `/load`、`/gacha/exec`、battle finish 的 `mission_tips` 字段 | `/load` 固定 `mission_tips: false`；后两者不返回该字段，客户端解析为"无更新"并保持登录时的角标值 | 主页任务按钮红点由服务端策略驱动（官方语义：任务入口值得提示时亮红点）；未定义亮点条件前维持关闭（2026-10-29 裁定暂不实现） |
+| `/gacha/exec`、battle finish 的 `need_feedback` 字段 | 从不返回；客户端解析为 None，问卷/评分邀请弹窗永不出现 | 官方行为是弹"去评价"确认框，确认后走雷霆 SDK `tapComment`/`channelStore` 跳应用商店评分并回调 `feedback/finish`；私服环境无对应平台能力，维持不返回即等价官方 never-ask 政策（2026-10-29 裁定不实现） |
 
 ## 空响应但业务已执行
 
