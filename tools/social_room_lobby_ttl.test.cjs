@@ -106,11 +106,11 @@ test.after(async () => {
     }
 })
 
-const { upsertSharedFollowEdgeSync } = require("../src/data/domains/social-follow")
+const { upsertSharedFollowEdgeAsync } = require("../src/data/domains/social-follow")
 
 test("TTL 过期后房间从 get_rooms 消失（边界：恰等时刻不可见）", async () => {
-    upsertSharedFollowEdgeSync(host.viewerId, friend.viewerId, Date.now())
-    upsertSharedFollowEdgeSync(friend.viewerId, host.viewerId, Date.now())
+    await upsertSharedFollowEdgeAsync(host.viewerId, friend.viewerId, Date.now())
+    await upsertSharedFollowEdgeAsync(friend.viewerId, host.viewerId, Date.now())
 
     const created = await multiContext.coordinator.createRoom({
         requestId: `ttl-${Date.now()}`,

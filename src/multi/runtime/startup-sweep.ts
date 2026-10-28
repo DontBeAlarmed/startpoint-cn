@@ -27,11 +27,11 @@ export function purgeOrphanedSocialRowsForLocalAuthority(): void {
         console.log("[MULTI] startup sweep skipped: shared social db configured (multi-node)")
         return
     }
-    try {
-        closeAllOpenRecruitments()
-    } catch (error) {
+    // W1a：closeAllOpenRecruitments 为异步形状——try/catch 不接 async 拒绝，
+    // 同步上下文必须 void+catch 就地捕获（否则 unhandled rejection）
+    void closeAllOpenRecruitments().catch(error => {
         console.warn(`[MULTI] startup sweep: recruitment close failed: ${describeError(error)}`)
-    }
+    })
     try {
         const purged = purgeAllRoomShareRowsSync()
         console.log(`[MULTI] startup sweep: purged ${purged} orphaned room share row(s)`)

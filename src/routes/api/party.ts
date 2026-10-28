@@ -7,7 +7,7 @@ import { getPlayerItemsSync } from "../../data/domains/item"
 import { getPlayerPartyLoadoutSync, updatePlayerPartySync } from "../../data/domains/party"
 import { listOpenRecruitmentRoomNumbersForHost, updateOpenRecruitmentSnapshotForRoom } from "../../data/domains/attention"
 import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader"
-import { getCharactersEvolutionImgLevels } from "../../lib/character"
+import { safeEvolutionImgLevel } from "../../multi/safe-display-fields"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import { refreshMainPartyLeaderSync } from "../../lib/profile-favorite-party"
 import { getDb } from "../../data/db"
@@ -623,26 +623,6 @@ const routes = async (fastify: FastifyInstance) => {
             // 资料队长联动（官方语义：leader_character_id = 喜爱配队一号位，回退普通第一编队）。
             // 必须在编队 upsert 之后执行，读取的是本次请求写入后的编队行。
             refreshMainPartyLeaderSync(playerId, player.leaderCharacterId)
-            // 房内即时刷新：若该玩家正在开房招募，编队变更瞬间重建铃铛/好友大厅
-            // 横幅的房主快照（战斗所选编队一号位口径，与喜爱配队解耦）。尽力而为。
-            // 招募行 TTL 锚真实钟（R-15=B），查询须同域。
-            try {
-                const realNowMs = getRealNowMs()
-                const leaderId = resolveBattlePartyLeaderCharacterIdSync(
-                    playerId,
-                    player.partySlot,
-                    player.leaderCharacterId,
-                )
-                const evolutionLevel = getCharactersEvolutionImgLevels(playerId, [leaderId])[0] ?? 0
-                for (const roomNumber of listOpenRecruitmentRoomNumbersForHost(playerId, viewerId, realNowMs)) {
-                    updateOpenRecruitmentSnapshotForRoom(playerId, viewerId, roomNumber, realNowMs, {
-                        character: leaderId,
-                        evolutionImgLevel: evolutionLevel,
-                    })
-                }
-            } catch (error) {
-                console.warn("[PARTY] in-room bell snapshot refresh failed", error instanceof Error ? error.message : error)
-            }
             const activeMission = publishActiveMissionOwnerStateWithinTransaction({
                 playerId,
                 now: evaluationTime,
@@ -650,6 +630,28 @@ const routes = async (fastify: FastifyInstance) => {
             })
             return { settlements, activeMissionList: activeMission.activeMissionList }
         })()
+
+        // 房内即时刷新（W1a 移出事务：社交存储 W1b 起为异步 IO，不得进入
+        // SQLite 事务；尽力而为数据，编队行已随上面事务落库）。编队变更瞬间
+        // 重建铃铛/好友大厅横幅的房主快照（战斗所选编队一号位口径，与喜爱
+        // 配队解耦）。招募行 TTL 锚真实钟（R-15=B），查询须同域。
+        void (async () => {
+            const realNowMs = getRealNowMs()
+            const leaderId = resolveBattlePartyLeaderCharacterIdSync(
+                playerId,
+                player.partySlot,
+                player.leaderCharacterId,
+            )
+            const evolutionLevel = safeEvolutionImgLevel(playerId, leaderId)
+            for (const roomNumber of await listOpenRecruitmentRoomNumbersForHost(playerId, viewerId, realNowMs)) {
+                await updateOpenRecruitmentSnapshotForRoom(playerId, viewerId, roomNumber, realNowMs, {
+                    character: leaderId,
+                    evolutionImgLevel: evolutionLevel,
+                })
+            }
+        })().catch(error => {
+            console.warn("[PARTY] in-room bell snapshot refresh failed", error instanceof Error ? error.message : error)
+        })
 
         reply.header("content-type", "application/x-msgpack")
         const responseData: Record<string, unknown> = {

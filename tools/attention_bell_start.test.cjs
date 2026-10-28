@@ -48,9 +48,10 @@ const HOST_VIEWER = 9501
 const HOST_PID = 501
 const ROOM = "998877"
 const GUEST_VIEWER = 9500
-const nowMs = getServerTime() * 1000
+const nowMs = getServerTime() * 1000;
 
-const recruitment = getOrCreateRecruitmentForRoom({
+(async () => {
+const recruitment = await getOrCreateRecruitmentForRoom({
     hostPid: HOST_PID,
     hostViewerId: HOST_VIEWER,
     category: 1,
@@ -62,52 +63,58 @@ const recruitment = getOrCreateRecruitmentForRoom({
 })
 
 // guest 轮询 check 领票（惰性投递造有效投递行）
-const delivered = listUndeliveredOpenRecruitments(GUEST_VIEWER, nowMs + 1, 3)
-recordDeliveries(GUEST_VIEWER, delivered.map(bell => bell.id))
+const delivered = await listUndeliveredOpenRecruitments(GUEST_VIEWER, nowMs + 1, 3)
+await await recordDeliveries(GUEST_VIEWER, delivered.map(bell => bell.id))
 assert.equal(delivered.length, 1, "guest 轮询即收到本房铃铛")
 
 // null / 空 key → null
-assert.equal(resolveBellRecruitmentForStart(null, ROOM, HOST_VIEWER, GUEST_VIEWER), null)
+assert.equal(await resolveBellRecruitmentForStart(null, ROOM, HOST_VIEWER, GUEST_VIEWER), null)
 
 // 未知 key → null（防伪造）
-assert.equal(resolveBellRecruitmentForStart("attention_000000_1", ROOM, HOST_VIEWER, GUEST_VIEWER), null)
+assert.equal(await resolveBellRecruitmentForStart("attention_000000_1", ROOM, HOST_VIEWER, GUEST_VIEWER), null)
 
 // 有效 key + 投递行 + 房间/房主一致 → 招募
-const matched = resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, GUEST_VIEWER)
+const matched = await resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, GUEST_VIEWER)
 assert.ok(matched !== null)
 assert.equal(matched.id, recruitment.id)
 assert.equal(matched.isNewbieHost, true, "cond92 冻结来源必须是招募行的 is_newbie_host")
 
 // 无投递行的 viewer 持同一 key → null（T2：key 不可转借）
-assert.equal(resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, 9599), null,
+assert.equal(await resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, 9599), null,
     "无投递行的 key 是伪造票")
 
 // declined → 无票
-recordResponse(recruitment.id, GUEST_VIEWER, "declined", nowMs + 2)
-assert.equal(resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, GUEST_VIEWER), null,
+await await recordResponse(recruitment.id, GUEST_VIEWER, "declined", nowMs + 2)
+assert.equal(await resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, GUEST_VIEWER), null,
     "declined 拒绝过的不算有效门票")
 
 // 房间号不一致（拿 A 房 key 开 B 房）→ null
-assert.equal(resolveBellRecruitmentForStart(recruitment.attentionKey, "112233", HOST_VIEWER, GUEST_VIEWER), null)
+assert.equal(await resolveBellRecruitmentForStart(recruitment.attentionKey, "112233", HOST_VIEWER, GUEST_VIEWER), null)
 
 // 房主不一致（拿 A 房主的 key 加入 B 房主）→ null；B 房投递行持有者正常
-const otherHost = getOrCreateRecruitmentForRoom({
+const otherHost = await getOrCreateRecruitmentForRoom({
     hostPid: 502, hostViewerId: 9502, category: 1, questId: 1001001,
     roomNumber: "445566", isNewbieHost: false, establisherJson: "{}", nowMs,
 })
-assert.equal(resolveBellRecruitmentForStart(recruitment.attentionKey, "445566", 9502, GUEST_VIEWER), null)
+assert.equal(await resolveBellRecruitmentForStart(recruitment.attentionKey, "445566", 9502, GUEST_VIEWER), null)
 const otherGuest = 9503
-const otherDelivered = listUndeliveredOpenRecruitments(otherGuest, nowMs + 3, 3)
-recordDeliveries(otherGuest, otherDelivered.map(bell => bell.id))
+const otherDelivered = await listUndeliveredOpenRecruitments(otherGuest, nowMs + 3, 3)
+await await recordDeliveries(otherGuest, otherDelivered.map(bell => bell.id))
 assert.ok(otherDelivered.some(bell => bell.id === otherHost.id), "其他 guest 可领到 B 房铃铛")
 assert.ok(
-    resolveBellRecruitmentForStart(otherHost.attentionKey, "445566", 9502, otherGuest) !== null,
+    await resolveBellRecruitmentForStart(otherHost.attentionKey, "445566", 9502, otherGuest) !== null,
     "持 B 房投递行的 guest 正常进房",
 )
 
 // 关闭 → null
-closeRecruitmentForRoom(HOST_VIEWER, ROOM)
-assert.equal(resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, GUEST_VIEWER), null,
+await await closeRecruitmentForRoom(HOST_VIEWER, ROOM)
+assert.equal(await resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, GUEST_VIEWER), null,
     "已关闭招募不得作为铃铛进房依据")
+
+
+})().catch(error => {
+    console.error(error)
+    process.exitCode = 1
+})
 
 console.log("attention bell start: all assertions passed")

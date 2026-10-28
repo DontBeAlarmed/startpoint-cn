@@ -8,8 +8,8 @@ import { ensureSocialRoomSharesSchema } from "../social/social-room-shares-schem
  * 双形态（A2 同款）：配置 MULTI_SOCIAL_DB_PATH 走共享社交库（多节点可见），
  * 否则退主库。可见性位 OR-merge 在 SQL 层完成——share_type_list 的到达顺序
  * 不可控（[1] 与 15s 恒发的 [3] 交错），REPLACE 会静默收缩已公开的位。
- * 生命周期刷新（refreshRoomShareRow）对不存在的行是 no-op：未开放列表可见
- * 的房没有注册行，钩子静默跳过。
+ * 生命周期刷新（refreshRoomShareRowAsync）对不存在的行是 no-op：未开放列表可见
+ * 的房没有注册行，钩子静默跳过。W1a：API 异步形状；PG 后端 W1b。
  */
 
 export const SOCIAL_ROOM_SHARE_TTL_MS = (() => {
@@ -49,8 +49,9 @@ function roomSharesDatabase() {
     return main
 }
 
-/** 位掩码 OR-merge upsert（SQL 层保证已公开位永不收缩） */
-export function upsertRoomShareRowSync(input: RoomShareUpsertInput): void {
+/** 位掩码 OR-merge upsert（SQL 层保证已公开位永不收缩）。
+ * W1a 起异步形状（PG 后端 W1b 接入前提）；同步上下文写路径 fire-and-forget。 */
+export async function upsertRoomShareRowAsync(input: RoomShareUpsertInput): Promise<void> {
     const expiresAtMs = input.nowMs + SOCIAL_ROOM_SHARE_TTL_MS
     roomSharesDatabase().prepare(`
         INSERT INTO social_room_shares (
@@ -86,12 +87,12 @@ export function upsertRoomShareRowSync(input: RoomShareUpsertInput): void {
  * 生命周期刷新（raising_state/mates 变化钩子）：行不存在时 no-op；
  * 每次刷新同时续期 expires_at（长战斗+再战可超 TTL）。
  */
-export function refreshRoomShareRowSync(
+export async function refreshRoomShareRowAsync(
     roomNumber: string,
     raisingState: number,
     mates: number,
     nowMs: number,
-): void {
+): Promise<void> {
     try {
         roomSharesDatabase().prepare(`
             UPDATE social_room_shares
@@ -104,14 +105,14 @@ export function refreshRoomShareRowSync(
 }
 
 /** 解散/清理钩子：删除注册行（幂等） */
-/** 启动清扫：删除本地库全部注册行（仅本地权威启动态调用，见 startup-sweep.ts）。
- * 返回删除行数。 */
+/** 启动清扫（startup-sweep）用：全量清空注册行（主任务 dc565e25 新增，保留 Sync 形状） */
 export function purgeAllRoomShareRowsSync(): number {
     const result = getDb().prepare(`DELETE FROM social_room_shares`).run()
     return result.changes
 }
 
-export function deleteRoomShareRowSync(roomNumber: string): void {
+export async function deleteRoomShareRowAsync(roomNumber: string): Promise<void> {
+
     try {
         roomSharesDatabase().prepare(`
             DELETE FROM social_room_shares WHERE room_number = ?
@@ -122,7 +123,7 @@ export function deleteRoomShareRowSync(roomNumber: string): void {
 }
 
 /** get_rooms 数据源：同 category、未过期的注册行 */
-export function listActiveRoomSharesSync(categoryId: number, nowMs: number): readonly RoomShareRow[] {
+export async function listActiveRoomSharesAsync(categoryId: number, nowMs: number): Promise<readonly RoomShareRow[]> {
     return roomSharesDatabase().prepare(`
         SELECT room_number, host_viewer_id, category_id, quest_id, share_bits,
                raising_state, mates, establisher_json, expires_at_ms
@@ -133,7 +134,7 @@ export function listActiveRoomSharesSync(categoryId: number, nowMs: number): rea
 }
 
 /** 测试用：直接读单行 */
-export function getRoomShareRowSync(roomNumber: string): RoomShareRow | undefined {
+export async function getRoomShareRowAsync(roomNumber: string): Promise<RoomShareRow | undefined> {
     return roomSharesDatabase().prepare(`
         SELECT room_number, host_viewer_id, category_id, quest_id, share_bits,
                raising_state, mates, establisher_json, expires_at_ms

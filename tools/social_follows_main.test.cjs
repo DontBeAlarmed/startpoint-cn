@@ -31,7 +31,7 @@ const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const followRoutes = require("../src/routes/api/follow").default
 const {
-    getSharedFollowRelationSync,
+    getSharedFollowRelationAsync,
 } = require("../src/data/domains/social-follow")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 
@@ -102,27 +102,27 @@ test.after(async () => {
 test("add 端点双写主库 social_follows，delete 端点移除该行", async () => {
     const added = decode(await postFollow("add", { viewer_id: viewerA, follow_id: viewerB }))
     assert.equal(added.data_headers.result_code, 1)
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerB), "single")
-    assert.equal(getSharedFollowRelationSync(viewerB, viewerA), "single")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerB), "single")
+    assert.equal(await getSharedFollowRelationAsync(viewerB, viewerA), "single")
 
     const removed = decode(await postFollow("delete", { viewer_id: viewerA, follow_id: viewerB }))
     assert.equal(removed.data_headers.result_code, 1)
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerB), "none")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerB), "none")
 })
 
 test("互相关注后关系判定为 mutual，任一方向单向都算 single", async () => {
     await postFollow("add", { viewer_id: viewerA, follow_id: viewerB })
     await postFollow("add", { viewer_id: viewerB, follow_id: viewerA })
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerB), "mutual")
-    assert.equal(getSharedFollowRelationSync(viewerB, viewerA), "mutual")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerB), "mutual")
+    assert.equal(await getSharedFollowRelationAsync(viewerB, viewerA), "mutual")
 
     await postFollow("delete", { viewer_id: viewerB, follow_id: viewerA })
     // A→B 仍在：B 视角（作为 follower 方向的反查）也满足 single
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerB), "single")
-    assert.equal(getSharedFollowRelationSync(viewerB, viewerA), "single")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerB), "single")
+    assert.equal(await getSharedFollowRelationAsync(viewerB, viewerA), "single")
 
     await postFollow("delete_followed", { viewer_id: viewerB, followed_id: viewerA })
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerB), "none")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerB), "none")
 })
 
 test("bulk_edit 按原始 viewer id 列表镜像增删", async () => {
@@ -132,8 +132,8 @@ test("bulk_edit 按原始 viewer id 列表镜像增删", async () => {
         delete_follow_id_list: [],
     }))
     assert.equal(bulk.data_headers.result_code, 1)
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerB), "single")
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerC), "single")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerB), "single")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerC), "single")
 
     const bulk2 = decode(await postFollow("bulk_edit", {
         viewer_id: viewerA,
@@ -141,14 +141,14 @@ test("bulk_edit 按原始 viewer id 列表镜像增删", async () => {
         delete_follow_id_list: [viewerC],
     }))
     assert.equal(bulk2.data_headers.result_code, 1)
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerC), "none")
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerB), "single")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerC), "none")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerB), "single")
 })
 
 test("自关注不产生共享边", async () => {
     const selfAdd = decode(await postFollow("add", { viewer_id: viewerA, follow_id: viewerA }))
     assert.equal(selfAdd.data_headers.result_code, 1)
-    assert.equal(getSharedFollowRelationSync(viewerA, viewerA), "none")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, viewerA), "none")
 })
 
 test("add 未知目标（400 路径）不触碰共享表", async () => {
@@ -160,5 +160,5 @@ test("add 未知目标（400 路径）不触碰共享表", async () => {
         payload: pack({ viewer_id: viewerA, follow_id: 740999999 }).toString("base64"),
     })
     assert.equal(unknown.statusCode, 400)
-    assert.equal(getSharedFollowRelationSync(viewerA, 740999999), "none")
+    assert.equal(await getSharedFollowRelationAsync(viewerA, 740999999), "none")
 })

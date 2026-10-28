@@ -205,7 +205,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         try {
             const settings = getServerGameplaySettingsSync();
             const recruitment = settings.multiRandomRecruitmentPublishEnabled && settings.multiNpcReleaseSeconds > 0
-                ? findOpenRecruitmentForRoom(viewerId, body.room_number, nowMs)
+                ? await findOpenRecruitmentForRoom(viewerId, body.room_number, nowMs)
                 : null;
             serveCandidates = resolveSummonServeCandidates({
                 publishEnabled: settings.multiRandomRecruitmentPublishEnabled,
@@ -401,7 +401,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                     hostContext.player.partySlot,
                     hostContext.player.leaderCharacterId,
                 );
-                const recruitment = getOrCreateRecruitmentForRoom({
+                const recruitment = await getOrCreateRecruitmentForRoom({
                     hostPid: hostContext.playerId,
                     hostViewerId: viewerId,
                     category: room.value.category,
@@ -422,7 +422,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                     nowMs: getRealNowMs(), // R-15=B
                 });
                 console.log(`[MULTI] share_room ${recruitment.created ? "created" : "refreshed"} key=${recruitment.attentionKey}`);
-                pruneExpiredRecruitments(getRealNowMs()); // R-15=B
+                await pruneExpiredRecruitments(getRealNowMs()); // R-15=B
                 // 私服混合：发布后挂服务端 NPC 释放点（W>0 时启用；回调内惰性重读配置）
                 scheduleNpcRelease(body.room_number);
             } catch (error) {
@@ -458,8 +458,9 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         console.log(result.ok ? "[MULTI] room disbanded" : "[MULTI] room already absent");
         if (result.ok) {
             // 尽力而为的铃铛卫生操作：绝不能让招募关闭失败破坏解散主流程
+            // （W1a：异步形状——async handler 内 await，try/catch 有效）
             try {
-                closeRecruitmentForRoom(viewerId, body.room_number);
+                await closeRecruitmentForRoom(viewerId, body.room_number);
             } catch (error) {
                 console.warn("[MULTI] close recruitment on disband failed", describeError(error));
             }

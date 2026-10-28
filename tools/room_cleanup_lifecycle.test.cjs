@@ -246,8 +246,8 @@ test("room number exhaustion fails without consuming or mutating room state", t 
     assert.equal(disbandRoom(next.room_number), true)
 })
 
+test("room disband closes the room's open recruitment rows (N4/F5; timer path funnels the same disbandRoom)", async t => {
 
-test("room disband closes the room's open recruitment rows (N4/F5; timer path funnels the same disbandRoom)", t => {
     // F5：计时器解散此前只删注册行，招募行留 open → 死房铃铛（bell-gate 对
     // 本节点缺房放行）最长存活到 45s TTL。解散监听器必须一并关行。
     // 计时器路径经 cleanExpiredRooms → disbandRoom → 监听器，与本测试同一
@@ -287,7 +287,7 @@ test("room disband closes the room's open recruitment rows (N4/F5; timer path fu
         false,
         { nodeSessionId: "embedded", viewerId: hostViewerId },
     )
-    const recruitment = getOrCreateRecruitmentForRoom({
+    const recruitment = await getOrCreateRecruitmentForRoom({
         hostPid: hostViewerId + 1000,
         hostViewerId,
         category: 1,
@@ -298,7 +298,7 @@ test("room disband closes the room's open recruitment rows (N4/F5; timer path fu
         nowMs: getRealNowMs(),
     })
     assert.equal(
-        findOpenRecruitmentForRoom(hostViewerId, room.room_number, getRealNowMs())?.id,
+        (await findOpenRecruitmentForRoom(hostViewerId, room.room_number, getRealNowMs()))?.id,
         recruitment.id,
         "前置：招募行 open",
     )
@@ -306,7 +306,7 @@ test("room disband closes the room's open recruitment rows (N4/F5; timer path fu
     assert.equal(disbandRoom(room.room_number), true)
 
     assert.equal(
-        findOpenRecruitmentForRoom(hostViewerId, room.room_number, getRealNowMs()),
+        await await findOpenRecruitmentForRoom(hostViewerId, room.room_number, getRealNowMs()),
         null,
         "解散后招募行必须关闭",
     )

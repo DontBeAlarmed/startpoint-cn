@@ -120,7 +120,7 @@ async function main() {
     })).statusCode, 400, "无会话 viewer 必须拒绝")
 
     // ---- 房主开招募（share_room 接线的域层落点） ----
-    const recruitment = getOrCreateRecruitmentForRoom({
+    const recruitment = await getOrCreateRecruitmentForRoom({
         hostPid: host.playerId,
         hostViewerId: host.viewerId,
         category: 1,
@@ -181,7 +181,7 @@ async function main() {
         "快照捕获的进化等级必须原样下发（硬编码 0 = 铃铛弹框头像恒为初始皮肤）")
 
     // ---- check 轮询即 presence 上报 ----
-    assert.equal(isPresenceOnline(guest.viewerId), true, "check 轮询必须 touch presence")
+    assert.equal(await isPresenceOnline(guest.viewerId), true, "check 轮询必须 touch presence")
 
     // ---- 互关后房主开第二条招募：新投递携带 establisher_follow=1（与房间 join 路径同源） ----
     addLocalFollowSync({
@@ -189,7 +189,7 @@ async function main() {
         targetPlayerId: guest.playerId,
         followedAtMs: Date.now(),
     })
-    const secondRecruitment = getOrCreateRecruitmentForRoom({
+    const secondRecruitment = await getOrCreateRecruitmentForRoom({
         hostPid: host.playerId,
         hostViewerId: host.viewerId,
         category: 1,
@@ -398,7 +398,7 @@ async function main() {
         boundaryHost.viewerId, boundaryHost.playerId, 1, 1, 1001001, 0, 341005,
     )
     const realNow = Date.now()
-    const expiredRecruitment = getOrCreateRecruitmentForRoom({
+    const expiredRecruitment = await getOrCreateRecruitmentForRoom({
         hostPid: boundaryHost.playerId,
         hostViewerId: boundaryHost.viewerId,
         category: 1,
@@ -429,7 +429,7 @@ async function main() {
         )
 
         // 阳性对照：同偏移下新建未过期（真实钟）行必须可投递——证明阴性结果是过期语义而非管线断裂
-        const liveRecruitment = getOrCreateRecruitmentForRoom({
+        const liveRecruitment = await getOrCreateRecruitmentForRoom({
             hostPid: boundaryHost.playerId,
             hostViewerId: boundaryHost.viewerId,
             category: 1,

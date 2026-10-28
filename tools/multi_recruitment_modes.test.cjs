@@ -52,9 +52,9 @@ const { resolveBellRecruitmentForStart } = require("../src/multi/http/battle")
 const { listUndeliveredOpenRecruitments, recordDeliveries } = require("../src/data/domains/attention")
 
 // 模拟一次 guest 轮询：取候选 + 记帐真下发行（两步契约，与 check 路由同构）
-function pollBells(viewer, atMs, limit = 3) {
-    const bells = listUndeliveredOpenRecruitments(viewer, atMs, limit)
-    recordDeliveries(viewer, bells.map(bell => bell.id))
+async function pollBells(viewer, atMs, limit = 3) {
+    const bells = await listUndeliveredOpenRecruitments(viewer, atMs, limit)
+    await await recordDeliveries(viewer, bells.map(bell => bell.id))
     return bells
 }
 
@@ -62,8 +62,8 @@ const HOST_VIEWER = 9701
 const ROOM = "135790"
 const nowMs = Date.now()
 
-function shareRoom(overrides = {}) {
-    return getOrCreateRecruitmentForRoom({
+async function shareRoom(overrides = {}) {
+    return await await getOrCreateRecruitmentForRoom({
         hostPid: 701,
         hostViewerId: HOST_VIEWER,
         category: 1,
@@ -76,6 +76,7 @@ function shareRoom(overrides = {}) {
     })
 }
 
+(async () => {
 // ---- 设置域：默认值 = NPC 快速预设 ----
 {
     const settings = getServerGameplaySettingsSync()
@@ -127,27 +128,27 @@ function shareRoom(overrides = {}) {
 {
     db.prepare("DELETE FROM attention_recruitments").run()
     db.prepare("DELETE FROM attention_deliveries").run()
-    const recruitment = shareRoom()
+    const recruitment = await shareRoom()
 
-    const found = findOpenRecruitmentForRoom(HOST_VIEWER, ROOM, nowMs)
+    const found = await findOpenRecruitmentForRoom(HOST_VIEWER, ROOM, nowMs)
     assert.ok(found !== null && found.id === recruitment.id)
 
-    assert.equal(findOpenRecruitmentForRoom(9999, ROOM, nowMs), null, "他人房间不命中")
-    assert.equal(findOpenRecruitmentForRoom(HOST_VIEWER, "000000", nowMs), null)
+    assert.equal(await findOpenRecruitmentForRoom(9999, ROOM, nowMs), null, "他人房间不命中")
+    assert.equal(await findOpenRecruitmentForRoom(HOST_VIEWER, "000000", nowMs), null)
 
     // 过期 → null
     db.prepare("UPDATE attention_recruitments SET expires_at_ms = ? WHERE id = ?")
         .run(nowMs - 1, recruitment.id)
-    assert.equal(findOpenRecruitmentForRoom(HOST_VIEWER, ROOM, nowMs), null, "过期行不命中")
+    assert.equal(await findOpenRecruitmentForRoom(HOST_VIEWER, ROOM, nowMs), null, "过期行不命中")
 
     // 关闭 → null
     db.prepare("UPDATE attention_recruitments SET expires_at_ms = ?, status = 'closed' WHERE id = ?")
         .run(nowMs + 1000, recruitment.id)
-    assert.equal(findOpenRecruitmentForRoom(HOST_VIEWER, ROOM, nowMs), null, "关闭行不命中")
+    assert.equal(await findOpenRecruitmentForRoom(HOST_VIEWER, ROOM, nowMs), null, "关闭行不命中")
 
     // closeAllOpenRecruitments
-    const a = shareRoom({ roomNumber: "246801", nowMs: nowMs + 1 })
-    const b = shareRoom({ hostViewerId: 9702, hostPid: 702, roomNumber: "246802", nowMs: nowMs + 1 })
+    const a = await shareRoom({ roomNumber: "246801", nowMs: nowMs + 1 })
+    const b = await shareRoom({ hostViewerId: 9702, hostPid: 702, roomNumber: "246802", nowMs: nowMs + 1 })
     closeAllOpenRecruitments()
     for (const id of [a.id, b.id, recruitment.id]) {
         assert.equal(
@@ -159,29 +160,29 @@ function shareRoom(overrides = {}) {
     // hasActiveDelivery：delivered/accepted 持票，declined/缺失无票
     db.prepare("UPDATE attention_recruitments SET status = 'open' WHERE id = ?").run(a.id)
     const guest = 9800
-    const bells = pollBells(guest, nowMs + 2)
+    const bells = await pollBells(guest, nowMs + 2)
     assert.equal(bells.length, 1)
-    assert.equal(hasActiveDelivery(a.id, guest), true, "delivered 持票")
-    assert.equal(hasActiveDelivery(a.id, 9999), false, "无投递行无票")
+    assert.equal(await hasActiveDelivery(a.id, guest), true, "delivered 持票")
+    assert.equal(await hasActiveDelivery(a.id, 9999), false, "无投递行无票")
     const { recordResponse } = require("../src/data/domains/attention")
-    recordResponse(a.id, guest, "accepted", nowMs + 3)
-    assert.equal(hasActiveDelivery(a.id, guest), true, "accepted 仍持票")
+    await await recordResponse(a.id, guest, "accepted", nowMs + 3)
+    assert.equal(await hasActiveDelivery(a.id, guest), true, "accepted 仍持票")
     // declined 需从 delivered 转移——accepted 行是单向终态，不能降级（设计语义）
-    const c = shareRoom({ hostViewerId: 9703, hostPid: 703, roomNumber: "246803", nowMs: nowMs + 4 })
+    const c = await shareRoom({ hostViewerId: 9703, hostPid: 703, roomNumber: "246803", nowMs: nowMs + 4 })
     const guestC = 9801
-    pollBells(guestC, nowMs + 5)
-    recordResponse(c.id, guestC, "declined", nowMs + 6)
-    assert.equal(hasActiveDelivery(c.id, guestC), false, "declined 无票")
+    await pollBells(guestC, nowMs + 5)
+    await await recordResponse(c.id, guestC, "declined", nowMs + 6)
+    assert.equal(await hasActiveDelivery(c.id, guestC), false, "declined 无票")
 }
 
 // ---- 过期复活修复：过期行重发 = 全新行（新 key/新 posted_at） ----
 {
     db.prepare("DELETE FROM attention_recruitments").run()
     db.prepare("DELETE FROM attention_deliveries").run()
-    const first = shareRoom({ nowMs })
+    const first = await shareRoom({ nowMs })
     db.prepare("UPDATE attention_recruitments SET expires_at_ms = ? WHERE id = ?")
         .run(nowMs - 1, first.id)
-    const revived = shareRoom({ nowMs: nowMs + 1000 })
+    const revived = await shareRoom({ nowMs: nowMs + 1000 })
     assert.equal(revived.created, true, "过期行重发必须创建新行")
     assert.notEqual(revived.id, first.id)
     assert.notEqual(revived.attentionKey, first.attentionKey, "复活不得复用旧 key")
@@ -195,22 +196,22 @@ function shareRoom(overrides = {}) {
     db.prepare("DELETE FROM attention_deliveries").run()
     // 三个不同房主的招募（同一房主同房间只会有一行）
     for (let i = 0; i < 3; i++) {
-        shareRoom({ hostViewerId: 9750 + i, hostPid: 750 + i, roomNumber: `2469${i}1` })
+        await shareRoom({ hostViewerId: 9750 + i, hostPid: 750 + i, roomNumber: `2469${i}1` })
     }
     const guestF = 9820
 
     // 候选读取是纯读：不写投递行，反复读取结果恒定
-    const first = listUndeliveredOpenRecruitments(guestF, nowMs + 1, 9)
+    const first = await listUndeliveredOpenRecruitments(guestF, nowMs + 1, 9)
     assert.equal(first.length, 3)
-    const again = listUndeliveredOpenRecruitments(guestF, nowMs + 1, 9)
+    const again = await listUndeliveredOpenRecruitments(guestF, nowMs + 1, 9)
     assert.equal(again.length, 3, "候选读取不得消耗投递机会（F4）")
 
     // 模拟 check 路由：T1 过滤 + top-N 截取后只记帐真下发的子集
     // （此处以"只取第 1 行"模拟其余两行被过滤/截取）
     const delivered = first.slice(0, 1)
-    recordDeliveries(guestF, delivered.map(bell => bell.id))
+    await await recordDeliveries(guestF, delivered.map(bell => bell.id))
 
-    const second = listUndeliveredOpenRecruitments(guestF, nowMs + 2, 9)
+    const second = await listUndeliveredOpenRecruitments(guestF, nowMs + 2, 9)
     assert.equal(second.length, 2, "落选行在后续轮询仍可送达")
     assert.equal(
         second.some(bell => bell.id === delivered[0].id),
@@ -245,31 +246,36 @@ function shareRoom(overrides = {}) {
 {
     db.prepare("DELETE FROM attention_recruitments").run()
     db.prepare("DELETE FROM attention_deliveries").run()
-    const recruitment = shareRoom({ nowMs })
+    const recruitment = await shareRoom({ nowMs })
     const guest = 9810
     assert.equal(
-        resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, guest),
+        await resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, guest),
         null,
         "无投递行的 key 是伪造票",
     )
-    pollBells(guest, nowMs + 1)
-    const matched = resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, guest)
+    await pollBells(guest, nowMs + 1)
+    const matched = await resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, guest)
     assert.ok(matched !== null && matched.id === recruitment.id, "delivered 持票进房")
     const { recordResponse } = require("../src/data/domains/attention")
-    recordResponse(recruitment.id, guest, "declined", nowMs + 2)
+    await await recordResponse(recruitment.id, guest, "declined", nowMs + 2)
     assert.equal(
-        resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, guest),
+        await resolveBellRecruitmentForStart(recruitment.attentionKey, ROOM, HOST_VIEWER, guest),
         null,
         "declined 无票",
     )
     assert.equal(
-        resolveBellRecruitmentForStart(recruitment.attentionKey, "999999", HOST_VIEWER, guest),
+        await resolveBellRecruitmentForStart(recruitment.attentionKey, "999999", HOST_VIEWER, guest),
         null,
         "跨房间拒绝（既有语义不变）",
     )
 }
 
 // ---- web_api PATCH：多字段原子保存 / 未知字段拒绝 / W 运行时校验 / 清扫 ----
+})().catch(error => {
+    console.error(error)
+    process.exitCode = 1
+})
+
 async function main() {
     const fastify = Fastify({ logger: false })
     const { default: settingsApiPlugin } = require("../src/routes/web_api/settings")
@@ -310,7 +316,7 @@ async function main() {
         delete process.env.MULTI_ROOM_INCOMPLETE_EXPIRY_MS
 
         // 清扫：publish on→off 真转换关闭全部 open 招募；off→off 不触发（本就无行）
-        shareRoom({ nowMs: Date.now(), roomNumber: "555001" })
+        await shareRoom({ nowMs: Date.now(), roomNumber: "555001" })
         assert.equal(
             db.prepare("SELECT COUNT(*) AS n FROM attention_recruitments WHERE status = 'open'").get().n,
             1,
@@ -330,7 +336,7 @@ async function main() {
             dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
             multiRandomRecruitmentPublishEnabled: true,
         })
-        shareRoom({ nowMs: Date.now(), roomNumber: "555002" })
+        await shareRoom({ nowMs: Date.now(), roomNumber: "555002" })
         const onAgain = await patch({ multiRandomRecruitmentPublishEnabled: true })
         assert.equal(onAgain.statusCode, 200)
         assert.equal(

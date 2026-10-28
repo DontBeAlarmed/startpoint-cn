@@ -37,8 +37,8 @@ const {
     findOpenRecruitmentForRoom,
 } = require("../src/data/domains/attention")
 const {
-    upsertRoomShareRowSync,
-    getRoomShareRowSync,
+    upsertRoomShareRowAsync,
+    getRoomShareRowAsync,
 } = require("../src/data/domains/social-room-shares")
 const { purgeOrphanedSocialRowsForLocalAuthority } = require("../src/multi/runtime/startup-sweep")
 const { createRoom, listActiveRooms } = require("../src/multi/room/manager")
@@ -46,8 +46,8 @@ const { createRoom, listActiveRooms } = require("../src/multi/room/manager")
 const HOST = 64201
 const nowMs = Date.now()
 
-function seedRows(roomNumber) {
-    upsertRoomShareRowSync({
+async function seedRows(roomNumber) {
+    await upsertRoomShareRowAsync({
         roomNumber,
         hostViewerId: HOST,
         categoryId: 1,
@@ -71,16 +71,17 @@ function seedRows(roomNumber) {
     })
 }
 
+(async () => {
 // ---- 启动态（无存活房间）：孤儿行全部清除 ----
 {
-    seedRows("642101")
-    assert.ok(getRoomShareRowSync("642101"), "前置：注册行存在")
-    assert.ok(findOpenRecruitmentForRoom(HOST, "642101", nowMs), "前置：招募行 open")
+    await seedRows("642101")
+    assert.ok(await getRoomShareRowAsync("642101"), "前置：注册行存在")
+    assert.ok(await findOpenRecruitmentForRoom(HOST, "642101", nowMs), "前置：招募行 open")
 
     purgeOrphanedSocialRowsForLocalAuthority()
 
-    assert.equal(getRoomShareRowSync("642101"), undefined, "孤儿注册行已清除")
-    assert.equal(findOpenRecruitmentForRoom(HOST, "642101", nowMs), null, "孤儿招募行已关闭")
+    assert.equal(await getRoomShareRowAsync("642101"), undefined, "孤儿注册行已清除")
+    assert.equal(await findOpenRecruitmentForRoom(HOST, "642101", nowMs), null, "孤儿招募行已关闭")
 }
 
 // ---- 存活房间在场（非启动态）：跳过清扫，绝不碰活数据 ----
@@ -90,19 +91,19 @@ function seedRows(roomNumber) {
         false,
         { nodeSessionId: "embedded", viewerId: HOST },
     )
-    seedRows(room.room_number)
+    await seedRows(room.room_number)
     assert.ok(listActiveRooms().length > 0, "前置：内存房间存活")
 
     purgeOrphanedSocialRowsForLocalAuthority()
 
-    assert.ok(getRoomShareRowSync(room.room_number), "存活房间的注册行保留")
-    assert.ok(findOpenRecruitmentForRoom(HOST, room.room_number, nowMs), "存活房间的招募行保留")
+    assert.ok(await getRoomShareRowAsync(room.room_number), "存活房间的注册行保留")
+    assert.ok(await findOpenRecruitmentForRoom(HOST, room.room_number, nowMs), "存活房间的招募行保留")
 
     // disband 清行走解散监听器（生产由 runtime service 安装；测试显式装）
     const { installDisbandLifecycleListener } = require("../src/multi/room/disband-listener")
     installDisbandLifecycleListener()
     require("../src/multi/room/manager").disbandRoom(room.room_number)
-    assert.equal(getRoomShareRowSync(room.room_number), undefined, "收尾：disband 钩子清行")
+    assert.equal(await getRoomShareRowAsync(room.room_number), undefined, "收尾：disband 钩子清行")
     require("../src/multi/room/manager").setRoomDisbandListener(null)
 }
 
@@ -110,10 +111,10 @@ function seedRows(roomNumber) {
 {
     process.env.MULTI_SOCIAL_DB_PATH = path.join(databaseDirectory, "shared-social.db")
     try {
-        seedRows("642103")
+        await seedRows("642103")
         purgeOrphanedSocialRowsForLocalAuthority()
         // 配置共享库后行写入共享文件；清扫必须跳过（行仍在）
-        assert.ok(getRoomShareRowSync("642103"), "共享库模式不清扫")
+        assert.ok(await getRoomShareRowAsync("642103"), "共享库模式不清扫")
     } finally {
         if (previousSocialDbPath === undefined) delete process.env.MULTI_SOCIAL_DB_PATH
         else process.env.MULTI_SOCIAL_DB_PATH = previousSocialDbPath
@@ -121,3 +122,8 @@ function seedRows(roomNumber) {
 }
 
 console.log("startup sweep: all assertions passed")
+
+})().catch(error => {
+    console.error(error)
+    process.exitCode = 1
+})

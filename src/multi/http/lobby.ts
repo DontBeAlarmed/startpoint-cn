@@ -11,8 +11,8 @@ import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
 import { isQuestJoinAllowed } from "../../lib/quest-join-gate"
 import { getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
 import { issueRoomAdmission } from "./room-admission"
-import { listActiveRoomSharesSync } from "../../data/domains/social-room-shares"
-import { getSharedFollowRelationSync } from "../../data/domains/social-follow"
+import { listActiveRoomSharesAsync } from "../../data/domains/social-room-shares"
+import { getSharedFollowRelationAsync } from "../../data/domains/social-follow"
 import { parseEstablisherSnapshot } from "../../data/domains/attention"
 import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader"
 import { projectLobbyRaisingState } from "../room/lobby-projection"
@@ -30,7 +30,7 @@ function isPositiveSafeInteger(value: number): boolean {
  * 是 F0-F4 契约，不用于本过滤——可见性是房主的访问控制意图，投影会让
  * 互关房退化成全服房。bit3（随机招募）只走铃铛，注册表位掩码里本来就不含。
  */
-function buildFriendRoomLobby(viewerId: number, categoryId: number): Record<string, unknown>[] {
+async function buildFriendRoomLobby(viewerId: number, categoryId: number): Promise<Record<string, unknown>[]> {
     if (!Number.isSafeInteger(categoryId)) return []
     // F-06：共享注册行 TTL（expires_at）写侧锚真实钟，读侧同域——虚拟钟会恒判未过期
     const nowMs = getRealNowMs()
@@ -48,13 +48,13 @@ function buildFriendRoomLobby(viewerId: number, categoryId: number): Record<stri
         establisher_json: string
     }[] = []
     try {
-        rows = listActiveRoomSharesSync(categoryId, nowMs)
+        rows = await listActiveRoomSharesAsync(categoryId, nowMs)
     } catch (error) {
         console.warn("[LOBBY] friend room registry unavailable, returning empty list", describeError(error))
         return rooms
     }
     for (const row of rows) {
-        const relation = getSharedFollowRelationSync(viewerId, row.host_viewer_id)
+        const relation = await getSharedFollowRelationAsync(viewerId, row.host_viewer_id)
         const visible = ((row.share_bits & 1) !== 0 && relation === "mutual")
             || ((row.share_bits & 2) !== 0 && relation !== "none")
         if (!visible) continue
@@ -108,7 +108,7 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "rooms": buildFriendRoomLobby(viewerId, body.category_id) }
+            "data": { "rooms": await buildFriendRoomLobby(viewerId, body.category_id) }
         })
     })
 

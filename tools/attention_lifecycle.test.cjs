@@ -49,15 +49,15 @@ const ROOM = "123456"
 let nowMs = 1_000_000
 
 // 两步投递契约的"轮询"原语：取候选 + 记帐真下发行（与 check 路由同构）
-function poll(viewer, atMs = nowMs, limit = 3) {
-    const bells = listUndeliveredOpenRecruitments(viewer, atMs, limit)
-    recordDeliveries(viewer, bells.map(bell => bell.id))
+async function poll(viewer, atMs = nowMs, limit = 3) {
+    const bells = await listUndeliveredOpenRecruitments(viewer, atMs, limit)
+    await recordDeliveries(viewer, bells.map(bell => bell.id))
     return bells
 }
 
+async function share(input = {}) {
+    return await getOrCreateRecruitmentForRoom({
 
-function share(input = {}) {
-    return getOrCreateRecruitmentForRoom({
         hostPid: HOST_PID,
         hostViewerId: HOST_VIEWER,
         category: 1,
@@ -74,9 +74,17 @@ function share(input = {}) {
     })
 }
 
+// W0 两步契约的域级等价调用：域层不做 T1 过滤——列出即投递（保持原测试语义）
+async function deliverAll(viewer, atMs, limit) {
+    const bells = await listUndeliveredOpenRecruitments(viewer, atMs, limit)
+    await recordDeliveries(viewer, bells.map(bell => bell.id))
+    return bells
+}
+
+(async () => {
 // ---- get-or-create：同 (房主, 房间) 恒定 key，重发只刷新 ----
 {
-    const first = share()
+    const first = await share()
     assert.equal(first.created, true)
     assert.match(first.attentionKey, /^attention_\d{6}_9001$/)
 
@@ -84,7 +92,7 @@ function share(input = {}) {
         "SELECT expires_at_ms FROM attention_recruitments WHERE id = ?"
     ).get(first.id).expires_at_ms
     nowMs += 15_000
-    const second = share({ isNewbieHost: false, establisherJson: buildEstablisherSnapshot({ character: 2, rankLevel: 7, hostEntryTime: 999 }) })
+    const second = await share({ isNewbieHost: false, establisherJson: buildEstablisherSnapshot({ character: 2, rankLevel: 7, hostEntryTime: 999 }) })
     assert.equal(second.created, false, "重发不得创建新招募")
     assert.equal(second.attentionKey, first.attentionKey, "重发不得更换 attention_key")
     const row = db.prepare("SELECT * FROM attention_recruitments WHERE id = ?").get(first.id)
@@ -93,16 +101,16 @@ function share(input = {}) {
     assert.equal(JSON.parse(row.establisher_json).rankLevel, 7, "重发刷新房主快照")
 
     // 不同房间 → 不同招募行
-    const otherRoom = share({ roomNumber: "654321" })
+    const otherRoom = await share({ roomNumber: "654321" })
     assert.equal(otherRoom.created, true)
     assert.notEqual(otherRoom.attentionKey, first.attentionKey)
-    closeRecruitmentForRoom(HOST_VIEWER, "654321")
+    await closeRecruitmentForRoom(HOST_VIEWER, "654321")
 }
 
 // ---- 读时惰性投递 ----
 {
     const viewerB = 9002
-    const bells = poll(viewerB, nowMs)
+    const bells = await poll(viewerB, nowMs)
     assert.equal(bells.length, 1)
     assert.equal(bells[0].roomNumber, ROOM)
     assert.equal(bells[0].isNewbieHost, false, "投递携带最新冻结标记")
@@ -116,27 +124,27 @@ function share(input = {}) {
 
     // 再次轮询：不再重投（客户端 receive 按空槽插入、不按 key 去重——
     // 重投已投递条目会在弹框里堆叠同一房间的多个铃铛）
-    const again = poll(viewerB, nowMs)
+    const again = await poll(viewerB, nowMs)
     assert.equal(again.length, 0, "已投递的铃铛不得重投")
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries WHERE viewer_id = ?").get(viewerB).n, 1)
 
     // 房主看不见自己的招募
-    assert.equal(poll(HOST_VIEWER, nowMs).length, 0)
+    assert.equal((await poll(HOST_VIEWER, nowMs)).length, 0)
 
     // 接受后不再出现在铃铛列表
-    recordResponse(bells[0].id, viewerB, "accepted", nowMs + 1)
-    assert.equal(poll(viewerB, nowMs + 2).length, 0, "accepted 必须收敛")
+    await recordResponse(bells[0].id, viewerB, "accepted", nowMs + 1)
+    assert.equal((await poll(viewerB, nowMs + 2)).length, 0, "accepted 必须收敛")
 }
 
 // ---- recordResponse 单向转移（仅 delivered 可变） ----
 {
     const viewerC = 9003
-    share()
-    const bells = poll(viewerC, nowMs)
+    await share()
+    const bells = await poll(viewerC, nowMs)
     assert.equal(bells.length, 1)
     const recruitmentId = bells[0].id
 
-    recordResponse(recruitmentId, viewerC, "declined", 5_555)
+    await recordResponse(recruitmentId, viewerC, "declined", 5_555)
     const declined = db.prepare(
         "SELECT * FROM attention_deliveries WHERE recruitment_id = ? AND viewer_id = ?"
     ).get(recruitmentId, viewerC)
@@ -144,11 +152,11 @@ function share(input = {}) {
     assert.equal(declined.acted_at_ms, 5_555)
 
     // 拒绝后不复发：再次轮询不得重新投递已 declined 的招募
-    assert.equal(poll(viewerC, nowMs).length, 0,
+    assert.equal((await poll(viewerC, nowMs)).length, 0,
         "declined 必须收敛（不得重新投递）")
 
     // 对已响应状态重复写必须 no-op（不降级、不刷新 acted_at）
-    recordResponse(recruitmentId, viewerC, "accepted", 7_777)
+    await recordResponse(recruitmentId, viewerC, "accepted", 7_777)
     const still = db.prepare(
         "SELECT * FROM attention_deliveries WHERE recruitment_id = ? AND viewer_id = ?"
     ).get(recruitmentId, viewerC)
@@ -158,22 +166,22 @@ function share(input = {}) {
 
 // ---- findOpenRecruitmentByKey：accept 路径解析 + 防伪 ----
 {
-    const fresh = share({ roomNumber: "222333" })
-    const found = findOpenRecruitmentByKey(fresh.attentionKey, nowMs)
+    const fresh = await share({ roomNumber: "222333" })
+    const found = await findOpenRecruitmentByKey(fresh.attentionKey, nowMs)
     assert.ok(found !== null)
     assert.equal(found.roomNumber, "222333")
     assert.equal(found.hostViewerId, HOST_VIEWER)
 
-    assert.equal(findOpenRecruitmentByKey("attention_000000_1", nowMs), null, "未知 key 必须拒绝")
+    assert.equal(await findOpenRecruitmentByKey("attention_000000_1", nowMs), null, "未知 key 必须拒绝")
 
     // 过期后失效
-    const expired = findOpenRecruitmentByKey(fresh.attentionKey, nowMs + getRecruitmentLifetimeMs() + 1)
+    const expired = await findOpenRecruitmentByKey(fresh.attentionKey, nowMs + getRecruitmentLifetimeMs() + 1)
     assert.equal(expired, null, "过期招募不得被 accept")
 
     // 关闭后失效
-    const fresh2 = share({ roomNumber: "333444" })
-    closeRecruitmentForRoom(HOST_VIEWER, "333444")
-    assert.equal(findOpenRecruitmentByKey(fresh2.attentionKey, nowMs), null, "关闭招募不得被 accept")
+    const fresh2 = await share({ roomNumber: "333444" })
+    await closeRecruitmentForRoom(HOST_VIEWER, "333444")
+    assert.equal(await findOpenRecruitmentByKey(fresh2.attentionKey, nowMs), null, "关闭招募不得被 accept")
 }
 
 // ---- limit（return_attention_max_num）与多房主并存 ----
@@ -182,7 +190,7 @@ function share(input = {}) {
     db.prepare("DELETE FROM attention_deliveries").run()
     const viewer = 9010
     for (let i = 0; i < 5; i++) {
-        getOrCreateRecruitmentForRoom({
+        await getOrCreateRecruitmentForRoom({
             hostPid: 200 + i,
             hostViewerId: 9100 + i,
             category: 1,
@@ -193,7 +201,7 @@ function share(input = {}) {
             nowMs: nowMs + i,
         })
     }
-    const limited = poll(viewer, nowMs)
+    const limited = await poll(viewer, nowMs)
     assert.equal(limited.length, 3, "单次 check 最多 return_attention_max_num 个铃铛")
     // 最新招募优先（posted_at DESC）
     assert.equal(limited[0].roomNumber, "700004")
@@ -202,13 +210,13 @@ function share(input = {}) {
 
 // ---- expiry 收敛：过期行不再投递 ----
 {
-    const stale = getOrCreateRecruitmentForRoom({
+    const stale = await getOrCreateRecruitmentForRoom({
         hostPid: 300, hostViewerId: 9200, category: 1, questId: 1001001,
         roomNumber: "800001", isNewbieHost: false, establisherJson: "{}",
         nowMs: nowMs - getRecruitmentLifetimeMs() - 10,
     })
     assert.equal(stale.created, true)
-    assert.equal(poll(9011, nowMs).some(r => r.id === stale.id), false,
+    assert.equal((await poll(9011, nowMs)).some(r => r.id === stale.id), false,
         "过期招募不得出现在投递中")
 }
 
@@ -223,11 +231,11 @@ function share(input = {}) {
 
 // ---- close 只影响目标房间 ----
 {
-    const keep = share({ roomNumber: "444555" })
-    const doomed = share({ roomNumber: "555666" })
-    closeRecruitmentForRoom(HOST_VIEWER, "555666")
-    assert.ok(findOpenRecruitmentByKey(keep.attentionKey, nowMs) !== null, "其它房间的招募不受影响")
-    assert.equal(findOpenRecruitmentByKey(doomed.attentionKey, nowMs), null, "关闭房间必须失效")
+    const keep = await share({ roomNumber: "444555" })
+    const doomed = await share({ roomNumber: "555666" })
+    await closeRecruitmentForRoom(HOST_VIEWER, "555666")
+    assert.ok(await findOpenRecruitmentByKey(keep.attentionKey, nowMs) !== null, "其它房间的招募不受影响")
+    assert.equal(await findOpenRecruitmentByKey(doomed.attentionKey, nowMs), null, "关闭房间必须失效")
 }
 
 // ---- prune：过期标记 + 超过保留期的行连同投递历史删除 ----
@@ -236,31 +244,36 @@ function share(input = {}) {
     db.prepare("DELETE FROM attention_deliveries").run()
     const retentionMs = 60_000
     const expiredAt = nowMs + getRecruitmentLifetimeMs()
-    const stale = getOrCreateRecruitmentForRoom({
+    const stale = await getOrCreateRecruitmentForRoom({
         hostPid: 400, hostViewerId: 9300, category: 1, questId: 1001001,
         roomNumber: "910001", isNewbieHost: false, establisherJson: "{}", nowMs,
     })
     // live 的过期时间必须落在 prune 时间之后，否则会被一并标记 expired
     const liveAtMs = nowMs + 120_000
-    const live = share({ roomNumber: "910002", nowMs: liveAtMs })
-    poll(9301, nowMs)
+    const live = await share({ roomNumber: "910002", nowMs: liveAtMs })
+    await poll(9301, nowMs)
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries").get().n, 2)
 
     // 过期即标记 expired，但保留期内行仍在（含投递历史）
-    pruneExpiredRecruitments(expiredAt + 1, retentionMs)
+    await pruneExpiredRecruitments(expiredAt + 1, retentionMs)
     const marked = db.prepare("SELECT status FROM attention_recruitments WHERE id = ?").get(stale.id)
     assert.equal(marked.status, "expired")
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_deliveries").get().n, 2,
         "保留期内不得删除投递历史")
 
     // 超过保留期：过期行 + 其投递历史删除；open 行不受影响
-    pruneExpiredRecruitments(expiredAt + retentionMs + 1, retentionMs)
+    await pruneExpiredRecruitments(expiredAt + retentionMs + 1, retentionMs)
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM attention_recruitments WHERE id = ?").get(stale.id).n, 0,
         "超过保留期的过期招募必须删除")
     assert.equal(db.prepare(
         "SELECT COUNT(*) AS n FROM attention_deliveries WHERE recruitment_id = ?"
     ).get(stale.id).n, 0, "删除招募必须连带删除投递历史")
-    assert.ok(findOpenRecruitmentByKey(live.attentionKey, liveAtMs) !== null, "open 招募不得被 prune 误删")
+    assert.ok(await findOpenRecruitmentByKey(live.attentionKey, liveAtMs) !== null, "open 招募不得被 prune 误删")
 }
+
+})().catch(error => {
+    console.error(error)
+    process.exitCode = 1
+})
 
 console.log("attention lifecycle: all assertions passed")
