@@ -437,6 +437,20 @@ export function deserializePlayerData(
             })
         }
 
+        // deserialize growth fund received bonus ids (fund_receive_list: int[])
+        const userGrowthFundReceivedList = toDeserialize['fund_receive_list']
+
+        let growthFundReceivedList: number[] = []
+        if (userGrowthFundReceivedList !== undefined) {
+            if (!Array.isArray(userGrowthFundReceivedList))
+                throw new Error("Invalid 'fund_receive_list' field: array expected.")
+            growthFundReceivedList = userGrowthFundReceivedList.map(bonusId => {
+                if (!Number.isSafeInteger(bonusId) || bonusId < 1)
+                    throw new Error("Invalid or missing fields for 'fund_receive_list' field.")
+                return bonusId
+            })
+        }
+
         // deserialize rush event data
         const userRushEventList = toDeserialize['user_rush_event_list']
         const rushEventList: PlayerRushEvent[] = []
@@ -497,6 +511,7 @@ export function deserializePlayerData(
             startDashExchangeCampaignList: startDashExchangeCampaignList,
             multiSpecialExchangeCampaignList: multiSpecialExchangeCampaignList,
             specialExchangeCampaignList: specialExchangeCampaignList,
+            growthFundReceivedList: growthFundReceivedList,
             userOption: userOption,
             rushEventList: rushEventList.length === 0 ? undefined : rushEventList,
             rushEventClearedFolderList: toDeserialize['user_rush_event_cleared_folder_list'],

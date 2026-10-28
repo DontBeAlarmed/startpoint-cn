@@ -137,7 +137,6 @@ export function wrapOptionFields(
     d.pass_force_reward = false;
     d.crazy_gacha_result_list ??= {};
     d.last_crazy_gacha_draw_result ??= [];
-    d.fund_receive_list = [];
     d.login_info = {};
     d.tower_dungeon_list = [];
     d.special_exchange_campaign_list ??= [];

@@ -489,6 +489,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         periodicReward: 0,
         rewardCampaign: 0,
         specialExchange: 0,
+        growthFund: 0,
     }
     let bundledImports = 0
     const bundledRoots = new Set()
@@ -570,6 +571,10 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.specialExchange++
             return converterOutput("special-exchange")
         },
+        convertGrowthFundTables: async () => {
+            converterCalls.growthFund++
+            return converterOutput("growth-fund")
+        },
         importBundledTable: async (root, tableName) => {
             bundledRoots.add(root)
             bundledImports++
@@ -602,6 +607,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         periodicReward: 1,
         rewardCampaign: 1,
         specialExchange: 1,
+        growthFund: 1,
     })
     assert.equal(
         bundledImports,
@@ -636,6 +642,7 @@ test("default release builder fails explicitly for a missing dynamic gacha refer
         ])],
         ["master/gacha_odds/a-character.orderedmap", nestedOrderedMap("a-character")],
         ["master/gacha_odds/rarity-main.orderedmap", nestedOrderedMap("rarity-main")],
+        ["master/growth_fund/growth_fund.orderedmap", serializeOrderedMap([])],
     ])
     const builder = createDefaultContentTableBuilder({
         convertCharacters: async () => converterOutput("character"),
@@ -678,6 +685,7 @@ test("default release builder rejects an incomplete converter output", async () 
         ["master/gacha_odds/a-character.orderedmap", nestedOrderedMap("a-character")],
         ["master/gacha_odds/rarity-main.orderedmap", nestedOrderedMap("rarity-main")],
         ["master/gacha_odds/z-character.orderedmap", nestedOrderedMap("z-character")],
+        ["master/growth_fund/growth_fund.orderedmap", serializeOrderedMap([])],
     ])
     const incompleteCharacterOutput = converterOutput("character")
     delete incompleteCharacterOutput["character.json"]
@@ -700,6 +708,7 @@ test("default release builder rejects an incomplete converter output", async () 
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
         convertSpecialExchangeTables: async () => converterOutput("special-exchange"),
+        convertGrowthFundTables: async () => converterOutput("growth-fund"),
         importBundledTable: async (_root, tableName) => ({ imported: tableName }),
     })
 
@@ -782,6 +791,7 @@ test("default release builder bounds parallel reads and imports while preserving
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
         convertSpecialExchangeTables: async () => converterOutput("special-exchange"),
+        convertGrowthFundTables: async () => converterOutput("growth-fund"),
         importBundledTable: async (_root, tableName) => {
             activeImports++
             maxImports = Math.max(maxImports, activeImports)

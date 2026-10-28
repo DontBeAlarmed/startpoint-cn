@@ -94,6 +94,11 @@ import {
     type SpecialExchangeSourceReader,
 } from "../converters/special-exchange"
 import {
+    convertGrowthFundTables,
+    type GrowthFundConversionOutput,
+    type GrowthFundSourceReader,
+} from "../converters/growth-fund"
+import {
     convertQuests,
     type QuestConversionCompatibility,
     type QuestConversionOutput,
@@ -138,6 +143,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "reward",
     "reward-campaign",
     "special-exchange",
+    "growth-fund",
     "quest",
     "bundled-json",
     "server-json",
@@ -221,6 +227,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertSpecialExchangeTables?: (
         reader: SpecialExchangeSourceReader,
     ) => SpecialExchangeConversionOutput | Promise<SpecialExchangeConversionOutput>
+    readonly convertGrowthFundTables?: (
+        reader: GrowthFundSourceReader,
+    ) => GrowthFundConversionOutput | Promise<GrowthFundConversionOutput>
     readonly convertQuests?: (
         reader: QuestSourceReader,
         compatibility: QuestConversionCompatibility,
@@ -510,6 +519,8 @@ export function createDefaultContentTableBuilder(
     const rewardCampaignConverter = dependencies.convertRewardCampaigns ?? convertRewardCampaigns
     const specialExchangeConverter = dependencies.convertSpecialExchangeTables
         ?? convertSpecialExchangeTables
+    const growthFundConverter = dependencies.convertGrowthFundTables
+        ?? convertGrowthFundTables
     const questConverter = dependencies.convertQuests ?? convertQuests
     const periodicRewardConverter = dependencies.convertPeriodicRewards ?? convertPeriodicRewards
     const loginBonusConverter = dependencies.convertLoginBonuses ?? convertLoginBonuses
@@ -542,6 +553,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "reward"
                     || definition.converterId === "reward-campaign"
                     || definition.converterId === "special-exchange"
+                    || definition.converterId === "growth-fund"
                     || definition.converterId === "quest"
                     || definition.converterId === "periodic-reward"
                     || directOrderedMapDepth(definition.converterId) !== null
@@ -664,6 +676,13 @@ export function createDefaultContentTableBuilder(
                     values,
                     "special-exchange",
                     await specialExchangeConverter(reader),
+                )
+            }
+            if (converterIds.has("growth-fund")) {
+                addConverterOutput(
+                    values,
+                    "growth-fund",
+                    await growthFundConverter(reader),
                 )
             }
             if (converterIds.has("quest")) {

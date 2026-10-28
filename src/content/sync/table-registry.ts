@@ -7,6 +7,7 @@ import { ADDITIONAL_REWARD_PATHS } from "../converters/additional-reward"
 import { EVENT_FAMILY_SOURCE_PATHS } from "../converters/event-family"
 import { PERIODIC_REWARD_TABLE_SOURCES } from "../converters/periodic-reward"
 import { LOGIN_BONUS_SOURCE } from "../converters/login-bonus"
+import { GROWTH_FUND_PATH } from "../converters/growth-fund"
 import {
     SPECIAL_EXCHANGE_CAMPAIGN_CHARACTER_PATH,
     SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_PATH,
@@ -139,6 +140,8 @@ const REWARD_CAMPAIGN_SOURCE = "master/campaign/reward_campaign.orderedmap"
 const SPECIAL_EXCHANGE_CAMPAIGN_SOURCE = SPECIAL_EXCHANGE_CAMPAIGN_PATH
 const SPECIAL_EXCHANGE_CAMPAIGN_CHARACTER_SOURCE = SPECIAL_EXCHANGE_CAMPAIGN_CHARACTER_PATH
 const SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_SOURCE = SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_PATH
+
+const GROWTH_FUND_SOURCE = GROWTH_FUND_PATH
 
 const GAMEPLAY_TABLES = [
     [
@@ -545,6 +548,14 @@ const definitionInputs: TableSourceInput[] = [
         scope: "cdn",
         sourceOrderedMaps: [SPECIAL_EXCHANGE_CAMPAIGN_EQUIPMENT_SOURCE],
         converterId: "special-exchange",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "growth_fund.json",
+        scope: "cdn",
+        sourceOrderedMaps: [GROWTH_FUND_SOURCE],
+        converterId: "growth-fund",
         converterVersion: 1,
         outputShapeVersion: 1,
     },

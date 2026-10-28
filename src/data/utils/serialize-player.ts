@@ -254,7 +254,15 @@ export function serializePlayerData(
             "birth": playerData.birth,
             "free_mana": playerData.freeMana,
             "paid_mana": playerData.paidMana,
-            "enable_auto_3x": playerData.enableAuto3x
+            "enable_auto_3x": playerData.enableAuto3x,
+            // 成长基金购买身份（2026-10-29 裁定）：不做购买路径，全存档默认拥有。
+            // 客户端 PlayerRepository dummy 模板同为全 true；未来若实现真实购买，
+            // 这五行换成存档字段。
+            "is_bought_fund_main_quest": true,
+            "is_bought_fund_laite": true,
+            "is_bought_fund_laite2": true,
+            "is_bought_fund_laite3": true,
+            "is_bought_fund_ex_quest": true
         },
         "premium_bonus_list": [],
         "expired_premium_bonus_list": null,
@@ -367,6 +375,7 @@ export function serializePlayerData(
                 "status": campaign.status
             }
         }),
+        "fund_receive_list": toSerialize.growthFundReceivedList ?? [],
         "special_exchange_campaign_list": (toSerialize.specialExchangeCampaignList ?? []).map(campaign => {
             return {
                 "campaign_id": campaign.campaignId,

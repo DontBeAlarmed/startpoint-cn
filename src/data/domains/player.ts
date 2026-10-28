@@ -119,6 +119,7 @@ import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { ensureActivityPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, insertPlayerSpecialExchangeCampaignsSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync, recoverActivityPeriodicRewardPointsSync } from "./campaign";
+import { insertPlayerGrowthFundReceivedBatchSync } from "./growth-fund";
 import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "../../lib/mission/mission-catalog"
 
@@ -572,6 +573,7 @@ export function insertMergedPlayerDataSync(
         playerId,
         toInsert.specialExchangeCampaignList ?? [],
     )
+    insertPlayerGrowthFundReceivedBatchSync(playerId, toInsert.growthFundReceivedList ?? [])
     insertPlayerOptionsSync(playerId, toInsert.userOption)
     insertCarnivalSaveStateSync(getDb(), playerId, toInsert)
 
@@ -1099,6 +1101,9 @@ export function insertDefaultPlayerSync(
     // insert the special exchange campaign list (no rows: campaigns start
     // un-entered with status 0 until the client calls enter_campaign)
     insertPlayerSpecialExchangeCampaignsSync(playerId, [])
+
+    // growth fund received list starts empty (fund_receive_list: [])
+    insertPlayerGrowthFundReceivedBatchSync(playerId, [])
 
         initializePeriodicMissionSnapshots(playerId, player, {
             countCurrentLoginDay: true,

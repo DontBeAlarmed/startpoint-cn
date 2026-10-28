@@ -7,6 +7,7 @@ import { getPlayerBoxGachasSync } from "../domains/boxGacha"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync, getPlayerCharactersManaNodeAwakeLevelsSync } from "../domains/character"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerSync } from "../domains/player"
 import { getPlayerDrawnQuestsSync, getPlayerQuestProgressSync } from "../domains/quest"
+import { getPlayerGrowthFundReceivedIdsSync } from "../domains/growth-fund"
 import { getPlayerEquipmentListSync } from "../domains/equipment"
 import { getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync } from "../domains/gacha"
 import {
@@ -120,6 +121,7 @@ export function getClientSerializedData(
         startDashExchangeCampaignList: getPlayerStartDashExchangeCampaignsSync(playerId),
         multiSpecialExchangeCampaignList: getPlayerMultiSpecialExchangeCampaignsSync(playerId),
         specialExchangeCampaignList: getPlayerSpecialExchangeCampaignsSync(playerId),
+        growthFundReceivedList: getPlayerGrowthFundReceivedIdsSync(playerId),
         userOption: getPlayerOptionsSync(playerId),
         rushEventList: doSerializeRushEventData ? getPlayerRushEventListSync(playerId) : undefined,
         rushEventClearedFolderList: doSerializeRushEventData ? getPlayerRushEventListClearedFoldersSync(playerId) : undefined,
@@ -170,6 +172,7 @@ export function getMergedPlayerDataSync(
         startDashExchangeCampaignList: getPlayerStartDashExchangeCampaignsSync(playerId),
         multiSpecialExchangeCampaignList: getPlayerMultiSpecialExchangeCampaignsSync(playerId),
         specialExchangeCampaignList: getPlayerSpecialExchangeCampaignsSync(playerId),
+        growthFundReceivedList: getPlayerGrowthFundReceivedIdsSync(playerId),
         userOption: getPlayerOptionsSync(playerId),
         rushEventList: getPlayerRushEventListSync(playerId),
         rushEventClearedFolderList: getPlayerRushEventListClearedFoldersSync(playerId),

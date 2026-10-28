@@ -1157,6 +1157,13 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_growth_fund_received (
+        bonus_id INTEGER NOT NULL,
+        player_id INTEGER NOT NULL,
+        PRIMARY KEY (bonus_id, player_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_rush_events (
         player_id INTEGER NOT NULL,
         event_id INTEGER NOT NULL,

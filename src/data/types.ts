@@ -631,6 +631,12 @@ export interface ClientUserInfo {
     free_mana: number
     paid_mana: number
     enable_auto_3x: boolean
+    // 成长基金购买身份（恒真裁定，2026-10-29）：load 输出，公共片段可不带
+    is_bought_fund_main_quest?: boolean
+    is_bought_fund_laite?: boolean
+    is_bought_fund_laite2?: boolean
+    is_bought_fund_laite3?: boolean
+    is_bought_fund_ex_quest?: boolean
 }
 
 export interface UserDailyChallengePointListItemCampaign {
@@ -830,6 +836,7 @@ export interface ClientPlayerData {
     start_dash_exchange_campaign_list: UserStartDashCampaignList[]
     multi_special_exchange_campaign_list: UserMultiSpecialExchangeCampaignList[]
     special_exchange_campaign_list?: UserSpecialExchangeCampaignList[]
+    fund_receive_list?: number[]
     associate_token: string
     config: Object,
     // rush event data
@@ -865,6 +872,7 @@ export interface MergedPlayerData {
     startDashExchangeCampaignList: PlayerStartDashExchangeCampaign[],
     multiSpecialExchangeCampaignList: PlayerMultiSpecialExchangeCampaign[],
     specialExchangeCampaignList: PlayerSpecialExchangeCampaign[],
+    growthFundReceivedList: number[],
     userOption: Record<string, boolean>,
     // rush event data
     rushEventList?: PlayerRushEvent[],

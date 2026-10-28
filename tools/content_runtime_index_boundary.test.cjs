@@ -65,6 +65,7 @@ const reviewedRawTableCalls = new Map([
     ["src/lib/stamina-campaign.ts", ["stamina_campaign.json"]], // Stamina campaign adapter
     ["src/lib/star-crumb-exchange/catalog.ts", ["star_crumb_exchange.json", "star_crumb_exchange_cost.json"]], // Star exchange catalog
     ["src/lib/special-exchange/catalog.ts", ["special_exchange_campaign.json", "special_exchange_campaign_character.json", "special_exchange_campaign_equipment.json"]], // Special exchange catalog
+    ["src/lib/growth-fund-content.ts", ["growth_fund.json"]], // Growth fund catalog
     ["src/lib/story-join-character.ts", ["story_join_character.json"]], // Story join adapter
 ])
 

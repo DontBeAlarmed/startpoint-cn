@@ -1,0 +1,726 @@
+{
+  "1": {
+    "bonusId": 1,
+    "displayOrder": 1000,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_1",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 1
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到1级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "2": {
+    "bonusId": 2,
+    "displayOrder": 1001,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_10",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 10
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 300,
+    "name": "RANK达到10级",
+    "rewardNumberText": 300,
+    "rewardDescription": "免费星导石 ×300"
+  },
+  "3": {
+    "bonusId": 3,
+    "displayOrder": 1002,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_20",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 20
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 500,
+    "name": "RANK达到20级",
+    "rewardNumberText": 500,
+    "rewardDescription": "免费星导石 ×500"
+  },
+  "4": {
+    "bonusId": 4,
+    "displayOrder": 1003,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_30",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 30
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 700,
+    "name": "RANK达到30级",
+    "rewardNumberText": 700,
+    "rewardDescription": "免费星导石 ×700"
+  },
+  "5": {
+    "bonusId": 5,
+    "displayOrder": 1004,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_40",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 40
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 900,
+    "name": "RANK达到40级",
+    "rewardNumberText": 900,
+    "rewardDescription": "免费星导石 ×900"
+  },
+  "6": {
+    "bonusId": 6,
+    "displayOrder": 1005,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_50",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 50
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1100,
+    "name": "RANK达到50级",
+    "rewardNumberText": 1100,
+    "rewardDescription": "免费星导石 ×1100"
+  },
+  "7": {
+    "bonusId": 7,
+    "displayOrder": 1006,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_60",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 60
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到60级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "8": {
+    "bonusId": 8,
+    "displayOrder": 1007,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_70",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 70
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到70级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "12": {
+    "bonusId": 12,
+    "displayOrder": 1000,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_main_02",
+    "kind": {
+      "index": 1,
+      "mainQuestId": 2009007
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关主线章节2",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "13": {
+    "bonusId": 13,
+    "displayOrder": 1001,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_main_03",
+    "kind": {
+      "index": 1,
+      "mainQuestId": 3013003
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关主线章节3",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "14": {
+    "bonusId": 14,
+    "displayOrder": 1002,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_main_04",
+    "kind": {
+      "index": 1,
+      "mainQuestId": 4011005
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关主线章节4",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "15": {
+    "bonusId": 15,
+    "displayOrder": 1003,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_main_05",
+    "kind": {
+      "index": 1,
+      "mainQuestId": 5013004
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关主线章节5",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "16": {
+    "bonusId": 16,
+    "displayOrder": 1004,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_main_06",
+    "kind": {
+      "index": 1,
+      "mainQuestId": 6010006
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关主线章节6",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "18": {
+    "bonusId": 18,
+    "displayOrder": 1000,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_ex_02",
+    "kind": {
+      "index": 2,
+      "exQuestId": 2009003
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关高难章节2",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "19": {
+    "bonusId": 19,
+    "displayOrder": 1001,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_ex_03",
+    "kind": {
+      "index": 2,
+      "exQuestId": 3013001
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关高难章节3",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "20": {
+    "bonusId": 20,
+    "displayOrder": 1002,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_ex_04",
+    "kind": {
+      "index": 2,
+      "exQuestId": 4011003
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关高难章节4",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "21": {
+    "bonusId": 21,
+    "displayOrder": 1003,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_ex_05",
+    "kind": {
+      "index": 2,
+      "exQuestId": 5013001
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关高难章节5",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "22": {
+    "bonusId": 22,
+    "displayOrder": 1004,
+    "thumbnailId": "item/etc/fund_rewards_quest",
+    "questThumbnailId": "item/etc/fund_ex_06",
+    "kind": {
+      "index": 2,
+      "exQuestId": 6010002
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": {
+      "kind": "item",
+      "itemId": 999003,
+      "count": 1
+    },
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 150,
+    "name": "通关高难章节6",
+    "rewardNumberText": 0,
+    "rewardDescription": "免费星导石 ×150\n角色单抽扭蛋券 ×1"
+  },
+  "37": {
+    "bonusId": 37,
+    "displayOrder": 1008,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_80",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 80
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到80级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "38": {
+    "bonusId": 38,
+    "displayOrder": 1009,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_90",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 90
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 200,
+    "name": "RANK达到90级",
+    "rewardNumberText": 200,
+    "rewardDescription": "免费星导石 ×200"
+  },
+  "39": {
+    "bonusId": 39,
+    "displayOrder": 1010,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_100",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 100
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 300,
+    "name": "RANK达到100级",
+    "rewardNumberText": 300,
+    "rewardDescription": "免费星导石 ×300"
+  },
+  "40": {
+    "bonusId": 40,
+    "displayOrder": 1011,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_110",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 110
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 400,
+    "name": "RANK达到110级",
+    "rewardNumberText": 400,
+    "rewardDescription": "免费星导石 ×400"
+  },
+  "41": {
+    "bonusId": 41,
+    "displayOrder": 1012,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_120",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 120
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 500,
+    "name": "RANK达到120级",
+    "rewardNumberText": 500,
+    "rewardDescription": "免费星导石 ×500"
+  },
+  "42": {
+    "bonusId": 42,
+    "displayOrder": 1013,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_130",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 130
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 600,
+    "name": "RANK达到130级",
+    "rewardNumberText": 600,
+    "rewardDescription": "免费星导石 ×600"
+  },
+  "43": {
+    "bonusId": 43,
+    "displayOrder": 1014,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_140",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 140
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 700,
+    "name": "RANK达到140级",
+    "rewardNumberText": 700,
+    "rewardDescription": "免费星导石 ×700"
+  },
+  "44": {
+    "bonusId": 44,
+    "displayOrder": 1015,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_150",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 150
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 800,
+    "name": "RANK达到150级",
+    "rewardNumberText": 800,
+    "rewardDescription": "免费星导石 ×800"
+  },
+  "45": {
+    "bonusId": 45,
+    "displayOrder": 1016,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_160",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 160
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到160级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "46": {
+    "bonusId": 46,
+    "displayOrder": 1017,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_170",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 170
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到170级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "47": {
+    "bonusId": 47,
+    "displayOrder": 1018,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_180",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 180
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到180级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "48": {
+    "bonusId": 48,
+    "displayOrder": 1019,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_190",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 190
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 300,
+    "name": "RANK达到190级",
+    "rewardNumberText": 300,
+    "rewardDescription": "免费星导石 ×300"
+  },
+  "49": {
+    "bonusId": 49,
+    "displayOrder": 1020,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_200",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 200
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 500,
+    "name": "RANK达到200级",
+    "rewardNumberText": 500,
+    "rewardDescription": "免费星导石 ×500"
+  },
+  "50": {
+    "bonusId": 50,
+    "displayOrder": 1021,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_210",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 210
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 700,
+    "name": "RANK达到210级",
+    "rewardNumberText": 700,
+    "rewardDescription": "免费星导石 ×700"
+  },
+  "51": {
+    "bonusId": 51,
+    "displayOrder": 1022,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_220",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 220
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 900,
+    "name": "RANK达到220级",
+    "rewardNumberText": 900,
+    "rewardDescription": "免费星导石 ×900"
+  },
+  "52": {
+    "bonusId": 52,
+    "displayOrder": 1023,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_230",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 230
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1100,
+    "name": "RANK达到230级",
+    "rewardNumberText": 1100,
+    "rewardDescription": "免费星导石 ×1100"
+  },
+  "53": {
+    "bonusId": 53,
+    "displayOrder": 1024,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_240",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 240
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到240级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  },
+  "54": {
+    "bonusId": 54,
+    "displayOrder": 1025,
+    "thumbnailId": "scene/general/sprite_sheet/stone",
+    "questThumbnailId": "item/etc/fund_rank_250",
+    "kind": {
+      "index": 0,
+      "laiteRankThreshold": 250
+    },
+    "reward1": {
+      "kind": "stone"
+    },
+    "reward2": null,
+    "chargeVmoneyNum": 0,
+    "freeVmoneyNum": 1500,
+    "name": "RANK达到250级",
+    "rewardNumberText": 1500,
+    "rewardDescription": "免费星导石 ×1500"
+  }
+}
