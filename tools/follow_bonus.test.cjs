@@ -34,10 +34,10 @@ process.once("exit", () => {
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const {
-    deleteSharedFollowEdgeSync,
+    deleteSharedFollowEdgeAsync,
     getCoopBonusCountsSync,
     incrementCoopBonusCountsSync,
-    upsertSharedFollowEdgeSync,
+    upsertSharedFollowEdgeAsync,
 } = require("../src/data/domains/social-follow")
 const { buildFollowBonusInfo, incrementFollowBonusForBattle } = require("../src/lib/follow-bonus")
 
@@ -48,14 +48,15 @@ const A = 61000101
 const B = 61000102
 const C = 61000103
 
-function edge(follower, followed, count = 0) {
-    upsertSharedFollowEdgeSync(follower, followed, 1_000_000)
+async function edge(follower, followed, count = 0) {
+    await upsertSharedFollowEdgeAsync(follower, followed, 1_000_000)
     if (count > 0) {
         db.prepare("UPDATE social_follows SET coop_bonus_count = ? WHERE follower_viewer_id = ? AND followed_viewer_id = ?")
             .run(count, follower, followed)
     }
 }
 
+(async () => {
 // ---- 无关注边：null（字段省略语义） ----
 {
     assert.equal(buildFollowBonusInfo(A, [B, C]), null)
@@ -63,7 +64,7 @@ function edge(follower, followed, count = 0) {
 
 // ---- 单向：A→B（B 未回关）——A 看到计数，B 看不到 A ----
 {
-    edge(A, B)
+    await edge(A, B)
     const forA = buildFollowBonusInfo(A, [B, C])
     assert.ok(forA !== null)
     assert.equal(forA.viewerId, A)
@@ -74,7 +75,7 @@ function edge(follower, followed, count = 0) {
     assert.equal(forB, null, "B 未关注 A：B 视角无条目")
 
     // B 回关 → 互关：双方各自独立计数（都从 0 起，各显示 10）
-    edge(B, A)
+    await edge(B, A)
     const forB2 = buildFollowBonusInfo(B, [A])
     assert.deepEqual(forB2.followBonusList, { [String(A)]: 0 }, "互关后 B 视角独立计数 0")
 }
@@ -102,11 +103,11 @@ function edge(follower, followed, count = 0) {
 
 // ---- 取关清零：删行即清；重关注从 0 起 ----
 {
-    deleteSharedFollowEdgeSync(A, B)
+    await deleteSharedFollowEdgeAsync(A, B)
     assert.equal(getCoopBonusCountsSync(A, [B])[B] ?? 0, 0, "取关后计数清零")
     assert.equal(buildFollowBonusInfo(A, [B]), null, "取关后无条目")
 
-    edge(A, B)
+    await edge(A, B)
     assert.equal(getCoopBonusCountsSync(A, [B])[B], 0, "重关注新行从 0 起")
     const forA = buildFollowBonusInfo(A, [B])
     assert.equal(forA.followBonusList[String(B)], 0, "重关注未开战显示 0")
@@ -114,7 +115,7 @@ function edge(follower, followed, count = 0) {
 
 // ---- 上限双钳：计数 1e6 → 增量封顶；显示值与合计各自钳 1e6 ----
 {
-    edge(A, B, 1_000_000)
+    await edge(A, B, 1_000_000)
     incrementFollowBonusForBattle([A, B])
     assert.equal(getCoopBonusCountsSync(A, [B])[B], 1_000_000, "计数钳 1e6")
     const forA = buildFollowBonusInfo(A, [B])
@@ -124,8 +125,8 @@ function edge(follower, followed, count = 0) {
 // ---- 双队友聚合 + 自边保护 ----
 {
     db.prepare("DELETE FROM social_follows").run()
-    edge(A, B)
-    edge(A, C)
+    await edge(A, B)
+    await edge(A, C)
     const forA = buildFollowBonusInfo(A, [B, C])
     assert.deepEqual(forA.followBonusList, { [String(B)]: 0, [String(C)]: 0 })
     assert.equal(forA.totalFollowBonus, 0, "合计 = Σ逐人")
@@ -140,5 +141,10 @@ function edge(follower, followed, count = 0) {
     const before = buildFollowBonusInfo(A, [B]).followBonusList[String(B)]
     assert.equal(before, 0, "无增量时 start 显示计数 0")
 }
+})().catch(error => {
+    console.error(error)
+    process.exitCode = 1
+})
 
 console.log("follow bonus: all assertions passed")
+
