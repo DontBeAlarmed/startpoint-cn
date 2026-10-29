@@ -90,11 +90,11 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
             .filter(admission => admission.roomNumber === roomNumber
                 && !this.isOccupiedMember(roomNumber, admission.participant.viewerId))
             .length
-        // 战斗后返回：占座成员重发入场票是"收回自己的座位"，不是新增占位——
-        // occupied 基数已含其座位，若不加豁免会把返房成员顶成满员
-        // （2026-10-30 真机复现：房主+两客机返回全部被拒，诊断日志账目实锤）。
-        if (!this.isOccupiedMember(roomNumber, input.participant.viewerId)
-            && this.getOccupiedMemberCount(roomNumber) + pendingMemberCount >= MAX_REAL_ROOM_MEMBERS) {
+        // R-6 新模型：结算已释放非房主座位，返回成员=普通加入（无豁免）；
+        // pending 票=预占座（持有者 Enter 转正），occupied+pending 达到容量即拒：
+        // 官服实测（2026-10-30）：结算后房主先回、D 抢位、B/C 后回被满员拒——
+        // 逐账验证 `>=` 精确复现（第 3 张票入座后房间即满，第 4 张拒绝）
+        if (this.getOccupiedMemberCount(roomNumber) + pendingMemberCount >= MAX_REAL_ROOM_MEMBERS) {
             return { ok: false, error: "ROOM_FULL" }
         }
 

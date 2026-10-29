@@ -1039,32 +1039,30 @@ test("a previous-round host Enter cannot authorize the next rematch generation",
     handleMessage(host.socket, [0, [6]])
     assert.equal(room.raising_state, 4)
 
-    // 释放（OV-2：安排 host 回房宽限）→ host 立即重进（正常重赛，取消宽限）
+    // 释放（R-6 新模型：结算即清非房主座位）→ host 立即重进（正常重赛）
     updateRoomState(room.room_number, 1)
+    assert.equal(isRoomMember(room, guest.client.participant), false,
+        "R-6：结算释放非房主座位，客机座位随结算清空")
     handleMessage(host.socket, [0, [0, { party: {} }]])
 
-    // guest 断线 → 自身租约到期移除（host 在场，房间存活）
+    // guest 断线：座位已在结算释放，无移除动作、无补位 join
     assert.equal(handleSocketDisconnect(guest.socket), true)
     await new Promise(resolve => setTimeout(resolve, 40))
     assert.equal(isRoomMember(room, guest.client.participant), false)
 
     // 前一代 Enter 的 NPC join 定时器不得授权新一代招募（世代守卫）
-    // （第三个 500ms 计时器 = guest 移除后 reconcileRematchSlots 的 NPC 补位 join）
+    // （R-6 下补位 join 不再由 guest 移除触发——结算已清座，重赛 Enter
+    //   的 reconcile 按剩余空位补位）
     const joinTimers = timers.filter(timer => timer.delayMs === 500)
-    assert.equal(joinTimers.length, 3, "两次 host Enter + 一次补位各安排一次 NPC join")
+    assert.equal(joinTimers.length, 2, "两次 host Enter 各安排一次 NPC join")
     joinTimers[0].callback()
     await flushPromises()
     assert.equal(getRecruitCalls(), 0, "前一代 Enter 不得授权新一代招募")
 
-    // T2（重进 Enter 的挂起 join）被 guest 移除触发的补位招募世代顶掉
+    // T2（重进 Enter 的挂起 join）是当前世代：招募生效
     joinTimers[1].callback()
     await flushPromises()
-    assert.equal(getRecruitCalls(), 0, "补位招募 bump 世代后，重进 Enter 的挂起 join 失效")
-
-    // T3（补位 join）是当前世代：招募生效
-    joinTimers[2].callback()
-    await flushPromises()
-    assert.equal(getRecruitCalls(), 1, "补位 join 按当前世代招募")
+    assert.equal(getRecruitCalls(), 1, "重赛 Enter 按当前世代招募")
 })
 
 test("a released real member with a stale TCP client cannot occupy a rematch seat", async t => {

@@ -340,6 +340,16 @@ export function updateRoomState(
     const previousState = room.raising_state;
     console.log(`[MULTI] room state: ${roomNumber} → ${state}`);
     room.raising_state = state;
+    // R-6（官服语义，2026-10-30 维护者裁定）：战斗结算释放全部非房主座位——
+    // 房间回到"仅房主+空位"，成员返回与外部加入走同一条普通加入流程竞争
+    // 空位（先到先得，成员无优先权）。NPC 名册由 onBattleReleased 钩子清空。
+    if (previousState === 4 && state === 1) {
+        room.member_participants = room.member_participants.filter(
+            member => member.viewerId === room.host_viewer_id,
+        );
+        // 房间寿命从结算重新起算（战斗时长不计入老化窗口）
+        updateHostEntryTime(roomNumber);
+    }
     // OV-2：战斗释放（4→1）是 host 回房宽限的起点——release 时刻正常结算
     // 与强退的 socket 拓扑不可区分，统一安排宽限：host 重进则取消，宽限内
     // 未重进（强退）则解散（见 tcp/lobby 的 return-lease）。
