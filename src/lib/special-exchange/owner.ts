@@ -49,6 +49,8 @@ export interface SpecialExchangeEnterSuccess {
     readonly playerId: number
     readonly campaign: SpecialExchangeCampaignDefinition
     readonly status: number
+    /** 礼物型（obtain_source==1）enter 发券时的 item_list 片段；普通进入缺省 */
+    readonly items?: Readonly<Record<string, number>>
 }
 
 export interface SpecialExchangeBuyTicketSuccess {
@@ -129,6 +131,31 @@ export function enterSpecialExchangeCampaignSync(input: {
         input.playerId,
         input.campaignId,
     )
+    // 双审 P1（协议保真）：obtain_source==1（礼物型）活动由官方服务器在 enter
+    // 时直接发券并推进 status→2（SpecialExchangeEnterCampaignDummyRemote.as:53-97
+    // status 0/1 → addItem(ticket,1)+status 2，2/3 不重复发；
+    // SpecialExchangeCampaignEnterCampaignLoadingTask.as:74-93 仅 source==1 走
+    // enter 且按券差弹 GetItem toast）。
+    if (campaign.obtainSource === 1 && currentStatus < 2) {
+        return getDb().transaction((): SpecialExchangeEnterResult => {
+            upsertPlayerSpecialExchangeCampaignStatusSync(input.playerId, input.campaignId, 2)
+            const items = withDeferredInventoryBatchContextWithinTransactionSync({
+                playerId: input.playerId,
+                preloadItemIds: [campaign.ticketItemId],
+                playerExistence: "caller-verified",
+            }, (inventory: InventoryBatchContext) => {
+                inventory.grant(campaign.ticketItemId, 1)
+                return projectGrantedItems(inventory.flush())
+            })
+            return {
+                ok: true,
+                playerId: input.playerId,
+                campaign,
+                status: 2,
+                items,
+            }
+        })()
+    }
     if (currentStatus === 0) {
         upsertPlayerSpecialExchangeCampaignStatusSync(input.playerId, input.campaignId, 1)
     }

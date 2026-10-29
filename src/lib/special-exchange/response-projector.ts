@@ -18,8 +18,23 @@ function specialExchangeCampaignEntry(
 export function projectSpecialExchangeEnterResponse(
     input: SpecialExchangeEnterSuccess,
 ): Record<string, unknown> {
+    // 礼物型 enter 发券时附带 item_list 片段（客户端按券差弹 GetItem toast）
+    const itemsFragment: CommonResponseFragment | null = input.items === undefined
+        ? null
+        : {
+            user_info: null,
+            character_list: null,
+            item_list: input.items,
+            equipment_list: null,
+            mission_info: null,
+            over_max: null,
+            mail_arrived: null,
+        }
     return {
         data: {
+            ...(itemsFragment === null
+                ? {}
+                : mergeCommonResponseFragments([itemsFragment])),
             special_exchange_campaign_list: [
                 specialExchangeCampaignEntry(input.campaign.campaignId, input.status),
             ],

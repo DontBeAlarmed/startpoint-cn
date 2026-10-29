@@ -11,6 +11,12 @@ import { getPlayerRankLevel } from "./player-rank-content"
 import { getMailArrivedSync } from "./mail-notification"
 import { mergeCommonResponseFragments } from "./common-response/merge"
 import type { CommonResponseFragment } from "./common-response/model"
+import {
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+} from "./reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
+import { RewardType } from "./types/rewards"
 import { generateDataHeaders } from "../utils"
 
 // 成长基金（growth_fund）：购买身份为 user_info 恒真布尔（2026-10-29 裁定，
@@ -129,17 +135,35 @@ export function receiveGrowthFundBonusSync(input: {
             }
         }
 
-        // 石类：free 走共享 BEADS 授予路径（与登录奖励同引擎，含容量/溢出策略）；
-        // paid（当前数据恒 0，保留语义）在事务内直加。
+        // 石类 free 走共享 BEADS 授予引擎（与登录奖励/定时资源同路，含容量与
+        // 溢出策略）；道具同批进入引擎（999003 券等）；paid（当前数据恒 0，
+        // 保留官方语义）在事务内直加。
+        const plan = createRewardGrantExecutionPlan([
+            ...[...rewards.items.entries()].map(([itemId, count]) => ({
+                type: RewardType.ITEM as const,
+                id: itemId,
+                count,
+            })),
+            ...(rewards.freeVmoney > 0
+                ? [{ type: RewardType.BEADS as const, count: rewards.freeVmoney }]
+                : []),
+        ])
+        const rewardResult = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+            input.playerId,
+            plan,
+            {
+                playerId: input.playerId,
+                freeMana: player.freeMana,
+                freeVmoney: player.freeVmoney,
+                expPool: player.expPool,
+            },
+            { itemOverflow: createRewardGrantItemOverflowPolicy(input.playerId) },
+        )
         const paidAfter = player.vmoney + rewards.paidVmoney
-        const freeAfter = player.freeVmoney + rewards.freeVmoney
-        updatePlayerSync({
-            id: input.playerId,
-            vmoney: paidAfter,
-            freeVmoney: freeAfter,
-        })
-        for (const [itemId, count] of rewards.items) {
-            grantGrowthFundItemSync(input.playerId, itemId, count)
+        const freeAfter = rewardResult.playerAfter?.freeVmoney
+            ?? (player.freeVmoney + rewards.freeVmoney)
+        if (rewards.paidVmoney > 0) {
+            updatePlayerSync({ id: input.playerId, vmoney: paidAfter })
         }
         for (const bonusId of accepted) {
             insertPlayerGrowthFundReceivedSync(input.playerId, bonusId)
@@ -149,7 +173,9 @@ export function receiveGrowthFundBonusSync(input: {
             ok: true,
             result: {
                 playerId: input.playerId,
-                fundReceiveList: getPlayerGrowthFundReceivedIdsSync(input.playerId),
+                // 响应 fund_receive_list = 本次领取批次（客户端对每个元素弹
+                // GrowthFund toast，全量累计会把历史已领 id 重弹——双审 P2）
+                fundReceiveList: accepted,
                 paidVmoneyAfter: paidAfter,
                 freeVmoneyAfter: freeAfter,
                 items: Object.fromEntries(rewards.items),
@@ -157,14 +183,6 @@ export function receiveGrowthFundBonusSync(input: {
             },
         }
     })()
-}
-
-function grantGrowthFundItemSync(playerId: number, itemId: number, count: number): void {
-    getDb().prepare(`
-    INSERT INTO players_items (id, amount, player_id)
-    VALUES (?, ?, ?)
-    ON CONFLICT (id, player_id) DO UPDATE SET amount = amount + excluded.amount
-    `).run(itemId, count, playerId)
 }
 
 function isConditionMet(
@@ -206,8 +224,4 @@ export function projectGrowthFundReceiveResponse(input: {
             fund_receive_list: [...input.result.fundReceiveList],
         },
     }
-}
-
-export function growthFundErrorHeaders(viewerId: number): Record<string, unknown> {
-    return generateDataHeaders({ viewer_id: viewerId })
 }

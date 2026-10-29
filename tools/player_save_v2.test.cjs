@@ -576,7 +576,8 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 31 // 合同升 30（R-11）后，未来 schema 用 31 构造
+    // 未来 schema 用 currentDataSchema+1 动态构造（合同每升一级本用例必须仍然成立）
+    future.producer.dbSchemaVersion = currentDataSchema + 1
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const starsState = (gachaId = 80000) => ({

@@ -267,6 +267,45 @@ test("enter_campaign is idempotent and never downgrades later states", async () 
     })
 })
 
+// ---------- ⑤b 礼物型（obtain_source==1）：enter 即发券（双审 P1 修复回归） ----------
+
+test("gift campaign enter grants the ticket once and sets status 2", async () => {
+    const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
+    const previousOffset = getTimeOffset()
+    // campaign 1012（装备礼物，券 999006）窗口 2024-07-11 12:00 ~ 2024-08-01 23:59:59 JST
+    setServerTimeOffset(Date.parse("2024-07-15T12:00:00Z") - Date.now())
+    try {
+        await withRoutes(async fastify => {
+            const { playerId, viewerId } = await createPlayer("gift-enter")
+
+            const first = await post(fastify, "/api/index.php/special_exchange/enter_campaign", {
+                viewer_id: viewerId, campaign_id: 1012,
+            })
+            assert.equal(first.statusCode, 200)
+            const firstData = decode(first).data
+            assert.deepEqual(firstData.special_exchange_campaign_list, [
+                { campaign_id: 1012, status: 2 },
+            ])
+            const ticketsAfterFirst = getPlayerItemSync(playerId, 999006)
+            assert.equal(ticketsAfterFirst, 1, "礼物券入包")
+            assert.ok(firstData.item_list && Number(firstData.item_list["999006"]) >= 1,
+                "响应带 item_list 片段")
+
+            // 二次进入：不重复发券
+            const second = await post(fastify, "/api/index.php/special_exchange/enter_campaign", {
+                viewer_id: viewerId, campaign_id: 1012,
+            })
+            assert.equal(second.statusCode, 200)
+            assert.deepEqual(decode(second).data.special_exchange_campaign_list, [
+                { campaign_id: 1012, status: 2 },
+            ])
+            assert.equal(getPlayerItemSync(playerId, 999006), ticketsAfterFirst, "不重复发券")
+        })
+    } finally {
+        setServerTimeOffset(previousOffset)
+    }
+})
+
 // ---------- ⑥ 非 lineup 角色 ----------
 
 test("exchange rejects a character outside the campaign lineup", async () => {

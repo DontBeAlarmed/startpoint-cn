@@ -284,9 +284,11 @@ export function upsertPlayerSpecialExchangeCampaignStatusSync(
     campaignId: number,
     status: number
 ): void {
+    // 状态机 1→2→3 单调（双审 P2b 加固）：MAX 防御任何调用方的降级写入
     getDb().prepare(`
     INSERT INTO players_special_exchange_campaigns (campaign_id, status, player_id)
     VALUES (?, ?, ?)
-    ON CONFLICT (campaign_id, player_id) DO UPDATE SET status = excluded.status
+    ON CONFLICT (campaign_id, player_id) DO UPDATE SET
+        status = MAX(players_special_exchange_campaigns.status, excluded.status)
     `).run(campaignId, status, playerId)
 }

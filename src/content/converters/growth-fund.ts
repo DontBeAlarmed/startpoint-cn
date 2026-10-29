@@ -148,6 +148,14 @@ export function validateGrowthFundTable(
         if (hasStoneReward && entry.chargeVmoneyNum === 0 && entry.freeVmoneyNum === 0) {
             invalid(`bonus ${idText} declares a stone reward with no stone amount`)
         }
+        // 双审 P2c：两槽同为 stone 会对行级 charge/free 双计，直接禁止（现数据无此形态）
+        if (isStoneReward(entry.reward1) && isStoneReward(entry.reward2)) {
+            invalid(`bonus ${idText} declares two stone rewards; merge into one`)
+        }
+        // 双审 P2c：两槽同为 stone 会对行级 charge/free 双计，直接禁止（现数据无此形态）
+        if (isStoneReward(entry.reward1) && isStoneReward(entry.reward2)) {
+            invalid(`bonus ${idText} declares two stone rewards; merge into one`)
+        }
         if (typeof entry.name !== "string" || entry.name === "") {
             invalid(`bonus ${idText} name is invalid`)
         }

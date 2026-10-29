@@ -3,7 +3,6 @@ import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils"
 import {
-    growthFundErrorHeaders,
     projectGrowthFundReceiveResponse,
     receiveGrowthFundBonusSync,
 } from "../../lib/growth-fund"
@@ -43,11 +42,11 @@ const routes = async (fastify: FastifyInstance): Promise<void> => {
         const result = receiveGrowthFundBonusSync({ playerId, bonusIds })
         reply.header("content-type", "application/x-msgpack")
         if (!result.ok) {
-            // 客户端无专属错误分支（资格由客户端预检），带内 result_code 0 走
-            // 通用错误弹窗；防御路径与仓库既有口径一致。
+            // 客户端无专属错误分支（资格由客户端预检），显式 result_code 0 走
+            // 通用错误弹窗（默认 1 是客户端成功码——双审 P1，禁止沿用）。
             console.warn(`[GROWTH_FUND] receive rejected: ${result.message}`)
             return reply.status(200).send({
-                data_headers: growthFundErrorHeaders(viewerId),
+                data_headers: generateDataHeaders({ viewer_id: viewerId, result_code: 0 }),
                 data: {},
             })
         }
