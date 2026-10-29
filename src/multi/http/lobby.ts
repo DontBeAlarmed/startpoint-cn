@@ -6,6 +6,7 @@ import { generateDataHeaders, realSecondsToVirtual } from "../../utils"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
+import { getRoom, isRoomViewerMember } from "../room/manager"
 import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
 import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
 import { isQuestJoinAllowed } from "../../lib/quest-join-gate"
@@ -310,12 +311,20 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         }
 
         const selectData = serializeRoomStatusConnection(room.value, context.tcpEndpoint?.())
-        // state 4（战斗/结算）期间一律回 2（等待横幅轮询）：客户端等待或超时
-        // 判定已解散（官服行为）。不可回 4——prepare 远端的链式 select 解析器
-        // 对 4 抛 C5001（mac-c 实测）。房主返回房间经 prepare 路径释放状态。
+        // state 4（战斗/结算）期间的区分服务（用户实测钉死）：
+        // - 房间成员（返回房间流程，含 prepare 链式重试）→ 2 等待横幅：
+        //   等房主返回房间或超时判定已解散；不可回 4——prepare 远端的链式
+        //   select 解析器对 4 抛 C5001（mac-c 实测）。
+        // - 非成员（房间号直进的局外人）→ 4 已开战弹窗（立即明确）。
+        // 房主返回房间经 prepare 路径释放状态（R-6）。
         if (viewerId === room.value.host.viewerId) {
             selectData.raising_state = 1
             console.log(`[MULTI] select_room: host override raising_state → 1`)
+        } else if (room.value.raisingState === 4) {
+            const isMember = isRoomViewerMember(getRoom(room.value.roomNumber), viewerId)
+            selectData.raising_state = isMember ? 2 : 4
+            console.log(`[MULTI] select_room: room in battle → state=${selectData.raising_state}`
+                + ` member=${isMember}`)
         } else if (!room.value.hostOnline) {
             selectData.raising_state = 2
             console.log(`[MULTI] select_room: host offline, guest polls raising_state → 2`)

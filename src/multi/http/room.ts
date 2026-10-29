@@ -25,7 +25,8 @@ import { safeEvolutionImgLevel } from "../safe-display-fields";
 import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader";
 import { openRoomShareRow } from "../room/share-sync";
 import { isNewbieHostSync } from "../../lib/newbie-host";
-import { getPlayerRankLevel } from "../player-context";
+import { getPlayerRankLevel } from "../player-context"
+import { getRoom, isRoomViewerMember } from "../room/manager";
 import { scheduleNpcRelease } from "../npc/release";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
@@ -147,8 +148,20 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         }
 
         const data = serializeRoomStatusConnection(room.value, context.tcpEndpoint?.());
+        // state 4（战斗/结算）期间（用户实测钉死）：成员 → 2 等待横幅（等房主
+        // 返回房间或超时判定已解散，prepare 远端 3s×5 轮询对 2 有内建重试）；
+        // 非成员 → A-error 4507（Failure 弹窗）——不可回 4：prepare 远端的链式
+        // select 解析器对 4 抛 C5001（mac-c 实测）。房主返回经此路径释放状态。
         if (viewerId === room.value.host.viewerId) {
             data.raising_state = 1
+        } else if (room.value.raisingState === 4) {
+            const isMember = isRoomViewerMember(getRoom(room.value.roomNumber), viewerId)
+            if (isMember) {
+                data.raising_state = 2
+                console.log(`[MULTI] prepare: member waits during battle → 2`)
+            } else {
+                return prepareFailure(reply, viewerId, body.room_number || "", "BATTLE_IN_PROGRESS")
+            }
         } else if (!room.value.hostOnline) {
             data.raising_state = 2
             console.log(`[MULTI] prepare: host offline, guest polls raising_state → 2`)
