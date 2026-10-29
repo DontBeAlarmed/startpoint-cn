@@ -6,7 +6,6 @@ import { generateDataHeaders, realSecondsToVirtual } from "../../utils"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
-import { getRoom, isRoomViewerMember } from "../room/manager"
 import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
 import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
 import { isQuestJoinAllowed } from "../../lib/quest-join-gate"
@@ -321,8 +320,9 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             selectData.raising_state = 1
             console.log(`[MULTI] select_room: host override raising_state → 1`)
         } else if (room.value.raisingState === 4) {
-            const roomRow = getRoom(room.value.roomNumber)
-            const isMember = roomRow !== undefined && isRoomViewerMember(roomRow, viewerId)
+            const isMember = room.value.members.some(
+                member => member.viewerId === viewerId,
+            )
             selectData.raising_state = isMember ? 2 : 4
             console.log(`[MULTI] select_room: room in battle → state=${selectData.raising_state}`
                 + ` member=${isMember}`)

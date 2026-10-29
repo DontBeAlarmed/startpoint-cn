@@ -26,7 +26,6 @@ import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-
 import { openRoomShareRow } from "../room/share-sync";
 import { isNewbieHostSync } from "../../lib/newbie-host";
 import { getPlayerRankLevel } from "../player-context"
-import { getRoom, isRoomViewerMember } from "../room/manager";
 import { scheduleNpcRelease } from "../npc/release";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
@@ -155,8 +154,9 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         if (viewerId === room.value.host.viewerId) {
             data.raising_state = 1
         } else if (room.value.raisingState === 4) {
-            const roomRow = getRoom(room.value.roomNumber)
-            const isMember = roomRow !== undefined && isRoomViewerMember(roomRow, viewerId)
+            const isMember = room.value.members.some(
+                member => member.viewerId === viewerId,
+            )
             if (isMember) {
                 data.raising_state = 2
                 console.log(`[MULTI] prepare: member waits during battle → 2`)
