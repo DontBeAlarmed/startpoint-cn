@@ -321,7 +321,8 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             selectData.raising_state = 1
             console.log(`[MULTI] select_room: host override raising_state → 1`)
         } else if (room.value.raisingState === 4) {
-            const isMember = isRoomViewerMember(getRoom(room.value.roomNumber), viewerId)
+            const roomRow = getRoom(room.value.roomNumber)
+            const isMember = roomRow !== undefined && isRoomViewerMember(roomRow, viewerId)
             selectData.raising_state = isMember ? 2 : 4
             console.log(`[MULTI] select_room: room in battle → state=${selectData.raising_state}`
                 + ` member=${isMember}`)
