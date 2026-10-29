@@ -26,15 +26,16 @@ export function installDisbandLifecycleListener(): void {
         }
     })
     setRoomDisbandListener((roomNumber, hostPlayerId, hostViewerId) => {
+        // 静默拆除（5805 竞态消除，2026-10-30 用户稳定复现定案）：先从广播
+        // 名册摘除全部房间 client，再对每个 socket 恰好发送一次 dismiss 并
+        // 关闭——dismiss 之后该 socket 不会再收到任何房间命令，客户端拆除
+        // 期间（cooperationRoomStatus 已置 None）无消息可命中 5805 的抛点。
+        // 旧序（先广播后关闭）在广播与关闭之间仍会投递 mate/ready 等在途
+        // 房间命令，命中拆除中的客户端。
         try {
-            sessionManager.broadcastToRoom(roomNumber, [1, [6, "multibattle_room_dismissed"]])
+            sessionManager.dismissAndDetachRoomClients(roomNumber)
         } catch (error) {
-            console.error(`[MULTI] disband broadcast failed: room=${roomNumber}: ${describeError(error)}`)
-        }
-        try {
-            sessionManager.closeRoomClients(roomNumber)
-        } catch (error) {
-            console.error(`[MULTI] disband client cleanup failed: room=${roomNumber}: ${describeError(error)}`)
+            console.error(`[MULTI] disband dismiss failed: room=${roomNumber}: ${describeError(error)}`)
         }
         try {
             releaseAbandonedMultiActiveQuest(hostPlayerId, roomNumber)
