@@ -90,7 +90,11 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
             .filter(admission => admission.roomNumber === roomNumber
                 && !this.isOccupiedMember(roomNumber, admission.participant.viewerId))
             .length
-        if (this.getOccupiedMemberCount(roomNumber) + pendingMemberCount >= MAX_REAL_ROOM_MEMBERS) {
+        // 战斗后返回：占座成员重发入场票是"收回自己的座位"，不是新增占位——
+        // occupied 基数已含其座位，若不加豁免会把返房成员顶成满员
+        // （2026-10-30 真机复现：房主+两客机返回全部被拒，诊断日志账目实锤）。
+        if (!this.isOccupiedMember(roomNumber, input.participant.viewerId)
+            && this.getOccupiedMemberCount(roomNumber) + pendingMemberCount >= MAX_REAL_ROOM_MEMBERS) {
             return { ok: false, error: "ROOM_FULL" }
         }
 
