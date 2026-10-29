@@ -40,6 +40,7 @@ let npcRecruitmentTiming: NpcRecruitmentTiming = Object.freeze({
 })
 
 interface ReconnectLease {
+    readonly seq: number
     readonly roomNumber: string
     readonly participant: ParticipantIdentity
     readonly connectionId: string
@@ -48,6 +49,7 @@ interface ReconnectLease {
 
 let reconnectGraceMs = DEFAULT_RECONNECT_GRACE_MS
 const reconnectLeases = new Map<string, ReconnectLease>()
+let leaseSeqCounter = 0
 
 export function configureReconnectGraceMs(value = DEFAULT_RECONNECT_GRACE_MS): void {
     if (!Number.isSafeInteger(value) || value <= 0) {
@@ -79,9 +81,16 @@ export function scheduleHostReturnLease(roomNumber: string, hostParticipant: Par
 export function cancelReconnectLease(participant: ParticipantIdentity): void {
     const key = reconnectKey(participant)
     const lease = reconnectLeases.get(key)
-    if (!lease) return
+    if (!lease) {
+        // 键错位诊断：重连换 nodeSessionId 后旧租约的取消会 MISS——打印在途键即可见
+        const inFlight = [...reconnectLeases.values()]
+            .map(lease => `${lease.seq}@${lease.roomNumber}`).join(",") || "none"
+        console.log(`[LOBBY-LEASE] cancel MISS in-flight=[${inFlight}]`)
+        return
+    }
     clearTimeout(lease.timer)
     reconnectLeases.delete(key)
+    console.log(`[LOBBY-LEASE] cancel HIT seq=${lease.seq} room=${lease.roomNumber}`)
 }
 
 // 好友房间大厅注册行同步（惰性 require 规避循环；无注册行 no-op）
@@ -122,12 +131,19 @@ function expireReconnectLease(key: string): void {
     if (!lease) return
     reconnectLeases.delete(key)
     const room = getRoom(lease.roomNumber)
-    if (!room || room.raising_state === 4) return
+    if (!room || room.raising_state === 4) {
+        console.log(`[LOBBY-LEASE] expire abort seq=${lease.seq} room=${lease.roomNumber}`
+            + ` state=${room?.raising_state ?? "gone"}`)
+        return
+    }
 
     const isHost = sessionManager.isRoomHostParticipant(
         lease.roomNumber,
         lease.participant,
     )
+    console.log(`[LOBBY-LEASE] expire seq=${lease.seq} room=${lease.roomNumber}`
+        + ` isHost=${isHost} state=${room.raising_state}`
+        + ` → ${isHost ? "DISBAND" : "remove-member"}`)
     if (isHost) {
         disbandRoom(lease.roomNumber)
         return
@@ -151,12 +167,15 @@ function scheduleReconnectLease(
     const key = reconnectKey(participant)
     const timer = setTimeout(() => expireReconnectLease(key), reconnectGraceMs)
     timer.unref?.()
+    const seq = ++leaseSeqCounter
     reconnectLeases.set(key, Object.freeze({
+        seq,
         roomNumber,
         participant: Object.freeze({ ...participant }),
         connectionId,
         timer,
     }))
+    console.log(`[LOBBY-LEASE] schedule seq=${seq} room=${roomNumber} grace=${reconnectGraceMs}ms`)
 }
 
 export function configureNpcRecruitmentTiming(

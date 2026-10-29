@@ -294,9 +294,14 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         })
         if (!issued.ok) {
             reply.header("content-type", "application/x-msgpack")
+            // 按真实错误种类投影（双审后用户实测钉死）：ROOM_FULL → 3 满员文案，
+            // 写死 7 会把满员误报成"未满足参加条件"（NotPlayable）
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": unavailableConnection(room.value.roomNumber, 7),
+                "data": unavailableConnection(
+                    room.value.roomNumber,
+                    roomUnavailableRaisingState(issued.error),
+                ),
             })
         }
 
