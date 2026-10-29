@@ -252,15 +252,15 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         }) : compatibility
         const room = classifyRoomJoin(context.questAvailability, selected)
         if (room.kind !== "available") {
+            const state = room.kind === "missing"
+                ? 9
+                : roomUnavailableRaisingState(room.error)
+            console.log(`[MULTI] select_room unavailable`
+                + ` error=${room.kind === "missing" ? "ROOM_NOT_FOUND" : room.error} → state=${state}`)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": unavailableConnection(
-                    body.room_number || "",
-                    room.kind === "missing"
-                        ? 9
-                        : roomUnavailableRaisingState(room.error),
-                ),
+                "data": unavailableConnection(body.room_number || "", state),
             })
         }
 
@@ -272,6 +272,8 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
                 room.value.questId,
                 (refCategory, refQuestId) => getPlayerSingleQuestProgressSync(ctx.playerId, refCategory, refQuestId),
             )) {
+            console.log(`[MULTI] select_room quest-gate blocked room=${room.value.roomNumber}`
+                + ` quest=${room.value.questId} → state=7`)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -293,9 +295,11 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             "error": "Bad Request", "message": "Unable to snapshot player."
         })
         if (!issued.ok) {
-            reply.header("content-type", "application/x-msgpack")
             // 按真实错误种类投影（双审后用户实测钉死）：ROOM_FULL → 3 满员文案，
             // 写死 7 会把满员误报成"未满足参加条件"（NotPlayable）
+            console.log(`[MULTI] select_room admission rejected room=${room.value.roomNumber}`
+                + ` error=${issued.error} → state=${roomUnavailableRaisingState(issued.error)}`)
+            reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
                 "data": unavailableConnection(
@@ -320,6 +324,8 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             console.log(`[MULTI] select_room: host offline, guest polls raising_state → 2`)
         }
 
+        console.log(`[MULTI] select_room served room=${room.value.roomNumber}`
+            + ` state=${selectData.raising_state}`)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
