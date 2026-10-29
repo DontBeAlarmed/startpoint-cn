@@ -5,6 +5,7 @@ import {
     insertPlayerGrowthFundReceivedSync,
 } from "../data/domains/growth-fund"
 import { getFinishedPlayerQuestIdsBySectionsSync } from "../data/domains/quest"
+import { getPlayerItemsByIdsSync } from "../data/domains/item"
 import { getGrowthFundTable } from "./growth-fund-content"
 import type { GrowthFundKind } from "../content/converters/growth-fund"
 import { getPlayerRankLevel } from "./player-rank-content"
@@ -168,6 +169,9 @@ export function receiveGrowthFundBonusSync(input: {
         for (const bonusId of accepted) {
             insertPlayerGrowthFundReceivedSync(input.playerId, bonusId)
         }
+        // 客户端 applyCommonResponseItemList 是 SET 语义（值=绝对余额，≤0 删条目）——
+        // 必须回发放后的绝对余额，增量会让客户端把本地数量错设为增量值。
+        const itemBalances = getPlayerItemsByIdsSync(input.playerId, [...rewards.items.keys()])
 
         return {
             ok: true,
@@ -178,7 +182,7 @@ export function receiveGrowthFundBonusSync(input: {
                 fundReceiveList: accepted,
                 paidVmoneyAfter: paidAfter,
                 freeVmoneyAfter: freeAfter,
-                items: Object.fromEntries(rewards.items),
+                items: itemBalances,
                 mailArrived: getMailArrivedSync(input.playerId),
             },
         }

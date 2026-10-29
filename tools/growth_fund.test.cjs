@@ -30,6 +30,7 @@ const {
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
 const { getPlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { SessionType } = require("../src/data/types")
 const { receiveGrowthFundBonusSync } = require("../src/lib/growth-fund")
 
@@ -91,6 +92,7 @@ test("claim main-quest bonus grants stones plus the 999003 ticket", async () => 
     const { playerId } = await createPlayer("main-quest")
     // bonus 12 = 主线 2009007（section 1）：150 免费石 + 999003 单抽券 ×1
     insertPlayerQuestProgressSync(playerId, 1, { questId: 2009007, finished: true })
+    grantInventoryFixtureItemSync(playerId, 999003, 5)
     const before = getPlayerSync(playerId)
 
     const result = receiveGrowthFundBonusSync({ playerId, bonusIds: [12] })
@@ -98,7 +100,9 @@ test("claim main-quest bonus grants stones plus the 999003 ticket", async () => 
 
     const after = getPlayerSync(playerId)
     assert.equal(after.freeVmoney, before.freeVmoney + 150)
-    assert.equal(getPlayerItemSync(playerId, 999003), 1, "角色单抽券到账")
+    assert.equal(getPlayerItemSync(playerId, 999003), 6, "角色单抽券到账（5+1）")
+    // 响应 item_list 是 SET 语义：必须回绝对余额（6），增量 1 会把客户端本地错设
+    assert.equal(result.result.items["999003"], 6)
     assert.deepEqual([...result.result.fundReceiveList], [12])
 })
 
