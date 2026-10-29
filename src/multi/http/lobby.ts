@@ -310,13 +310,10 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         }
 
         const selectData = serializeRoomStatusConnection(room.value, context.tcpEndpoint?.())
-        // 战斗中的房间必须回 4（客户端弹"已开战"立即结束）——优先级高于
-        // host-offline 兜底：房主进战后 lobby TCP 必然离线，旧投影误回 2
-        // （招募中语义=客户端轮询 5×3s 后弹"解散"），铃铛答铃撞上战斗即触发。
-        if (room.value.raisingState === 4) {
-            selectData.raising_state = 4
-            console.log(`[MULTI] select_room: room in battle, raising_state → 4`)
-        } else if (viewerId === room.value.host.viewerId) {
+        // state 4（战斗/结算）期间一律回 2（等待横幅轮询）：客户端等待或超时
+        // 判定已解散（官服行为）。不可回 4——prepare 远端的链式 select 解析器
+        // 对 4 抛 C5001（mac-c 实测）。房主返回房间经 prepare 路径释放状态。
+        if (viewerId === room.value.host.viewerId) {
             selectData.raising_state = 1
             console.log(`[MULTI] select_room: host override raising_state → 1`)
         } else if (!room.value.hostOnline) {

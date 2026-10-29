@@ -65,7 +65,9 @@ export function resetReconnectGraceMs(): void {
 }
 
 function reconnectKey(participant: ParticipantIdentity): string {
-    return participantKey(participant.nodeSessionId, participant.viewerId)
+    // 键按 viewerId（R-4）：重连换 nodeSessionId 后，Enter 的取消必须命中
+    // 断线时登记的租约——复合键会让取消永远 MISS、租约变成幽灵定时器
+    return `viewer:${participant.viewerId}`
 }
 
 /**
