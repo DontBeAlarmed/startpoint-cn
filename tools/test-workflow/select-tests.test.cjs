@@ -1096,6 +1096,8 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/scheduled_resource_rules.test.cjs",
         "tools/scheduled_resource_settlement.test.cjs",
         "tools/gift_receive_transaction.test.cjs",
+        "tools/growth_fund.test.cjs",
+        "tools/special_exchange.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -2432,6 +2434,8 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_coordinator_embedded.test.cjs",
         "tools/multi_coordinator_router.test.cjs",
         "tools/multi_lifecycle_faults.test.cjs",
+        "tools/multi_lifecycle_core.test.cjs",
+        "tools/multi_lifecycle_registry.test.cjs",
         "tools/multi_context_initialization.test.cjs",
         "tools/multi_finish_follow_info.test.cjs",
         "tools/multi_player_context.test.cjs",
@@ -2447,6 +2451,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/room_cleanup_lifecycle.test.cjs",
         "tools/startup_sweep.test.cjs",
         "tools/room_dismissal_lifecycle.test.cjs",
+        "tools/room_teardown_contract.test.cjs",
         "tools/session_frame_order.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
             "tools/multi_tcp_guardrails.test.cjs",

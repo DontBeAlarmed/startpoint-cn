@@ -453,6 +453,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/scheduled_resource_rules.test.cjs",
             "tools/scheduled_resource_settlement.test.cjs",
             "tools/gift_receive_transaction.test.cjs",
+            "tools/growth_fund.test.cjs",
+            "tools/special_exchange.test.cjs",
         ],
     },
     "integration:database": {
