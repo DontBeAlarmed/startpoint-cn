@@ -586,8 +586,10 @@ export class SessionManager {
 
     // 静默拆除（5805 竞态消除）：把房间全部 client 从广播名册摘除（后续
     // broadcastToRoom 不再命中它们），对每个 socket 恰好同步发送一次 dismiss
-    // ——它成为该 socket 收到的最后一条房间命令——随后延迟销毁 socket
-    // （让 dismiss 缓冲冲走；延迟不作用于消息序）。
+    // ——它成为该 socket 收到的最后一条房间命令——并立即销毁 socket。
+    // 立即关闭是关键：客户端收到 dismiss 后先走正常拆除（cooperationRoomStatus
+    // 仍有值，close 事件安全），随后才置 None；若延迟销毁，close 事件落在
+    // 置 None 之后，客户端断连回调会抛 5805（2026-10-30 复现实测）。
     dismissAndDetachRoomClients(roomNumber: string): number {
         const clients = this.getClientsInRoom(roomNumber)
         let detached = 0
@@ -598,13 +600,9 @@ export class SessionManager {
                 // 发送失败即关闭，忽略单 socket 异常
             }
             if (this.removeRoomClientIndexes(client)) detached++
+            this.removeClient(client)
+            this.closeClientSocket(client.socket)
         }
-        setTimeout(() => {
-            for (const client of clients) {
-                this.removeClient(client)
-                this.closeClientSocket(client.socket)
-            }
-        }, 100).unref?.()
         return detached
     }
 
