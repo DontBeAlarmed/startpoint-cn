@@ -184,6 +184,7 @@ test("lifecycle diagnostics expose closing and fallback counters without identit
         },
         drift: null,
         rejections: null,
+        effectDryRun: null,
     })
     assert.doesNotMatch(JSON.stringify(result.lifecycle), /viewer|player|device|token/i)
 

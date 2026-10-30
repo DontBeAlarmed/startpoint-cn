@@ -39,6 +39,7 @@ export interface AdminMultiLifecycleStatus {
     } | null
     readonly drift: AdminLifecycleDriftStatus | null
     readonly rejections: AdminMultiLifecycleRejections | null
+    readonly effectDryRun: AdminEffectDryRunStatus | null
 }
 
 export interface AdminLifecycleDriftSample {
@@ -68,6 +69,20 @@ export interface AdminLifecycleDriftStatus {
 export interface AdminMultiLifecycleRejections {
     readonly total: number
     readonly byReason: Readonly<Record<string, number>>
+}
+
+export interface AdminEffectDryRunEventSample {
+    readonly roomNumber: string
+    readonly event: string
+    readonly effects: readonly string[]
+}
+
+export interface AdminEffectDryRunStatus {
+    readonly mode: "dry-run"
+    readonly events: number
+    readonly totals: Readonly<Record<string, number>>
+    readonly lastEventAtMs: number | null
+    readonly lastEvent: AdminEffectDryRunEventSample | null
 }
 
 export interface CompatibilityRejectionDifference {
@@ -242,6 +257,9 @@ function sanitizeLifecycle(value: AdminMultiLifecycleStatus | null): AdminMultiL
         rejections: sanitizeLifecycleRejections(
             (value as { readonly rejections?: unknown }).rejections ?? null,
         ),
+        effectDryRun: sanitizeEffectDryRun(
+            (value as { readonly effectDryRun?: unknown }).effectDryRun ?? null,
+        ),
     })
 }
 
@@ -326,6 +344,48 @@ function sanitizeLifecycleRejections(value: unknown): AdminMultiLifecycleRejecti
     return Object.freeze({
         total: value.total,
         byReason: Object.freeze(byReason),
+    })
+}
+
+function sanitizeEffectDryRun(value: unknown): AdminEffectDryRunStatus | null {
+    if (!isRecord(value)) return null
+    if (value.mode !== "dry-run") return null
+    if (!isNonNegativeSafeInteger(value.events)) return null
+    if (!isRecord(value.totals)) return null
+    const totalsEntries = Object.entries(value.totals)
+    if (totalsEntries.length > MAX_REJECTION_REASON_ENTRIES) return null
+    const totals: Record<string, number> = {}
+    for (const [effect, count] of totalsEntries) {
+        if (!REJECTION_REASON_KEY_PATTERN.test(effect)) return null
+        if (!isNonNegativeSafeInteger(count)) return null
+        totals[effect] = count
+    }
+    const lastEventAtMs = value.lastEventAtMs === null || isNonNegativeSafeInteger(value.lastEventAtMs)
+        ? value.lastEventAtMs as number | null
+        : null
+    if (value.lastEventAtMs !== null && lastEventAtMs === null) return null
+    let lastEvent: AdminEffectDryRunEventSample | null = null
+    if (value.lastEvent !== null) {
+        if (!isRecord(value.lastEvent)) return null
+        const roomNumber = value.lastEvent.roomNumber
+        if (typeof roomNumber !== "string" || !/^\d{6}$/.test(roomNumber)) return null
+        if (typeof value.lastEvent.event !== "string" || value.lastEvent.event.length > 32) return null
+        if (!Array.isArray(value.lastEvent.effects) || value.lastEvent.effects.length > 9) return null
+        for (const effect of value.lastEvent.effects) {
+            if (typeof effect !== "string" || !REJECTION_REASON_KEY_PATTERN.test(effect)) return null
+        }
+        lastEvent = Object.freeze({
+            roomNumber,
+            event: value.lastEvent.event,
+            effects: Object.freeze([...value.lastEvent.effects]),
+        })
+    }
+    return Object.freeze({
+        mode: "dry-run",
+        events: value.events,
+        totals: Object.freeze(totals),
+        lastEventAtMs,
+        lastEvent,
     })
 }
 

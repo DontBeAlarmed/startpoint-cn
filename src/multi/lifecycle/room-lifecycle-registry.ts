@@ -8,6 +8,8 @@ import {
     type RoomLifecycleDecision,
     type RoomLifecycleState,
 } from "./room-lifecycle"
+import { recordEffectsDryRun } from "./effect-executor"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 /** 房间资源上界：结算后 15 分钟、closing 后 5 分钟（只回收，不推导状态）。 */
 export const LIFECYCLE_BATTLE_DEADLINE_MS = 900_000
@@ -72,7 +74,29 @@ export class RoomLifecycleRegistry {
             }
         }
         if (decision.state !== state) this.rooms.set(roomNumber, decision.state)
+        // 切片 1 dry-run：非拒绝且带 effects 的 decision 记账不执行——
+        // 外壳手写路径仍是唯一执行者，这里只回答"内核认为该发生什么"。
+        if (!decision.rejected && decision.effects.length > 0) {
+            recordEffectsDryRun(roomNumber, event.type, decision)
+        }
         return decision
+    }
+
+    /**
+     * 相位守卫的 hostReturn 派发：battle 相位之外派发的 hostReturn 今天只会
+     * 被 decide() 拒绝（NOT_IN_BATTLE，无任何 effect）——真机两轮日志 21+ 次
+     * 全部来自 getRoomStatus 闩锁与 resolveRoom 在 4→1 之后的重复派发。守卫
+     * 只消灭这类纯噪音；battle 相位内的语义（闩锁 pending / 提前返回）不变。
+     */
+    dispatchHostReturnIfInBattle(roomNumber: string, identity: string): void {
+        const state = this.rooms.get(roomNumber)
+        if (!state || state.phase !== "battle") return
+        this.dispatch(roomNumber, generation => ({
+            type: "hostReturn",
+            generation,
+            identity,
+            nowMs: getRealNowMs(),
+        }))
     }
 
     remove(roomNumber: string): void {

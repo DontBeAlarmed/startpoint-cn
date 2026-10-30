@@ -15,6 +15,7 @@ import { AdmissionRegistry } from "../admission/registry"
 import { embeddedAdmissionRegistry } from "../admission/registry"
 import { lifecycleRegistry } from "../lifecycle"
 import { getLifecycleDriftStatus } from "../lifecycle/drift-monitor"
+import { getEffectDryRunStatus } from "../lifecycle/effect-executor"
 import type {
     CoordinatorResult,
     MultiCoordinatorOrigin,
@@ -722,6 +723,7 @@ function localLifecycleStatus(): AdminMultiLifecycleStatus {
             total: stats.rejections,
             byReason: stats.rejectionReasons,
         }),
+        effectDryRun: getEffectDryRunStatus(),
     })
 }
 

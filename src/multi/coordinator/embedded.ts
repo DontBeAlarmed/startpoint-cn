@@ -384,12 +384,10 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             if (battleReleased) {
                 const hostIdentity = lifecycleRegistry.hostOf(room.room_number)
                 if (hostIdentity !== undefined) {
-                    lifecycleRegistry.dispatch(room.room_number, generation => ({
-                        type: "hostReturn",
-                        generation,
-                        identity: hostIdentity,
-                        nowMs: getRealNowMs(),
-                    }))
+                    // 相位守卫：4→1 之后的重复状态读（share 15s 心跳等）不再
+                    // 派发 hostReturn——内核只会拒 NOT_IN_BATTLE，无任何 effect
+                    // （切片 1 真机日志 21+ 次纯噪音的收口点）。
+                    lifecycleRegistry.dispatchHostReturnIfInBattle(room.room_number, hostIdentity)
                     reconcileHostReturn(room.room_number)
                 }
             }
@@ -416,12 +414,9 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 const hostIdentity = lifecycleRegistry.hostOf(room.room_number)
                 if (hostIdentity !== undefined) {
                     // 房主返回流程（prepare/select）是 4→1 的唯一触发；未结算时内核闩锁。
-                    lifecycleRegistry.dispatch(room.room_number, generation => ({
-                        type: "hostReturn",
-                        generation,
-                        identity: hostIdentity,
-                        nowMs: getRealNowMs(),
-                    }))
+                    // 相位守卫：非 battle 相位的派发内核只会拒绝（recruiting/ready
+                    // 期间的 prepare、4→1 之后的 3s×5 轮询），跳过等价且消灭噪音。
+                    lifecycleRegistry.dispatchHostReturnIfInBattle(room.room_number, hostIdentity)
                     reconcileHostReturn(room.room_number)
                 }
             }
