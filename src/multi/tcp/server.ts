@@ -19,7 +19,6 @@ import { installDisbandLifecycleListener } from "../room/disband-listener"
 import { startLobbyLifecycle, stopLobbyLifecycle } from "./lobby-lifecycle"
 import {
     configureNpcRecruitmentTiming,
-    configureReconnectGraceMs,
     resetNpcRecruitmentTiming,
     type NpcRecruitmentTiming,
 } from "./lobby"
@@ -740,7 +739,6 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
             try {
                 installDisbandLifecycleListener()
                 startRoomCleanup(options.roomCleanup)
-                configureReconnectGraceMs(options.roomCleanup?.reconnectGraceMs)
                 configureNpcRecruitmentTiming(options.npcRecruitment)
                 startLobbyLifecycle()
                 startNodeSessionChecks(context)

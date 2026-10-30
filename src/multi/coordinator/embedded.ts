@@ -180,15 +180,15 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     }
 
     async searchRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>> {
-        return this.resolveRoom(input, false)
+        return this.resolveRoom(input)
     }
 
     async prepareRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>> {
-        return this.resolveRoom(input, true)
+        return this.resolveRoom(input)
     }
 
     async selectRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>> {
-        return this.resolveRoom(input, false)
+        return this.resolveRoom(input)
     }
 
     async disbandRoom(input: RoomParticipantInput): Promise<CoordinatorResult<void>> {
@@ -377,7 +377,6 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
 
     private async resolveRoom(
         input: CompatibleRoomInput,
-        refreshHostEntryTime: boolean,
     ): Promise<CoordinatorResult<RoomStatus>> {
         const room = resolveCompatibleRoom(input)
         if (!room) return roomNotFound()
@@ -387,7 +386,10 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         }
         const compatibility = this.checkRoomCompatibility(room, input.compatibility)
         if (!compatibility.ok) return compatibility
-        if (refreshHostEntryTime) updateHostEntryTime(room.room_number)
+        // 房主的任何房间解析（搜索/准备/选择/恢复）都续命；客机轮询不续命。
+        if (input.participant.viewerId === room.host_viewer_id) {
+            updateHostEntryTime(room.room_number)
+        }
         return ok(this.toRoomStatus(room))
     }
 

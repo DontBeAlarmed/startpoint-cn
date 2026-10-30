@@ -169,7 +169,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 | `summon` | 仅房主可请求 NPC mate 候选（`mate1`/`mate2` 双候选，候选 ≤1 客户端判 Faild 并重开铃铛）。三模式语义（`游戏设置-联机招募模式`）：发布关（NPC 快速）或 W=0（官服还原）恒发双候选；W>0（私服混合）招募行缺失或窗口未到回空（省略 mate 字段），NPC 由服务端释放点在 W 到点注入。合法房主+活房间恒 200——任何 4xx 会把客户端 summon 状态机永久卡死在 WaitRemote |
 | `restore_room` | 已记录成员可恢复仍在进程内的房间；陌生玩家返回状态 13，缺失房间返回状态 9 |
 | `share_room` | 仅房主可提交。双重门控：`share_type_list` 含 3（随机招募）**且** `游戏设置-联机招募模式` 的发布开关开启时，幂等创建/刷新铃铛招募行（房主客户端每 15s 重发、上限 20 次，同房间恒定 attention_key）并挂服务端 NPC 释放点（W>0 私服混合）；发布关闭（NPC 快速预设）时含 3 也不落行——按钮退化为纯 NPC 开关。投递经 `/attention/check` 下发（T1 房间态门：本节点未开战/房主在线/真人未满员，异节点放行；投递行只对真下发的铃铛建立——候选读取不记帐，瞬时被滤房间在 45s 生命期内后续轮询仍可送达）、guest 经 `start` 携 attention_key 进房（T2 门票：需持有效投递行，冻结 cond92 资格）；纯 1/2（互关/粉丝）分享不落招募行。成功响应不含业务字段（客户端忽略响应体），招募记账失败不影响 200。位 1/2 以 OR-merge 持久化到 `social_room_shares` 注册表（好友房间大厅数据源；勾选 [1,3]/[2,3] 时 [3] 的 15s 重发绝不触碰注册行，行回收只走 disband 钩子 + TTL 兜底），`raising_state`/mates 由房间权威节点生命周期钩子实时同步 |
-| `disband_room` | 房间存在时仅房主可广播 Disbanded 并删除房间；房间已不存在时幂等成功。解散监听器统一关闭该房的招募行与注册行（覆盖计时器/宽限等全部解散路径，铃铛不再为死房投递） |
+| `disband_room` | 房间存在时仅房主可广播 Disbanded 并删除房间；房间已不存在时幂等成功。解散监听器统一关闭该房的招募行与注册行（覆盖计时器等全部解散路径，铃铛不再为死房投递） |
 
 ### 4.3 战斗生命周期
 
@@ -257,7 +257,7 @@ cooperation_room 拒绝裁决（F-02，2026-10 用户定案）：**日常可恢�
 
 客户端协议中的 `MeetingNotifyMessage.Bye`（Notify index 1）是客户端定义的无参数枚举消息，不是 HTTP 字段，也不等同于“玩家主动退出房间”。客户端停止使用当前 `cooperation_room` 连接时会发送它，主动离开和进入战斗时的连接切换都可能走同一消息；因此服务端必须结合 `raising_state` 解释，不能仅凭名称判断为解散。
 
-成员资格在房间内保存完整 `nodeSessionId + viewerId`，不从当前在线 socket 反推，因此远程成员临时离线后不会退化成 `embedded + viewerId`。结算事实的授权、Finalize 和移除也使用相同复合键；服务端不能在这些状态中只用 viewer 区分成员。成员资格与 socket 在线状态分开保存：战斗前普通网络断开只移除连接并启动 `MULTI_ROOM_RECONNECT_GRACE_MS` 宽限，宽限内保留 `restore_room` 资格；明确 `Bye` 仍立即释放 guest 或解散 host。进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。`raising_state=4` 期间 lobby 的 Enter、ChangeParty、Ready 和 EnterComs 一律被拒绝（写锁绑定房间生命周期，与 battle socket 是否在线无关）；只有正式 release 把房间转回 1 后，重赛 lobby 写入才重新开放。
+成员资格在房间内保存完整 `nodeSessionId + viewerId`，不从当前在线 socket 反推，因此远程成员临时离线后不会退化成 `embedded + viewerId`。结算事实的授权、Finalize 和移除也使用相同复合键；服务端不能在这些状态中只用 viewer 区分成员。成员资格与 socket 在线状态分开保存：战斗前普通网络断开只移除连接，客机立即释放座位，房主保留房间等待重连或老化清理；明确 `Bye` 仍立即释放 guest 或解散 host。进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。`raising_state=4` 期间 lobby 的 Enter、ChangeParty、Ready 和 EnterComs 一律被拒绝（写锁绑定房间生命周期，与 battle socket 是否在线无关）；只有正式 release 把房间转回 1 后，重赛 lobby 写入才重新开放。
 
 ### 6.2 Battle socket 握手
 
@@ -372,7 +372,7 @@ session party 的角色、合击角色、装备和能力魂槽位都必须按 Op
 - party 由 `readMultiplayerSnapshot()` 批量读取，并由 `buildPlayerSnapshot()` 投影；
 - 已连接真人与 NPC 一起组成最多三人的 Mates 列表。
 
-服务端已实现 25 秒断线重连宽限、权威席位释放、重赛 NPC 幂等补位和已 Enter 客户端 roster 同步。仍未完成的是随机匹配、公开成员发现、完整客户端异常矩阵和真实双客户端验收，不能据此标记为真人联机已完成。
+服务端已实现客机断线即释座、房主房间靠老化清理、权威席位释放、重赛 NPC 幂等补位和已 Enter 客户端 roster 同步。仍未完成的是随机匹配、公开成员发现、完整客户端异常矩阵和真实双客户端验收，不能据此标记为真人联机已完成。
 
 NPC 昵称与贡献规则见[NPC 昵称贡献](../systems/npc-contributor-names.md)。
 

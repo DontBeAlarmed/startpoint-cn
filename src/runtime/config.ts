@@ -47,7 +47,6 @@ export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly MULTI_ROOM_INCOMPLETE_EXPIRY_MS?: string
     readonly MULTI_ROOM_FULL_EXPIRY_MS?: string
     readonly MULTI_ROOM_CLEAN_INTERVAL_MS?: string
-    readonly MULTI_ROOM_RECONNECT_GRACE_MS?: string
     readonly NPC_JOIN_DELAY_MS?: string
     readonly NPC_READY_DELAY_MS?: string
     readonly MULTI_MODE?: string
@@ -86,7 +85,6 @@ export interface MultiRuntimeTuningConfig {
         readonly incompleteExpiryMs: number
         readonly fullExpiryMs: number
         readonly intervalMs: number
-        readonly reconnectGraceMs: number
     }
     readonly npcRecruitment: {
         readonly joinDelayMs: number
@@ -453,7 +451,6 @@ function parseMultiRuntimeTuning(env: RuntimeEnvironment): MultiRuntimeTuningCon
             incompleteExpiryMs: parseMilliseconds(env.MULTI_ROOM_INCOMPLETE_EXPIRY_MS, 900_000),
             fullExpiryMs: parseMilliseconds(env.MULTI_ROOM_FULL_EXPIRY_MS, 1_800_000),
             intervalMs: parseMilliseconds(env.MULTI_ROOM_CLEAN_INTERVAL_MS, 60_000),
-            reconnectGraceMs: parseMilliseconds(env.MULTI_ROOM_RECONNECT_GRACE_MS, 25_000),
         }),
         npcRecruitment: Object.freeze({
             joinDelayMs: parseMilliseconds(env.NPC_JOIN_DELAY_MS, 2_000),

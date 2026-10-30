@@ -23,7 +23,6 @@ const tuning = Object.freeze({
         incompleteExpiryMs: 120000,
         fullExpiryMs: 240000,
         intervalMs: 15000,
-        reconnectGraceMs: 18000,
     }),
     npcRecruitment: Object.freeze({ joinDelayMs: 250, readyDelayMs: 75 }),
 })

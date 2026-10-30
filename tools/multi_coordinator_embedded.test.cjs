@@ -94,6 +94,32 @@ test("exports the embedded coordinator and HTTP context factory", () => {
     assert.equal(typeof createEmbeddedMultiHttpContext, "function")
 })
 
+test("hostEntryTime is refreshed only by the host's room resolution", async t => {
+    if (!EmbeddedMultiCoordinator) return t.skip("embedded coordinator missing")
+
+    const { coordinator, status } = await createFixture(t)
+    const { getRoom } = require("../src/multi/room/manager")
+    const room = getRoom(status.roomNumber)
+    assert.ok(room)
+    room.host_entry_time = 1000
+
+    const guest = await coordinator.prepareRoom({
+        participant: participant(202),
+        roomNumber: status.roomNumber,
+        compatibility,
+    })
+    assert.equal(guest.ok, true)
+    assert.equal(room.host_entry_time, 1000, "guest polling must not extend the room")
+
+    const host = await coordinator.prepareRoom({
+        participant: participant(101),
+        roomNumber: status.roomNumber,
+        compatibility,
+    })
+    assert.equal(host.ok, true)
+    assert.notEqual(room.host_entry_time, 1000, "host resolution refreshes hostEntryTime")
+})
+
 test("createRoom projects the local room into a node-scoped read-only status", async t => {
     if (!EmbeddedMultiCoordinator) return t.skip("embedded coordinator missing")
 

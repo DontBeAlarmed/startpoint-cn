@@ -101,7 +101,7 @@ sequenceDiagram
     AS->>AS: 本地事务写 active quest
     Note over B,A: 客户端执行战斗；双方连接权威 Battle TCP 完成 SceneReady 和消息中继
     T->>F: 记录逐玩家 TCP Finalize
-    Note over A,T: Lobby 断线默认保留短暂重连宽限；明确 Bye 立即离开
+    Note over A,T: Lobby 断线：客机立即释座、房主保留房间待老化；明确 Bye 立即离开
 ```
 
 当前没有公开大厅；房间发现只表达六位房号或 access token。所属服务生成最小玩家与配队快照，Host 通过权威 `AdmissionRegistry` 预留真人席位并约束一次性 TCP 握手。房间最多 3 名真人，待入场 admission 与已登记成员共同计数；失败、过期、节点撤销和房间解散都会释放预留。双方分别向自己的服务调用 `/start`，只有游戏房主所属节点扣除房主入场成本。

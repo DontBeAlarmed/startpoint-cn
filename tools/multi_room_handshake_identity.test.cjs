@@ -42,9 +42,7 @@ const { sessionManager } = require("../src/multi/state/SessionManager")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
 const { AdmissionRegistry } = require("../src/multi/admission/registry")
 const {
-    configureReconnectGraceMs,
     handleSocketDisconnect,
-    resetReconnectGraceMs,
 } = require("../src/multi/tcp/lobby")
 const { handleMessage: handleLobbyMessage } = require("../src/multi/tcp/lobby")
 
@@ -311,8 +309,7 @@ test("the same node participant can reconnect without an identity conflict", asy
     assert.equal(getRoom(room.room_number)?.room_number, room.room_number)
 })
 
-test("a TCP room reconnect cancels the pending network-disconnect cleanup", async t => {
-    configureReconnectGraceMs(25)
+test("a TCP room reconnect keeps the host room without a lease", async t => {
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const participant = { nodeSessionId: "node-reconnect", viewerId: 118 }
     const room = createRoom(118, 1_118, 1, 1, 518, 0, 101, false, participant)
@@ -336,7 +333,6 @@ test("a TCP room reconnect cancels the pending network-disconnect cleanup", asyn
         admit: false,
     })
     t.after(() => {
-        resetReconnectGraceMs()
         sessionManager.removeClientBySocket(reconnected)
         disbandRoom(room.room_number)
     })

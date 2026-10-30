@@ -6,6 +6,7 @@ import {
     getRoom,
     isRoomMember,
     removeRoomMember,
+    updateHostEntryTime,
     updateRoomState,
 } from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
@@ -28,7 +29,6 @@ import { participantKey, type ParticipantIdentity } from "../coordinator/contrac
 
 const DEFAULT_NPC_JOIN_DELAY_MS = 2_000
 const DEFAULT_NPC_READY_DELAY_MS = 500
-const DEFAULT_RECONNECT_GRACE_MS = 25_000
 
 export interface NpcRecruitmentTiming {
     readonly joinDelayMs: number
@@ -39,62 +39,6 @@ let npcRecruitmentTiming: NpcRecruitmentTiming = Object.freeze({
     joinDelayMs: DEFAULT_NPC_JOIN_DELAY_MS,
     readyDelayMs: DEFAULT_NPC_READY_DELAY_MS,
 })
-
-interface ReconnectLease {
-    readonly seq: number
-    readonly roomNumber: string
-    readonly participant: ParticipantIdentity
-    readonly connectionId: string
-    readonly timer: ReturnType<typeof setTimeout>
-}
-
-let reconnectGraceMs = DEFAULT_RECONNECT_GRACE_MS
-const reconnectLeases = new Map<string, ReconnectLease>()
-let leaseSeqCounter = 0
-
-export function configureReconnectGraceMs(value = DEFAULT_RECONNECT_GRACE_MS): void {
-    if (!Number.isSafeInteger(value) || value <= 0) {
-        throw new TypeError("reconnect grace must be a positive safe integer")
-    }
-    reconnectGraceMs = value
-}
-
-export function resetReconnectGraceMs(): void {
-    for (const lease of reconnectLeases.values()) clearTimeout(lease.timer)
-    reconnectLeases.clear()
-    reconnectGraceMs = DEFAULT_RECONNECT_GRACE_MS
-}
-
-function reconnectKey(participant: ParticipantIdentity): string {
-    // 键按 viewerId（R-4）：重连换 nodeSessionId 后，Enter 的取消必须命中
-    // 断线时登记的租约——复合键会让取消永远 MISS、租约变成幽灵定时器
-    return `viewer:${participant.viewerId}`
-}
-
-/**
- * OV-2：战斗释放（4→1）后 host 回房宽限。release 时刻 host 在结算页/强退
- * 的 socket 拓扑相同，无法现场区分——统一安排宽限：host 重进（Enter 取消
- * 点 lobby.ts 既有）则取消，宽限到期仍未重进 → expireReconnectLease 的
- * host 分支解散房间（guest 快速得到 Disbanded，僵尸房寿命 15min → 25s）。
- */
-export function scheduleHostReturnLease(roomNumber: string, hostParticipant: ParticipantIdentity): void {
-    scheduleReconnectLease(roomNumber, hostParticipant, `return-lease-${roomNumber}`)
-}
-
-export function cancelReconnectLease(participant: ParticipantIdentity): void {
-    const key = reconnectKey(participant)
-    const lease = reconnectLeases.get(key)
-    if (!lease) {
-        // 键错位诊断：重连换 nodeSessionId 后旧租约的取消会 MISS——打印在途键即可见
-        const inFlight = [...reconnectLeases.values()]
-            .map(lease => `${lease.seq}@${lease.roomNumber}`).join(",") || "none"
-        console.log(`[LOBBY-LEASE] cancel MISS in-flight=[${inFlight}]`)
-        return
-    }
-    clearTimeout(lease.timer)
-    reconnectLeases.delete(key)
-    console.log(`[LOBBY-LEASE] cancel HIT seq=${lease.seq} room=${lease.roomNumber}`)
-}
 
 // 好友房间大厅注册行同步（惰性 require 规避循环；无注册行 no-op）
 function syncShareRow(roomNumber: string): void {
@@ -129,58 +73,6 @@ function removeDisconnectedMate(roomNumber: string, connectionId: string): void 
     syncShareRow(roomNumber)
 }
 
-function expireReconnectLease(key: string): void {
-    const lease = reconnectLeases.get(key)
-    if (!lease) return
-    reconnectLeases.delete(key)
-    const room = getRoom(lease.roomNumber)
-    if (!room || room.raising_state === 4) {
-        console.log(`[LOBBY-LEASE] expire abort seq=${lease.seq} room=${lease.roomNumber}`
-            + ` state=${room?.raising_state ?? "gone"}`)
-        return
-    }
-
-    const isHost = sessionManager.isRoomHostParticipant(
-        lease.roomNumber,
-        lease.participant,
-    )
-    console.log(`[LOBBY-LEASE] expire seq=${lease.seq} room=${lease.roomNumber}`
-        + ` isHost=${isHost} state=${room.raising_state}`
-        + ` → ${isHost ? "DISBAND" : "remove-member"}`)
-    if (isHost) {
-        disbandRoom(lease.roomNumber)
-        return
-    }
-
-    if (removeRoomMember(lease.roomNumber, lease.participant)) {
-        removeDisconnectedMate(lease.roomNumber, lease.connectionId)
-        const hostClient = findHostClient(lease.roomNumber)
-        if (hostClient?.enterData) reconcileRematchSlots(hostClient, room)
-    }
-}
-
-function scheduleReconnectLease(
-    roomNumber: string,
-    participant: ParticipantIdentity,
-    // connectionId 仅被 guest 到期分支的 removeDisconnectedMate 消费；
-    // host 分支不解引用，合成 id（如 return-lease）安全
-    connectionId: string,
-): void {
-    cancelReconnectLease(participant)
-    const key = reconnectKey(participant)
-    const timer = setTimeout(() => expireReconnectLease(key), reconnectGraceMs)
-    timer.unref?.()
-    const seq = ++leaseSeqCounter
-    reconnectLeases.set(key, Object.freeze({
-        seq,
-        roomNumber,
-        participant: Object.freeze({ ...participant }),
-        connectionId,
-        timer,
-    }))
-    console.log(`[LOBBY-LEASE] schedule seq=${seq} room=${roomNumber} grace=${reconnectGraceMs}ms`)
-}
-
 export function configureNpcRecruitmentTiming(
     options: Partial<NpcRecruitmentTiming> = {},
 ): void {
@@ -192,10 +84,6 @@ export function configureNpcRecruitmentTiming(
 
 export function resetNpcRecruitmentTiming(): void {
     configureNpcRecruitmentTiming()
-}
-
-export function handleParticipantReconnect(client: SessionClient): void {
-    if (client.participant) cancelReconnectLease(client.participant)
 }
 
 interface RoomRecruitmentState {
@@ -565,10 +453,6 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
     if (!isHost && (!room || !client.participant || !isRoomMember(room, client.participant))) return
 
-    // OV-2：重进 = host 回来了——取消战斗释放安排的回房宽限（漏取消会把
-    // 正常重赛在 25s 后误解散）。guest Enter 同样取消自身的重连租约。
-    if (client.participant) cancelReconnectLease(client.participant)
-
     client.yourself.party = ed.party
     if (ed.autoplayMode !== undefined) client.yourself.autoplayMode = ed.autoplayMode;
     if (ed.autoskillMode !== undefined) client.yourself.autoskillMode = ed.autoskillMode;
@@ -597,6 +481,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 
     if (isHost) {
         updateRoomState(client.roomNumber, 1)
+        updateHostEntryTime(client.roomNumber)
         // 房内切换编队的即时刷新：重写 open 招募的房主快照（角色 = 本次上报
         // 编队一号位）。尽力而为：失败由 15s 重发兜底。进化等级按房间主人的
         // 玩家行实查（client 会话不携带 playerId）。
@@ -701,7 +586,6 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
         }))
     }
 
-    if (client.participant) cancelReconnectLease(client.participant)
     if (preserveActiveBattle) {
         sessionManager.removeClient(client)
         try { client.socket.destroy() } catch {}
@@ -710,10 +594,15 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     }
 
     if (reason === "network") {
-        removeDisconnectedMate(client.roomNumber, client.connectionId)
+        // 房主网络断开不重写 mates：房主席位保留，由 host-offline 投影与老化回收处理。
+        if (!isHost) removeDisconnectedMate(client.roomNumber, client.connectionId)
         sessionManager.removeClient(client)
-        if (client.participant) {
-            scheduleReconnectLease(client.roomNumber, client.participant, client.connectionId)
+        if (!isHost && client.participant) {
+            // 客机宽限已删除：网络断开即释放座位；重连走完整准备/入场。
+            if (removeRoomMember(client.roomNumber, client.participant)) {
+                const hostClient = findHostClient(client.roomNumber)
+                if (hostClient?.enterData && room) reconcileRematchSlots(hostClient, room)
+            }
         }
         console.log(`[LOBBY] client disconnected: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
         return
