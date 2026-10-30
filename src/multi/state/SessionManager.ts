@@ -57,6 +57,8 @@ export interface SessionClient {
     viewerId: number
     roomNumber: string
     connectionId: string
+    /** 入场票签发的房间代次；旧代次事件在生命周期内核里被丢弃。 */
+    lifecycleGeneration?: number
     participant?: ParticipantIdentity
     snapshot?: PlayerSnapshot
     npcPartySnapshots: readonly PlayerPartySnapshot[]
@@ -620,10 +622,25 @@ export class SessionManager {
     }
 
     private dismissClient(client: SessionClient): void {
+        const roomNumber = client.roomNumber
+        const viewerId = client.viewerId
+        const lifecycleGeneration = client.lifecycleGeneration
         this.removeClient(client)
         this.sendJson(client.socket, [1, [6, "multibattle_room_dismissed"]])
         this.armDismissedSocketFallback(client.socket)
+        if (typeof client.socket.once === "function") {
+            client.socket.once("close", () => (
+                this.onDismissedSocketClosed?.(roomNumber, viewerId, lifecycleGeneration)
+            ))
+        }
     }
+
+    /** dismissed socket 关闭事件口（disband-listener 注册，驱动内核 closing→closed）。 */
+    onDismissedSocketClosed: ((
+        roomNumber: string,
+        viewerId: number,
+        lifecycleGeneration?: number,
+    ) => void) | null = null
 
     private armDismissedSocketFallback(socket: net.Socket): void {
         if (socket.destroyed) return

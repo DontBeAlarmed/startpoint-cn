@@ -1,6 +1,8 @@
 import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
 import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import { describeError } from "../describe-error"
+import { sessionManager } from "../state/SessionManager"
+import { identityOf, lifecycleRegistry } from "../lifecycle"
 import { setRoomDisbandListener } from "./manager"
 
 /**
@@ -9,6 +11,15 @@ import { setRoomDisbandListener } from "./manager"
  * only persistence cleanup, so there is no second dismissal path.
  */
 export function installDisbandLifecycleListener(): void {
+    // dismissed socket 关闭 → 内核 closeConfirmed；全部确认或到期后 closed。
+    sessionManager.onDismissedSocketClosed = (roomNumber, viewerId, lifecycleGeneration) => {
+        const decision = lifecycleRegistry.dispatch(roomNumber, generation => ({
+            type: "closeConfirmed",
+            generation,
+            identity: identityOf({ viewerId }),
+        }), lifecycleGeneration)
+        if (decision?.state.phase === "closed") lifecycleRegistry.remove(roomNumber)
+    }
     setRoomDisbandListener((roomNumber, hostPlayerId, hostViewerId) => {
         // 拆除已在 manager.disbandRoom 完成（dismiss-only）；这里只做持久层清理。
         try {

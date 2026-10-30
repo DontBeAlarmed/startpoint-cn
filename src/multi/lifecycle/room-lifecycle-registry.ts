@@ -45,10 +45,11 @@ export class RoomLifecycleRegistry {
     dispatch(
         roomNumber: string,
         build: (generation: number) => RoomEvent,
+        generationOverride?: number,
     ): RoomLifecycleDecision | null {
         const state = this.rooms.get(roomNumber)
         if (!state) return null
-        const event = build(state.generation)
+        const event = build(generationOverride ?? state.generation)
         const decision = decide(state, event)
         if (decision.rejected) {
             this.rejections++
@@ -72,6 +73,18 @@ export class RoomLifecycleRegistry {
 
     stats(): { readonly rooms: number; readonly rejections: number } {
         return { rooms: this.rooms.size, rejections: this.rejections }
+    }
+
+    /** 清掉超过 closing 期限仍未确认的 detached closing（资源回收，不推导状态）。 */
+    sweepClosing(nowMs: number, deadlineMs: number): number {
+        let removed = 0
+        for (const [roomNumber, state] of this.rooms) {
+            if (state.phase !== "closing" || state.closingAtMs === null) continue
+            if (nowMs - state.closingAtMs < deadlineMs) continue
+            this.rooms.delete(roomNumber)
+            removed++
+        }
+        return removed
     }
 
     get size(): number {

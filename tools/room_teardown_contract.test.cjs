@@ -5,8 +5,15 @@ const { after, test } = require("node:test")
 
 require("./test-workflow/bootstrap.cjs").bootstrap()
 
-const { createRoom, disbandRoom, getRoom } = require("../src/multi/room/manager")
+const {
+    createRoom,
+    disbandRoom,
+    getRoom,
+    setRoomDisbandListener,
+} = require("../src/multi/room/manager")
+const { installDisbandLifecycleListener } = require("../src/multi/room/disband-listener")
 const { sessionManager } = require("../src/multi/state/SessionManager")
+const { lifecycleRegistry } = require("../src/multi/lifecycle")
 
 const DISMISS_FRAME = [1, [6, "multibattle_room_dismissed"]]
 
@@ -130,6 +137,76 @@ test("dismissSingleClient uses the same dismiss-only contract", () => {
     assert.deepEqual(socket.writes, [DISMISS_FRAME])
     assert.equal(socket.destroyCalls, 0)
     assert.equal(sessionManager.getClientBySocket(socket), undefined)
+})
+
+function installCloseConfirmation() {
+    installDisbandLifecycleListener()
+    // 本文件不建库：只保留生产 closeConfirmed 钩子，摘掉持久层 listener。
+    setRoomDisbandListener(null)
+}
+
+function seatKernelGuest(roomNumber, viewerId) {
+    const identity = `viewer:${viewerId}`
+    lifecycleRegistry.dispatch(roomNumber, generation => ({ type: "admit", generation, identity }))
+    lifecycleRegistry.dispatch(roomNumber, generation => ({ type: "handshake", generation, identity }))
+    lifecycleRegistry.dispatch(roomNumber, generation => ({
+        type: "enter",
+        generation,
+        identity,
+        nowMs: Date.now(),
+    }))
+}
+
+test("a dismissed socket close drives closing → closed", () => {
+    lifecycleRegistry.reset()
+    installCloseConfirmation()
+    try {
+        const room = makeRoom()
+        const socket = new FakeSocket()
+        addRoomClient(room, socket)
+
+        assert.equal(disbandRoom(room.room_number), true)
+        assert.equal(lifecycleRegistry.get(room.room_number).phase, "closing")
+        assert.equal(socket.destroyCalls, 0, "dismiss-only：socket 保持到客户端断开")
+        socket.close()
+        assert.equal(lifecycleRegistry.get(room.room_number), undefined)
+    } finally {
+        sessionManager.onDismissedSocketClosed = null
+        setRoomDisbandListener(null)
+    }
+})
+
+test("closing waits for every live dismissed socket to close", () => {
+    lifecycleRegistry.reset()
+    installCloseConfirmation()
+    try {
+        const room = makeRoom()
+        const hostSocket = new FakeSocket()
+        const guestSocket = new FakeSocket()
+        addRoomClient(room, hostSocket)
+        addRoomClient(room, guestSocket, 202)
+        seatKernelGuest(room.room_number, 202)
+
+        assert.equal(disbandRoom(room.room_number), true)
+        assert.equal(lifecycleRegistry.get(room.room_number).phase, "closing")
+
+        hostSocket.close()
+        assert.equal(
+            lifecycleRegistry.get(room.room_number)?.phase,
+            "closing",
+            "剩余活 socket 未确认前不得 closed",
+        )
+
+        guestSocket.close()
+        assert.equal(
+            lifecycleRegistry.get(room.room_number),
+            undefined,
+            "全部 socket 确认后关闭并回收注册表",
+        )
+    } finally {
+        sessionManager.onDismissedSocketClosed = null
+        setRoomDisbandListener(null)
+    }
 })
 
 test("closeBattleClientsForRoom closes battle sockets immediately", () => {

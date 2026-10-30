@@ -112,7 +112,33 @@ test("rejected events are counted for shadow observation", () => {
     assert.equal(lifecycleRegistry.stats().rejections, 0)
 })
 
+test("a stale generation override is rejected without changing the state", () => {
+    lifecycleRegistry.reset()
+    const state = lifecycleRegistry.create("100006", "viewer:1")
+    const accepted = lifecycleRegistry.dispatch("100006", generation => ({
+        type: "admit", generation, identity: "viewer:2",
+    }), state.generation)
+    assert.equal(accepted.rejected, undefined)
+    const stale = lifecycleRegistry.dispatch("100006", generation => ({
+        type: "handshake", generation, identity: "viewer:2",
+    }), state.generation + 999)
+    assert.equal(stale.rejected, "STALE_GENERATION")
+})
+
+test("closing entries are swept after the close deadline", () => {
+    lifecycleRegistry.reset()
+    lifecycleRegistry.create("100007", "viewer:1")
+    const closing = lifecycleRegistry.dispatch("100007", generation => ({
+        type: "disband", generation, identity: null, nowMs: 1_000, closeDeadlineMs: 500,
+    }))
+    assert.equal(closing.state.phase, "closing")
+    assert.equal(lifecycleRegistry.sweepClosing(1_499, 500), 0)
+    assert.equal(lifecycleRegistry.sweepClosing(1_500, 500), 1)
+    assert.equal(lifecycleRegistry.get("100007"), undefined)
+})
+
 test("reset clears every tracked room", () => {
+    lifecycleRegistry.reset()
     lifecycleRegistry.create("100003", "viewer:1")
     lifecycleRegistry.create("100004", "viewer:2")
     assert.equal(lifecycleRegistry.size, 2)

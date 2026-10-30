@@ -225,7 +225,7 @@ export function checkHostAutoReady(roomNumber: string): void {
                     generation,
                     identity: identityOf(hostClient.participant!),
                     ready: true,
-                }))
+                }), hostClient.lifecycleGeneration)
             }
         }
     } else {
@@ -239,7 +239,7 @@ export function checkHostAutoReady(roomNumber: string): void {
                     generation,
                     identity: identityOf(hostClient.participant!),
                     ready: false,
-                }))
+                }), hostClient.lifecycleGeneration)
             }
         }
     }
@@ -469,14 +469,14 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
             generation,
             identity: identityOf(client.participant!),
             nowMs: getRealNowMs(),
-        }))
+        }), client.lifecycleGeneration)
         // HostReturn 清空 ready 后，房主重进时按客户端当前 ready 重新同步。
         lifecycleRegistry.dispatch(client.roomNumber, generation => ({
             type: "ready",
             generation,
             identity: identityOf(client.participant!),
             ready: client.isReady,
-        }))
+        }), client.lifecycleGeneration)
     }
 
     if (isHost) {
@@ -583,7 +583,7 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
             type: "socketLost",
             generation,
             identity: identityOf(client.participant!),
-        }))
+        }), client.lifecycleGeneration)
     }
 
     if (preserveActiveBattle) {
@@ -741,7 +741,7 @@ function handleReady(_socket: net.Socket, client: SessionClient, data: any[]): v
             generation,
             identity: identityOf(client.participant!),
             ready: client.isReady,
-        }))
+        }), client.lifecycleGeneration)
     }
 
     const mate = client.mates.find(m => m.viewerId === client.viewerId)
@@ -809,7 +809,7 @@ function beginBattle(client: SessionClient): boolean {
         generation,
         identity: identityOf(client.participant!),
         battleSessionId: sessionManager.getActiveBattleSessionId(client.roomNumber) ?? "",
-    }))
+    }), client.lifecycleGeneration)
     // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底
     // W1a：异步形状——同步上下文 fire-and-forget（拒绝就地捕获，try/catch
     // 不接 async 拒绝）

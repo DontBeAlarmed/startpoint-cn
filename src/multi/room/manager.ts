@@ -19,6 +19,8 @@ const DEFAULT_FULL_ROOM_EXPIRY_MS = 1_800_000; // 30min, mates >= 3
 const DEFAULT_ABANDONED_BATTLE_EXPIRY_MS = 900_000; // 15min
 const DEFAULT_CLEAN_INTERVAL_MS = 60_000;
 const REMAINING_NOTIFY_MS = 30000; // send RemainingTime float 30s before disband
+/** state 4 未 finalize 的硬上界（只回收，推导状态）；防常连 socket 把战局钉死。 */
+const BATTLE_HARD_LIMIT_MS = 2 * 60 * 60_000;
 const ROOM_NUMBER_ALLOCATION_ATTEMPTS = 10;
 
 // Track which rooms have already been notified (to avoid repeat floats)
@@ -30,6 +32,7 @@ export interface RoomCleanupOptions {
     incompleteExpiryMs?: number;
     fullExpiryMs?: number;
     intervalMs?: number;
+    battleHardLimitMs?: number;
     createInterval?: (callback: () => void, intervalMs: number) => RoomCleanupTimer;
     clearInterval?: (timer: RoomCleanupTimer) => void;
     abandonedBattleExpiryMs?: number;
@@ -49,6 +52,7 @@ interface RoomCleanupTiming {
     readonly incompleteExpiryMs: number;
     readonly fullExpiryMs: number;
     readonly abandonedBattleExpiryMs: number;
+    readonly battleHardLimitMs: number;
 }
 
 function notifyRoomDisbanded(roomNumber: string, hostPlayerId: number, hostViewerId: number): void {
@@ -62,6 +66,8 @@ function cleanExpiredRooms(timing: RoomCleanupTiming) {
     // timeOffset 调整不得使存量房间瞬时全灭或永不过期。
     // 旧值（虚拟秒）与新值（真实毫秒）混存窗口内可能出现一次瞬态误判，可接受。
     const timeOffset = 0;
+    // detached closing 的资源回收：没有 socket 可等的条目按 closeDeadline 清掉。
+    lifecycleRegistry.sweepClosing(now, LIFECYCLE_CLOSE_DEADLINE_MS);
     let cleaned = 0;
     for (const [roomNumber, room] of rooms) {
         // B2b：自检内核的资源 deadline（结算后 15 分钟 / closing 后 5 分钟）。
@@ -80,6 +86,18 @@ function cleanExpiredRooms(timing: RoomCleanupTiming) {
             continue;
         }
         if (room.raising_state === 4) {
+            // 已 Finalize 的战局交给 15 分钟 gcSweep；2 小时硬上界只兜住
+            // "从未结算"的常连战局（否则长战局刚结束就会被硬上界强拆）。
+            const battleFinalized = lifecycleDecision?.state.phase === "battle"
+                && lifecycleDecision.state.battleFinalized === true;
+            const startedAt = room.battle_started_at_ms
+                ?? room.host_entry_time * 1000;
+            const battleAge = startedAt > 0 ? now - startedAt : 0;
+            if (!battleFinalized && battleAge > timing.battleHardLimitMs) {
+                console.log(`[MULTI] recycling over-age battle room: ${roomNumber}`);
+                if (disbandRoom(roomNumber)) cleaned++;
+                continue;
+            }
             // A battle room is only recycled once every participant is gone
             // (no lobby socket, no battle socket) and the bounded grace has
             // passed; disbandRoom releases the battle facts idempotently.
@@ -126,6 +144,7 @@ export function startRoomCleanup(options: RoomCleanupOptions = {}): void {
         fullExpiryMs: options.fullExpiryMs ?? DEFAULT_FULL_ROOM_EXPIRY_MS,
         abandonedBattleExpiryMs: options.abandonedBattleExpiryMs
             ?? DEFAULT_ABANDONED_BATTLE_EXPIRY_MS,
+        battleHardLimitMs: options.battleHardLimitMs ?? BATTLE_HARD_LIMIT_MS,
     });
     const timer = createInterval(
         () => cleanExpiredRooms(timing),
@@ -348,6 +367,7 @@ export function updateRoomState(
     const previousState = room.raising_state;
     console.log(`[MULTI] room state: ${roomNumber} → ${state}`);
     room.raising_state = state;
+    if (previousState !== 4 && state === 4) room.battle_started_at_ms = getRealNowMs();
     // R-6（官服语义，2026-10-30 维护者裁定）：战斗结算释放全部非房主座位——
     // 房间回到"仅房主+空位"，成员返回与外部加入走同一条普通加入流程竞争
     // 空位（先到先得，成员无优先权）。NPC 名册由 onBattleReleased 钩子清空。
@@ -392,8 +412,46 @@ export function reconcileHostReturn(roomNumber: string): boolean {
     return true;
 }
 
+function settleDisbandedIdentities(
+    roomNumber: string,
+    lifecycle: ReturnType<typeof lifecycleRegistry.get>,
+    liveIdentities: ReadonlySet<string>,
+): void {
+    if (!lifecycle) return;
+    if (lifecycle.phase === "closed") {
+        lifecycleRegistry.remove(roomNumber);
+        return;
+    }
+    const known = new Set<string>([
+        ...lifecycle.seats,
+        ...lifecycle.battleParticipants,
+        ...Object.keys(lifecycle.joiners),
+    ]);
+    if (known.size === 0) {
+        lifecycleRegistry.remove(roomNumber);
+        return;
+    }
+    for (const identity of known) {
+        if (liveIdentities.has(identity)) continue;
+        // 没有活 socket 的成员当场确认关闭；有 socket 的等 dismiss 后 close。
+        const decision = lifecycleRegistry.dispatch(roomNumber, generation => ({
+            type: "closeConfirmed",
+            generation,
+            identity,
+        }));
+        if (decision?.state.phase === "closed") {
+            lifecycleRegistry.remove(roomNumber);
+            return;
+        }
+    }
+}
+
 export function disbandRoom(roomNumber: string): boolean {
     const room = rooms.get(roomNumber);
+    const lifecycle = lifecycleRegistry.get(roomNumber);
+    const liveIdentities = new Set(
+        sessionManager.getClientsInRoom(roomNumber).map(client => identityOf(client)),
+    );
     lifecycleRegistry.dispatch(roomNumber, generation => ({
         type: "disband",
         generation,
@@ -410,7 +468,7 @@ export function disbandRoom(roomNumber: string): boolean {
             sessionManager.dismissRoomClients(roomNumber);
             sessionManager.closeBattleClientsForRoom(roomNumber);
         }
-        lifecycleRegistry.remove(roomNumber);
+        // 重复解散：closing 已由第一次解除散负责，不在这里再次确认/remove。
         return false;
     }
     console.log(`[MULTI] room deleted: ${roomNumber}`);
@@ -421,7 +479,7 @@ export function disbandRoom(roomNumber: string): boolean {
     sessionManager.removeRoomState(roomNumber);
     notifiedRooms.delete(roomNumber);
     notifyRoomDisbanded(roomNumber, room?.host_player_id ?? 0, room?.host_viewer_id ?? 0);
-    lifecycleRegistry.remove(roomNumber);
+    settleDisbandedIdentities(roomNumber, lifecycle, liveIdentities);
     return true;
 }
 

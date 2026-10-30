@@ -30,10 +30,13 @@ const {
     getRoomCleanupStatus,
     startRoomCleanup,
     stopRoomCleanup,
+    updateRoomState,
 } = require("../src/multi/room/manager")
 const { RoomState } = require("../src/multi/types")
 const { sessionManager } = require("../src/multi/state/SessionManager")
+const { lifecycleRegistry } = require("../src/multi/lifecycle")
 const { getServerTime } = require("../src/utils")
+const { getRealNowMs } = require("../src/runtime/time/game-time")
 
 function useRoomNumbers(...candidates) {
     roomNumberCandidates = [...candidates]
@@ -147,6 +150,88 @@ test("room cleanup uses the configured incomplete and full expiry thresholds", t
 
     assert.equal(getRoom(incomplete.room_number), undefined)
     assert.equal(getRoom(full.room_number), full)
+})
+
+test("a finalized battle is left to the gcSweep instead of the hard bound", t => {
+    let cleanup
+    startRoomCleanup({
+        battleHardLimitMs: 60_000,
+        createInterval(callback) {
+            cleanup = callback
+            return { unref() {} }
+        },
+        clearInterval() {},
+    })
+    const room = createRoom(112, 212, 1, 1, 312, 1, 412)
+    t.after(() => disbandRoom(room.room_number))
+    assert.equal(updateRoomState(room.room_number, 4), true)
+    const identity = "viewer:112"
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "enter", generation, identity, nowMs: Date.now(),
+    }))
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "startBattle", generation, identity, battleSessionId: "finalized-session",
+    }))
+    const finalized = lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "finish",
+        generation,
+        identity,
+        nowMs: getRealNowMs(),
+        battleDeadlineMs: 900_000,
+        battleSessionId: "finalized-session",
+    }))
+    assert.equal(finalized?.state.battleFinalized, true, "前置：战局已全部 Finish")
+
+    room.battle_started_at_ms = getRealNowMs() - 60_001
+    cleanup()
+
+    assert.equal(
+        getRoom(room.room_number),
+        room,
+        "已 Finalize 的战局由 15 分钟 gcSweep 回收，不被 2 小时硬上界强拆",
+    )
+})
+
+test("state 4 past the hard battle bound is recycled even with clients", t => {
+    let cleanup
+    startRoomCleanup({
+        battleHardLimitMs: 60_000,
+        createInterval(callback) {
+            cleanup = callback
+            return { unref() {} }
+        },
+        clearInterval() {},
+    })
+    const room = createRoom(111, 211, 1, 1, 311, 1, 411)
+    assert.equal(updateRoomState(room.room_number, 4), true)
+    assert.equal(
+        typeof room.battle_started_at_ms,
+        "number",
+        "进入 state 4 必须写入战斗起算锚",
+    )
+    const socket = {
+        writable: true,
+        destroyed: false,
+        write() { return true },
+        once() {},
+        destroy() { this.destroyed = true },
+        end() {},
+    }
+    const client = sessionManager.createClient(socket, 111, room.room_number, "hard-bound-cid")
+    client.participant = { nodeSessionId: "embedded", viewerId: 111 }
+    assert.equal(sessionManager.addClientToRoom(client).ok, true)
+    t.after(() => {
+        sessionManager.removeClient(client)
+        disbandRoom(room.room_number)
+    })
+
+    room.battle_started_at_ms = getRealNowMs() - 30_000
+    cleanup()
+    assert.equal(getRoom(room.room_number), room, "未超上界的战斗房不得被回收")
+
+    room.battle_started_at_ms = getRealNowMs() - 60_001
+    cleanup()
+    assert.equal(getRoom(room.room_number), undefined, "over-age state 4 must be recycled")
 })
 
 test("room creation retries a colliding number and preserves the active room", () => {

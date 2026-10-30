@@ -68,6 +68,8 @@ export interface MultiRoom {
     share_room_options: number
     /** Wall-clock ms when a battle room last had zero connected participants. */
     battle_empty_since_ms?: number
+    /** Wall-clock ms when the room entered state 4; un-finalized hard bound anchor. */
+    battle_started_at_ms?: number
     is_npc_mode: boolean
     npc_count: number  // fixed NPC count per battle: 0=unrecruited, 1/2=fixed count
     npc_roster: RoomNpcAssignment[]

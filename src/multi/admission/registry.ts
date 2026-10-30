@@ -1,6 +1,7 @@
 import type { CoordinatorErrorCode, ParticipantIdentity } from "../coordinator/contracts"
 import type { PlayerSnapshot } from "../snapshot/player-snapshot"
 import { getRoom, getRoomOccupiedMemberCount, isRoomViewerMember } from "../room/manager"
+import { lifecycleRegistry } from "../lifecycle"
 import { getRealNowMs } from "../../runtime/time/game-time"
 
 const MAX_REAL_ROOM_MEMBERS = 3
@@ -10,6 +11,8 @@ export interface RoomAdmission {
     readonly participant: ParticipantIdentity
     readonly snapshot: PlayerSnapshot
     readonly expiresAt: number
+    /** 签发时的房间代次；握手把它绑定到 SessionClient，旧代次事件被内核丢弃。 */
+    readonly lifecycleGeneration?: number
 }
 
 export interface AdmissionProvider {
@@ -31,6 +34,8 @@ export interface AdmissionRegistryOptions {
     readonly now?: () => number
     readonly getOccupiedMemberCount?: (roomNumber: string) => number
     readonly isOccupiedMember?: (roomNumber: string, viewerId: number) => boolean
+    /** 房间所属节点权威代次；远程节点签发的票不带本地 registry，由 owner 补齐。 */
+    readonly resolveLifecycleGeneration?: (roomNumber: string) => number | undefined
 }
 
 function normalizeRoomNumber(value: unknown): string | null {
@@ -52,11 +57,14 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
     private readonly now: () => number
     private readonly getOccupiedMemberCount: (roomNumber: string) => number
     private readonly isOccupiedMember: (roomNumber: string, viewerId: number) => boolean
+    private readonly resolveLifecycleGeneration: (roomNumber: string) => number | undefined
 
     constructor(options: AdmissionRegistryOptions = {}) {
         this.now = options.now ?? getRealNowMs
         this.getOccupiedMemberCount = options.getOccupiedMemberCount ?? (() => 0)
         this.isOccupiedMember = options.isOccupiedMember ?? (() => false)
+        this.resolveLifecycleGeneration = options.resolveLifecycleGeneration
+            ?? (roomNumber => lifecycleRegistry.get(roomNumber)?.generation)
     }
 
     issue(input: AdmissionIssueInput): AdmissionIssueResult {
@@ -78,10 +86,27 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         }
         this.cleanup()
         const admissionKey = key(roomNumber, input.participant.viewerId)
+        // owner registry 是代次权威：远程节点签发的票只有 participant/snapshot，
+        // 在这里补上本节点代次；本节点缺失时才退回票面值。
+        const lifecycleGeneration = this.resolveLifecycleGeneration(roomNumber)
+            ?? input.lifecycleGeneration
         const existing = this.admissions.get(admissionKey)
         if (existing) {
             if (existing.participant.nodeSessionId !== input.participant.nodeSessionId) {
                 return { ok: false, error: "VIEWER_ID_CONFLICT" }
+            }
+            if (lifecycleGeneration !== undefined
+                && existing.lifecycleGeneration !== lifecycleGeneration) {
+                // 重发票刷新代次（及随票快照/有效期），避免房号复用后旧票
+                // 把旧代次、过期快照带进新房间。
+                const refreshed = Object.freeze({
+                    ...existing,
+                    snapshot: input.snapshot,
+                    expiresAt: input.expiresAt,
+                    lifecycleGeneration,
+                }) as RoomAdmission
+                this.admissions.set(admissionKey, refreshed)
+                return { ok: true, value: refreshed }
             }
             return { ok: true, value: existing }
         }
@@ -106,6 +131,9 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
             participant: Object.freeze({ ...input.participant }),
             snapshot: input.snapshot,
             expiresAt: input.expiresAt,
+            ...(lifecycleGeneration !== undefined
+                ? { lifecycleGeneration }
+                : {}),
         }
         Object.freeze(admission)
         this.admissions.set(admissionKey, admission)

@@ -88,6 +88,30 @@ test("repeated prepare for the same participant is idempotent", () => {
     assert.equal(registry.consume("123456", 101), null)
 })
 
+test("the owning registry fills and refreshes the lifecycle generation", () => {
+    let generation = 7
+    const registry = new AdmissionRegistry({
+        now: () => 1_000,
+        resolveLifecycleGeneration: () => generation,
+    })
+    const first = issue(registry)
+    assert.equal(first.ok, true)
+    assert.equal(first.value.lifecycleGeneration, 7,
+        "owner registry must fill a generation the remote ticket could not know")
+
+    generation = 8
+    const refreshed = issue(registry, {
+        snapshot: snapshotFixture(101, "Changed"),
+        expiresAt: 7_000,
+    })
+    assert.equal(refreshed.ok, true)
+    assert.notEqual(refreshed.value, first.value)
+    assert.equal(refreshed.value.lifecycleGeneration, 8)
+    assert.equal(refreshed.value.snapshot.name, "Changed")
+    assert.equal(refreshed.value.expiresAt, 7_000)
+    assert.equal(registry.consume("123456", 101)?.lifecycleGeneration, 8)
+})
+
 test("the same viewer id can be admitted to different rooms", () => {
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     assert.equal(issue(registry).ok, true)

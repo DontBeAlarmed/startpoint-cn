@@ -415,7 +415,8 @@ create_room
 - battle client 断开时从 battle 集合移除，并通知其他 battle client；
 - battle client 断开本身不直接改变 `raising_state`；
 - 最后一个非 battle lobby client 断开、房间没有 battle client 且状态不是 4 时，房间解散；
-- 房间仍有 lobby client 时，离开成员从 Mates 中移除并广播更新。
+- 房间仍有 lobby client 时，离开成员从 Mates 中移除并广播更新；
+- 解散经 `disbandRoom` 单点：房间内每个 socket 恰好收到一条 `multibattle_room_dismissed`，服务端不在同一 tick 主动关闭它，5 分钟后才兜底销毁；socket 关闭逐个确认，全部确认或 5 分钟到期后内核关闭条目。房号复用后，旧代次 socket 的迟到关闭确认被丢弃。
 
 ### 10.4 空闲清理
 
@@ -425,7 +426,7 @@ cleaner 默认每 60 秒扫描一次非战斗房间：
 |---|---:|
 | `state=1/2` 且成员少于 3 | 15 分钟 |
 | `state=1/2` 且成员达到 3 | 30 分钟 |
-| `state=4` 且仍有 lobby/battle socket | 跳过（战斗房间不按空闲过期） |
+| `state=4` 且仍有 lobby/battle socket | 跳过空闲过期；但进入 state 4 满 2 小时硬上界后回收 |
 | `state=4` 且 lobby/battle socket 全空 | 再等待 15 分钟 abandoned 战斗宽限后回收 |
 | `state=4` 且已全部 Finish（结算完成） | 从 Finish 起 15 分钟资源上界，由内核 gcSweep 触发，不要求 socket 全空 |
 
@@ -433,7 +434,9 @@ cleaner 默认每 60 秒扫描一次非战斗房间：
 `battle_empty_since_ms`，超过 `abandonedBattleExpiryMs`（默认 15 分钟）后由
 `disbandRoom` 回收并幂等释放 battle facts；宽限覆盖了成员只是落后于 HTTP
 finish 的场景。结算完成后 state 4 的 15 分钟资源上界由内核 gcSweep 触发
-（不依赖 socket 全空）；房主返回才 4→1。过期前 30 秒，服务端可以发送 RemainingTime。`state=4` 不存在通用"战斗 10 分钟自动清理"规则。
+（不依赖 socket 全空）；房主返回才 4→1。未结算战局另有一条从进入 state 4
+起算的 2 小时硬上界（锚 `battle_started_at_ms`），防止常连 socket 把战局
+永久钉死；清理只回收资源，不推导房间状态。过期前 30 秒，服务端可以发送 RemainingTime。`state=4` 不存在通用"战斗 10 分钟自动清理"规则。
 
 ## 11. Battle relay 与场景屏障
 

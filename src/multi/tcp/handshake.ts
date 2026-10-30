@@ -203,6 +203,22 @@ export async function handleHandshake(
         client.participant = admission.participant
         client.snapshot = admission.snapshot
         client.npcPartySnapshots = admission.snapshot.npcParties
+        // 代次以本节点 registry（owner）为准；票面只做一致性校验，旧票不得入新号房。
+        const roomGeneration = lifecycleRegistry.get(normalizedRoomNumber)?.generation
+        if (roomGeneration === undefined) {
+            // 活房间在 owner 节点必有内核条目；缺失说明代次无法绑定，
+            // 拒绝而不是放行一张无代次票（否则旧票可绕过房号复用守卫）。
+            releaseAdmission()
+            denyGracefully(socket, "room_generation_unavailable")
+            return
+        }
+        if (admission.lifecycleGeneration !== undefined
+            && admission.lifecycleGeneration !== roomGeneration) {
+            releaseAdmission()
+            denyGracefully(socket, "admission_generation_mismatch")
+            return
+        }
+        client.lifecycleGeneration = roomGeneration
         client.yourself = buildYourselfFromSnapshot(
             admission.snapshot,
             normalizedConnectionId,
@@ -236,7 +252,7 @@ export async function handleHandshake(
             type: "handshake",
             generation,
             identity: viewerKey,
-        }))
+        }), client.lifecycleGeneration)
         sessionManager.sendJson(socket, [0, normalizedConnectionId, normalizedRoomNumber])
         return
     }

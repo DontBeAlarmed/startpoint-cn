@@ -17,6 +17,7 @@ export async function issueRoomAdmission(
         participant,
         snapshot: prepared.snapshot,
         expiresAt: context.now() + context.admissionTtlMs,
+        lifecycleGeneration: lifecycleRegistry.get(roomNumber)?.generation,
     })
     if (issued.ok) {
         // B2a 影子：入场票签发 = 入房流水线的 admitted 阶段。

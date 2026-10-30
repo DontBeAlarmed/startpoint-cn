@@ -41,6 +41,7 @@ const {
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
 const { AdmissionRegistry } = require("../src/multi/admission/registry")
+const { lifecycleRegistry } = require("../src/multi/lifecycle")
 const {
     handleSocketDisconnect,
 } = require("../src/multi/tcp/lobby")
@@ -195,6 +196,19 @@ test("room admission is required and consumed once", async t => {
     assert.equal(accepted.ended, false)
     assert.deepEqual(replayed.messages.at(-1), [1, "DENIED"])
     assert.deepEqual(missing.messages.at(-1), [1, "DENIED"])
+})
+
+test("a live room without a bound generation is denied", async t => {
+    const room = createRoom(115, 1_115, 1, 1, 515, 0, 101)
+    t.after(() => disbandRoom(room.room_number))
+    lifecycleRegistry.remove(room.room_number)
+
+    const socket = await handshake(room, 228)
+
+    assert.equal(socket.ended, true)
+    assert.deepEqual(socket.messages.at(-1), [1, "DENIED"])
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(228, room.room_number), undefined,
+        "an unversioned ticket must not enter a room whose generation is unknown")
 })
 
 test("room handshake rejects an admission whose participant viewer differs from the TCP viewer", async t => {
