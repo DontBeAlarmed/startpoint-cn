@@ -439,9 +439,13 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         const removedViewerIds = new Set<number>()
         for (const participant of invalidatedParticipants) {
             if (survivingViewerIds.has(participant.viewerId)) continue
-            if (removeRoomMember(room.room_number, participant)) {
-                removedViewerIds.add(participant.viewerId)
-            }
+            // 房主由 host 分支单独处理，永远不从自己的 mates 里删
+            if (participant.viewerId === room.host_viewer_id) continue
+            // 4→1 释座可能已经把成员簿清空，removeRoomMember 返回 false；
+            // 仍要按 viewerId 清掉房间和宿主的 mates 投影，否则已失效客机
+            // 会残留在注册行/大厅视图里（multi_hub_session_cleanup 红点）。
+            removeRoomMember(room.room_number, participant)
+            removedViewerIds.add(participant.viewerId)
         }
         if (removedViewerIds.size === 0) return false
 
