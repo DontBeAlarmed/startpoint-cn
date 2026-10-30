@@ -66,6 +66,24 @@ D18 当前按已批准私服策略处理：`/load` 清除过期 EventTrade Item�
 
 服务端已在同一 active quest 内实现 `LevelNext`、第二代 SceneReady、第二次 BattleStart 和最终 Finalize，并按 CDN 字段限制 BothBoss 入口。当前缺口是 CN 客户端的 NPC/真人完整切场、第二 Boss、最终结算和异常断线体验验证；进程重启后的原房间与场景恢复仍不支持。详见[多场景联机分析](../protocol/super-owl-multiscene.md)。
 
+### 好友房间列表推荐编成按钮刷新后 F1009（客户端 cell 复用）
+
+**状态**：已知客户端问题，2026-10-31 裁决暂不处理。该错误在客户端点击前抛出，服务端收不到这次点击，无法做错误兜底；只能在客户端修复，或在服务端关闭/规避好友房间列表。
+
+**现象**：好友房间列表刷新后房间行消失，列表从 `[NumberInput, ...Room, ...Stage/Quest]` 缩短；原 Room 单元格被复用为 NumberInput/Stage 后，旧的“推荐编成”按钮层和按钮组注册仍在。点击残留按钮时客户端抛 F1009。只要任意一个原 Room 索引被非 Room/Quest 接管即可触发，不限于第一条。
+
+**根因定位（客户端源码，证据级别：机制链；原始截图/日志未保留，10-30/31 真机复现过点击报错）**：
+
+- `RoomListCellView.applyData` 只在 Room/Quest 且 `isRecentOtherPlayerPartyAvailable()` 时创建 `recentOtherPlayerPartyButtonLayer` 并注册到 `questListButtonGroupView`；复用为 NumberInput/Stage 时没有移除/隐藏旧按钮层，也没有注销注册。
+- `RoomListLogic.listButtonHandler` 用 cell 索引取 `getDataSource()[index]`；NumberInput/Stage 分支不设置 quest，最终 `getQuestByBattleKind(undefined)` 抛 F1009。
+- 该抛点发生在任何 HTTP/TCP 请求之前；服务端无法拦截或返回错误。
+
+**服务端边界**：`get_rooms` 只返回 rooms 数组，客户端按 `[NumberInput, ...rooms, ...本地 Stage/Quest]` 重排；按钮完全由客户端 cell 代码控制，没有服务端字段可隐藏。按 event/quest 可见性、可加入状态过滤只能减少触发机会，不能阻止合法房间消失后的 cell 复用。`rooms: []` 是正确的空列表返回；空房间条目会先触发解析器类型错误，或让 `RoomListAdapter.convert` 的空引用路径提前报错，不能作为占位。
+
+**当前不采用**：ghost/tombstone 假房、空房间占位。前者把 F1009 换成“死房可点”，后者会提前报错；都不属于服务端错误兜底。
+
+**真正修复**：客户端在 `RoomListCellView.applyData` 的非 Room/Quest 分支清理按钮层并注销按钮组，或在 `RoomListLogic.listButtonHandler` 对 NumberInput/Stage/空 quest 做防御返回。均属于客户端修改，当前约束下不做。
+
 ### 自动连战体力耗尽
 
 自动连战模式可能在体力耗尽后继续请求 start。服务端现已在 `is_auto_start_mode=true` 且体力事务明确失败时使用客户端端点内可处理的 `result_code=4050`，不扣资源、不创建 active quest；手动挑战仍按普通入场错误处理。该错误码的官方含义是关卡超出开放期，并非正常自动连战完成状态，客户端提示和返回目标仍需真机确认。正常次数耗尽应由客户端自身计数器收尾。详见[体力系统](../systems/stamina.md)。
