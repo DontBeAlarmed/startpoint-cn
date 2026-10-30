@@ -35,6 +35,15 @@ export interface SessionManagerOptions {
     readonly dismissFallbackMs?: number
 }
 
+export interface DismissFallbackStats {
+    readonly forcedCloses: number
+    readonly last: {
+        readonly roomNumber: string
+        readonly ageMs: number
+        readonly atMs: number
+    } | null
+}
+
 export interface SessionMate {
     viewerId: number
     connectionId: string
@@ -166,6 +175,8 @@ export class SessionManager {
     private activatedBattleScenes = new Map<string, Map<number, Set<string>>>()
     private battleTuning: MultiBattleTuning
     private dismissFallbackMs: number
+    private dismissFallbackForcedCloses = 0
+    private lastDismissFallback: DismissFallbackStats["last"] = null
 
     constructor(options: SessionManagerOptions = {}) {
         this.battleTuning = DEFAULT_MULTI_BATTLE_TUNING
@@ -183,6 +194,15 @@ export class SessionManager {
 
     resetDismissFallback(): void {
         this.dismissFallbackMs = DISMISS_FALLBACK_MS
+        this.dismissFallbackForcedCloses = 0
+        this.lastDismissFallback = null
+    }
+
+    getDismissFallbackStats(): DismissFallbackStats {
+        return Object.freeze({
+            forcedCloses: this.dismissFallbackForcedCloses,
+            last: this.lastDismissFallback,
+        })
     }
 
     configureBattleTuning(tuning: MultiBattleTuning): void {
@@ -627,7 +647,11 @@ export class SessionManager {
         const lifecycleGeneration = client.lifecycleGeneration
         this.removeClient(client)
         this.sendJson(client.socket, [1, [6, "multibattle_room_dismissed"]])
-        this.armDismissedSocketFallback(client.socket)
+        this.armDismissedSocketFallback(client.socket, {
+            roomNumber,
+            viewerId,
+            armedAt: getRealNowMs(),
+        })
         if (typeof client.socket.once === "function") {
             client.socket.once("close", () => (
                 this.onDismissedSocketClosed?.(roomNumber, viewerId, lifecycleGeneration)
@@ -642,10 +666,25 @@ export class SessionManager {
         lifecycleGeneration?: number,
     ) => void) | null = null
 
-    private armDismissedSocketFallback(socket: net.Socket): void {
+    private armDismissedSocketFallback(
+        socket: net.Socket,
+        context: { roomNumber: string; viewerId: number; armedAt: number },
+    ): void {
         if (socket.destroyed) return
         const timer = setTimeout(() => {
             if (socket.destroyed) return
+            const atMs = getRealNowMs()
+            const ageMs = Math.max(0, atMs - context.armedAt)
+            this.dismissFallbackForcedCloses++
+            this.lastDismissFallback = Object.freeze({
+                roomNumber: context.roomNumber,
+                ageMs,
+                atMs,
+            })
+            console.warn(
+                `[MULTI] dismiss fallback fired: room=${context.roomNumber}`
+                + ` viewer=${context.viewerId} ageMs=${ageMs}`,
+            )
             try {
                 socket.destroy()
             } catch {

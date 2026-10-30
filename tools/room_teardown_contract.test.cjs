@@ -9,6 +9,7 @@ const {
     createRoom,
     disbandRoom,
     getRoom,
+    getRoomCleanupDiagnostics,
     setRoomDisbandListener,
 } = require("../src/multi/room/manager")
 const { installDisbandLifecycleListener } = require("../src/multi/room/disband-listener")
@@ -106,6 +107,10 @@ test("dismiss fallback reclaims a half-open socket after the configured bound", 
 
         await new Promise(resolve => setTimeout(resolve, 60))
         assert.equal(socket.destroyCalls, 1)
+        const stats = sessionManager.getDismissFallbackStats()
+        assert.equal(stats.forcedCloses, 1, "the forced close must be counted")
+        assert.equal(stats.last?.roomNumber, room.room_number)
+        assert.ok((stats.last?.ageMs ?? 0) >= 20)
     } finally {
         sessionManager.resetDismissFallback()
     }
@@ -123,6 +128,8 @@ test("client close clears the dismiss fallback", async () => {
 
         await new Promise(resolve => setTimeout(resolve, 60))
         assert.equal(socket.destroyCalls, 0)
+        assert.equal(sessionManager.getDismissFallbackStats().forcedCloses, 0,
+            "a client-driven close must not count as a forced close")
     } finally {
         sessionManager.resetDismissFallback()
     }
@@ -168,9 +175,13 @@ test("a dismissed socket close drives closing → closed", () => {
 
         assert.equal(disbandRoom(room.room_number), true)
         assert.equal(lifecycleRegistry.get(room.room_number).phase, "closing")
+        assert.equal(getRoomCleanupDiagnostics().closingRooms, 1,
+            "a live dismissed socket must be visible as closing")
         assert.equal(socket.destroyCalls, 0, "dismiss-only：socket 保持到客户端断开")
         socket.close()
         assert.equal(lifecycleRegistry.get(room.room_number), undefined)
+        assert.equal(getRoomCleanupDiagnostics().closingRooms, 0,
+            "client close must clear the closing entry without waiting for the fallback")
     } finally {
         sessionManager.onDismissedSocketClosed = null
         setRoomDisbandListener(null)

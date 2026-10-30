@@ -26,6 +26,19 @@ export interface AdminMultiAuthorityStatus {
     readonly finalizedBattleFacts: number
 }
 
+export interface AdminMultiLifecycleStatus {
+    readonly closingRooms: number
+    readonly closingOldestAgeMs: number
+    readonly sweptClosing: number
+    readonly lastSweptClosingAtMs: number | null
+    readonly forcedDismissCloses: number
+    readonly lastForcedClose: {
+        readonly roomNumber: string
+        readonly ageMs: number
+        readonly atMs: number
+    } | null
+}
+
 export interface CompatibilityRejectionDifference {
     readonly field: string
     readonly different: true
@@ -65,6 +78,7 @@ export interface AdminMultiStatus {
         readonly active: number
         readonly finalized: number
     } | null
+    readonly lifecycle: AdminMultiLifecycleStatus | null
     readonly latestCompatibilityRejection: CompatibilityRejectionSummary | null
 }
 
@@ -72,6 +86,7 @@ export interface BuildAdminMultiStatusInput {
     readonly runtime: MultiRuntimeStatus
     readonly authority: AdminMultiAuthorityStatus | null
     readonly latestCompatibilityRejection: CompatibilityRejectionSummary | null
+    readonly lifecycle?: AdminMultiLifecycleStatus | null
 }
 
 export class CompatibilityRejectionStore {
@@ -143,6 +158,7 @@ export function buildAdminMultiStatus(input: BuildAdminMultiStatusInput): AdminM
             active: authority.activeBattleFacts,
             finalized: authority.finalizedBattleFacts,
         }),
+        lifecycle: sanitizeLifecycle(input.lifecycle ?? null),
         latestCompatibilityRejection: rejection,
     })
 }
@@ -155,6 +171,42 @@ function sanitizeAuthority(value: AdminMultiAuthorityStatus | null): AdminMultiA
         activeRooms: value.activeRooms,
         activeBattleFacts: value.activeBattleFacts,
         finalizedBattleFacts: value.finalizedBattleFacts,
+    })
+}
+
+function sanitizeLifecycle(value: AdminMultiLifecycleStatus | null): AdminMultiLifecycleStatus | null {
+    if (value === null) return null
+    const counts = [
+        value.closingRooms,
+        value.closingOldestAgeMs,
+        value.sweptClosing,
+        value.forcedDismissCloses,
+    ]
+    if (!counts.every(count => Number.isSafeInteger(count) && count >= 0)) return null
+    const lastForcedClose = value.lastForcedClose
+    const safeLastForcedClose = lastForcedClose !== null
+        && /^\d{6}$/.test(lastForcedClose.roomNumber)
+        && Number.isSafeInteger(lastForcedClose.ageMs)
+        && lastForcedClose.ageMs >= 0
+        && Number.isSafeInteger(lastForcedClose.atMs)
+        && lastForcedClose.atMs >= 0
+        ? Object.freeze({
+            roomNumber: lastForcedClose.roomNumber,
+            ageMs: lastForcedClose.ageMs,
+            atMs: lastForcedClose.atMs,
+        })
+        : null
+    const lastSweptClosingAtMs = value.lastSweptClosingAtMs === null
+        || (Number.isSafeInteger(value.lastSweptClosingAtMs) && value.lastSweptClosingAtMs >= 0)
+        ? value.lastSweptClosingAtMs
+        : null
+    return Object.freeze({
+        closingRooms: value.closingRooms,
+        closingOldestAgeMs: value.closingOldestAgeMs,
+        sweptClosing: value.sweptClosing,
+        lastSweptClosingAtMs,
+        forcedDismissCloses: value.forcedDismissCloses,
+        lastForcedClose: safeLastForcedClose,
     })
 }
 

@@ -18,6 +18,12 @@ export function identityOf(participant: { viewerId: number }): string {
     return `viewer:${participant.viewerId}`
 }
 
+export interface ClosingEntryDiagnostics {
+    readonly roomNumber: string
+    readonly ageMs: number
+    readonly pendingIdentities: readonly string[]
+}
+
 export class RoomLifecycleRegistry {
     private rooms = new Map<string, RoomLifecycleState>()
     private nextGeneration = 1
@@ -85,6 +91,26 @@ export class RoomLifecycleRegistry {
             removed++
         }
         return removed
+    }
+
+    /** closing 条目的只读诊断：年龄与尚未确认的身份（不改变状态）。 */
+    closingEntries(nowMs: number): readonly ClosingEntryDiagnostics[] {
+        const entries: ClosingEntryDiagnostics[] = []
+        for (const [roomNumber, state] of this.rooms) {
+            if (state.phase !== "closing" || state.closingAtMs === null) continue
+            const pending = new Set<string>([
+                ...state.seats,
+                ...state.battleParticipants,
+                ...Object.keys(state.joiners),
+            ])
+            for (const identity of state.dismissed) pending.delete(identity)
+            entries.push(Object.freeze({
+                roomNumber,
+                ageMs: Math.max(0, nowMs - state.closingAtMs),
+                pendingIdentities: Object.freeze([...pending]),
+            }))
+        }
+        return Object.freeze(entries)
     }
 
     get size(): number {

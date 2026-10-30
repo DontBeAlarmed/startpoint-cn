@@ -22,9 +22,21 @@ const REMAINING_NOTIFY_MS = 30000; // send RemainingTime float 30s before disban
 /** state 4 未 finalize 的硬上界（只回收，推导状态）；防常连 socket 把战局钉死。 */
 const BATTLE_HARD_LIMIT_MS = 2 * 60 * 60_000;
 const ROOM_NUMBER_ALLOCATION_ATTEMPTS = 10;
+/** closing 超过该年龄先打预警（不强制关闭），用于发现拆除/确认异常。 */
+const CLOSING_WARN_MS = 30_000;
 
 // Track which rooms have already been notified (to avoid repeat floats)
 const notifiedRooms = new Set<string>();
+const warnedClosingRooms = new Set<string>();
+let sweptClosingTotal = 0;
+let lastSweptClosingAtMs: number | null = null;
+
+export interface RoomCleanupDiagnostics {
+    readonly closingRooms: number;
+    readonly closingOldestAgeMs: number;
+    readonly sweptClosing: number;
+    readonly lastSweptClosingAtMs: number | null;
+}
 
 type RoomCleanupTimer = ReturnType<typeof setInterval>;
 
@@ -67,7 +79,27 @@ function cleanExpiredRooms(timing: RoomCleanupTiming) {
     // 旧值（虚拟秒）与新值（真实毫秒）混存窗口内可能出现一次瞬态误判，可接受。
     const timeOffset = 0;
     // detached closing 的资源回收：没有 socket 可等的条目按 closeDeadline 清掉。
-    lifecycleRegistry.sweepClosing(now, LIFECYCLE_CLOSE_DEADLINE_MS);
+    // 先对长期未确认的 closing 打一次预警，再执行真正的回收；两者都不改房间状态。
+    for (const entry of lifecycleRegistry.closingEntries(now)) {
+        if (entry.ageMs < CLOSING_WARN_MS || warnedClosingRooms.has(entry.roomNumber)) continue;
+        warnedClosingRooms.add(entry.roomNumber);
+        console.warn(
+            `[MULTI] closing still pending: room=${entry.roomNumber}`
+            + ` ageMs=${entry.ageMs} pending=${entry.pendingIdentities.length}`,
+        );
+    }
+    const swept = lifecycleRegistry.sweepClosing(now, LIFECYCLE_CLOSE_DEADLINE_MS);
+    if (swept > 0) {
+        sweptClosingTotal += swept;
+        lastSweptClosingAtMs = now;
+        console.warn(`[MULTI] closing swept: count=${swept}`);
+    }
+    const stillClosing = new Set(
+        lifecycleRegistry.closingEntries(now).map(entry => entry.roomNumber),
+    );
+    for (const roomNumber of warnedClosingRooms) {
+        if (!stillClosing.has(roomNumber)) warnedClosingRooms.delete(roomNumber);
+    }
     let cleaned = 0;
     for (const [roomNumber, room] of rooms) {
         // B2b：自检内核的资源 deadline（结算后 15 分钟 / closing 后 5 分钟）。
@@ -177,6 +209,16 @@ export function setRoomDisbandListener(
 
 export function getRoomCleanupStatus(): RoomCleanupStatus {
     return Object.freeze({ running: cleanupTimer !== null });
+}
+
+export function getRoomCleanupDiagnostics(): RoomCleanupDiagnostics {
+    const entries = lifecycleRegistry.closingEntries(getRealNowMs());
+    return Object.freeze({
+        closingRooms: entries.length,
+        closingOldestAgeMs: entries.reduce((max, entry) => Math.max(max, entry.ageMs), 0),
+        sweptClosing: sweptClosingTotal,
+        lastSweptClosingAtMs,
+    });
 }
 
 export function generateRoomNumber(): string {

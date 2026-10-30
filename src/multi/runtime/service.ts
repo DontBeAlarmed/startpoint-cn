@@ -8,6 +8,7 @@ import {
     multiCompatibilityRejections,
     recordMultiCompatibilityRejection,
     type AdminMultiAuthorityStatus,
+    type AdminMultiLifecycleStatus,
     type AdminMultiStatus,
 } from "../../lib/admin-multi-status"
 import { AdmissionRegistry } from "../admission/registry"
@@ -47,6 +48,7 @@ import {
 } from "../http/context"
 import {
     getRoom,
+    getRoomCleanupDiagnostics,
     getRoomOccupiedMemberCount,
     isRoomViewerMember,
     listActiveRooms,
@@ -516,6 +518,7 @@ class Service implements MultiRuntimeService {
             runtime: this.getStatus(),
             authority,
             latestCompatibilityRejection,
+            lifecycle: null,
         })
     }
 
@@ -526,10 +529,16 @@ class Service implements MultiRuntimeService {
             && runtime.coordinator.available
             ? localAuthorityStatus()
             : null
+        const lifecycle = this.config !== null
+            && this.config.mode !== "client"
+            && runtime.coordinator.available
+            ? localLifecycleStatus()
+            : null
         return buildAdminMultiStatus({
             runtime,
             authority,
             latestCompatibilityRejection: multiCompatibilityRejections.get(),
+            lifecycle,
         })
     }
 
@@ -687,6 +696,24 @@ function localAuthorityStatus(): AdminMultiAuthorityStatus {
         activeRooms: listActiveRooms().length,
         activeBattleFacts: facts.active,
         finalizedBattleFacts: facts.finalized,
+    })
+}
+
+function localLifecycleStatus(): AdminMultiLifecycleStatus {
+    const cleanup = getRoomCleanupDiagnostics()
+    const fallback = sessionManager.getDismissFallbackStats()
+    const last = fallback.last
+    return Object.freeze({
+        closingRooms: cleanup.closingRooms,
+        closingOldestAgeMs: cleanup.closingOldestAgeMs,
+        sweptClosing: cleanup.sweptClosing,
+        lastSweptClosingAtMs: cleanup.lastSweptClosingAtMs,
+        forcedDismissCloses: fallback.forcedCloses,
+        lastForcedClose: last === null ? null : Object.freeze({
+            roomNumber: last.roomNumber,
+            ageMs: last.ageMs,
+            atMs: last.atMs,
+        }),
     })
 }
 

@@ -142,12 +142,68 @@ test("admin status has one stable read-only shape for every runtime mode", () =>
             "tcp",
             "activeRooms",
             "battleFacts",
+            "lifecycle",
             "latestCompatibilityRejection",
         ])
         assert.equal(result.mode, mode)
         assert.equal(result.activeRooms, 2)
         assert.deepEqual(result.battleFacts, { active: 3, finalized: 4 })
+        assert.equal(result.lifecycle, null)
     }
+})
+
+test("lifecycle diagnostics expose closing and fallback counters without identities", () => {
+    const result = buildAdminMultiStatus({
+        runtime: runtime("host"),
+        authority: { activeRooms: 1, activeBattleFacts: 0, finalizedBattleFacts: 0 },
+        latestCompatibilityRejection: null,
+        lifecycle: {
+            closingRooms: 2,
+            closingOldestAgeMs: 30_000,
+            sweptClosing: 1,
+            lastSweptClosingAtMs: 1_725_000_000_000,
+            forcedDismissCloses: 3,
+            lastForcedClose: {
+                roomNumber: "123456",
+                ageMs: 300_000,
+                atMs: 1_725_000_000_000,
+            },
+        },
+    })
+
+    assert.deepEqual(result.lifecycle, {
+        closingRooms: 2,
+        closingOldestAgeMs: 30_000,
+        sweptClosing: 1,
+        lastSweptClosingAtMs: 1_725_000_000_000,
+        forcedDismissCloses: 3,
+        lastForcedClose: {
+            roomNumber: "123456",
+            ageMs: 300_000,
+            atMs: 1_725_000_000_000,
+        },
+    })
+    assert.doesNotMatch(JSON.stringify(result.lifecycle), /viewer|player|device|token/i)
+
+    const invalid = buildAdminMultiStatus({
+        runtime: runtime("host"),
+        authority: { activeRooms: 1, activeBattleFacts: 0, finalizedBattleFacts: 0 },
+        latestCompatibilityRejection: null,
+        lifecycle: {
+            closingRooms: 1,
+            closingOldestAgeMs: 0,
+            sweptClosing: 0,
+            lastSweptClosingAtMs: -1,
+            forcedDismissCloses: 1,
+            lastForcedClose: {
+                roomNumber: "not-a-room",
+                ageMs: 1,
+                atMs: 1,
+            },
+        },
+    })
+    assert.equal(invalid.lifecycle.lastSweptClosingAtMs, null)
+    assert.equal(invalid.lifecycle.lastForcedClose, null)
 })
 
 test("unavailable and degraded diagnostics never invent authoritative counts", () => {

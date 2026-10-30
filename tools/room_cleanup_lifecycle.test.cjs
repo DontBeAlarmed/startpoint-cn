@@ -27,6 +27,7 @@ const {
     createRoom,
     disbandRoom,
     getRoom,
+    getRoomCleanupDiagnostics,
     getRoomCleanupStatus,
     startRoomCleanup,
     stopRoomCleanup,
@@ -150,6 +151,55 @@ test("room cleanup uses the configured incomplete and full expiry thresholds", t
 
     assert.equal(getRoom(incomplete.room_number), undefined)
     assert.equal(getRoom(full.room_number), full)
+})
+
+test("closing diagnostics warn before the forced sweep and count swept entries", t => {
+    let cleanup
+    startRoomCleanup({
+        createInterval(callback) {
+            cleanup = callback
+            return { unref() {} }
+        },
+        clearInterval() {},
+    })
+    const now = getRealNowMs()
+    lifecycleRegistry.create("999997", "viewer:1")
+    lifecycleRegistry.dispatch("999997", generation => ({
+        type: "disband",
+        generation,
+        identity: null,
+        nowMs: now - 31_000,
+        closeDeadlineMs: 300_000,
+    }))
+    t.after(() => {
+        lifecycleRegistry.remove("999997")
+        lifecycleRegistry.remove("999996")
+    })
+
+    const warnings = []
+    const originalWarn = console.warn
+    console.warn = (...args) => { warnings.push(args.join(" ")) }
+    try {
+        cleanup()
+    } finally {
+        console.warn = originalWarn
+    }
+    assert.equal(warnings.some(line => (
+        line.includes("closing still pending") && line.includes("999997")
+    )), true, "a 30s+ closing must warn before the 5min sweep")
+    assert.equal(getRoomCleanupDiagnostics().closingRooms, 1)
+
+    const beforeSwept = getRoomCleanupDiagnostics().sweptClosing
+    lifecycleRegistry.create("999996", "viewer:2")
+    lifecycleRegistry.dispatch("999996", generation => ({
+        type: "disband",
+        generation,
+        identity: null,
+        nowMs: now - 400_000,
+        closeDeadlineMs: 300_000,
+    }))
+    cleanup()
+    assert.equal(getRoomCleanupDiagnostics().sweptClosing, beforeSwept + 1)
 })
 
 test("a finalized battle is left to the gcSweep instead of the hard bound", t => {

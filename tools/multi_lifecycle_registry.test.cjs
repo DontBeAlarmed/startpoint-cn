@@ -132,6 +132,11 @@ test("closing entries are swept after the close deadline", () => {
         type: "disband", generation, identity: null, nowMs: 1_000, closeDeadlineMs: 500,
     }))
     assert.equal(closing.state.phase, "closing")
+    const entries = lifecycleRegistry.closingEntries(1_200)
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].roomNumber, "100007")
+    assert.equal(entries[0].ageMs, 200)
+    assert.deepEqual(entries[0].pendingIdentities, ["viewer:1"])
     assert.equal(lifecycleRegistry.sweepClosing(1_499, 500), 0)
     assert.equal(lifecycleRegistry.sweepClosing(1_500, 500), 1)
     assert.equal(lifecycleRegistry.get("100007"), undefined)
