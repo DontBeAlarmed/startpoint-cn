@@ -6,6 +6,7 @@ import {
     getRoom,
     getRoomByToken,
     listActiveRooms,
+    reconcileHostReturn,
     removeRoomMember,
     updateRoomState,
     updateHostEntryTime,
@@ -180,15 +181,15 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
     }
 
     async searchRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>> {
-        return this.resolveRoom(input)
+        return this.resolveRoom(input, false)
     }
 
     async prepareRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>> {
-        return this.resolveRoom(input)
+        return this.resolveRoom(input, true)
     }
 
     async selectRoom(input: CompatibleRoomInput): Promise<CoordinatorResult<RoomStatus>> {
-        return this.resolveRoom(input)
+        return this.resolveRoom(input, true)
     }
 
     async disbandRoom(input: RoomParticipantInput): Promise<CoordinatorResult<void>> {
@@ -372,11 +373,33 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             return roomNotFound()
         }
         const room = getRoom(input.roomNumber)
-        return room ? ok(this.toRoomStatus(room)) : roomNotFound()
+        if (!room) return roomNotFound()
+        if (input.participant.viewerId === room.host_viewer_id) {
+            // restore_room 是房主真实回房路径；账实同 prepare/select。
+            updateHostEntryTime(room.room_number)
+            // /start、share、summon 也走 getRoomStatus：只有战斗事实已释放
+            // （或房主已 finish）才允许闩锁，避免开战瞬间误触发 HostReturn。
+            const battleReleased = sessionManager.getActiveBattleSessionId(room.room_number) === null
+                || sessionManager.hasParticipantFinalizedBattle(room.room_number, input.participant)
+            if (battleReleased) {
+                const hostIdentity = lifecycleRegistry.hostOf(room.room_number)
+                if (hostIdentity !== undefined) {
+                    lifecycleRegistry.dispatch(room.room_number, generation => ({
+                        type: "hostReturn",
+                        generation,
+                        identity: hostIdentity,
+                        nowMs: getRealNowMs(),
+                    }))
+                    reconcileHostReturn(room.room_number)
+                }
+            }
+        }
+        return ok(this.toRoomStatus(room))
     }
 
     private async resolveRoom(
         input: CompatibleRoomInput,
+        allowHostReturn: boolean,
     ): Promise<CoordinatorResult<RoomStatus>> {
         const room = resolveCompatibleRoom(input)
         if (!room) return roomNotFound()
@@ -389,6 +412,19 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         // 房主的任何房间解析（搜索/准备/选择/恢复）都续命；客机轮询不续命。
         if (input.participant.viewerId === room.host_viewer_id) {
             updateHostEntryTime(room.room_number)
+            if (allowHostReturn) {
+                const hostIdentity = lifecycleRegistry.hostOf(room.room_number)
+                if (hostIdentity !== undefined) {
+                    // 房主返回流程（prepare/select）是 4→1 的唯一触发；未结算时内核闩锁。
+                    lifecycleRegistry.dispatch(room.room_number, generation => ({
+                        type: "hostReturn",
+                        generation,
+                        identity: hostIdentity,
+                        nowMs: getRealNowMs(),
+                    }))
+                    reconcileHostReturn(room.room_number)
+                }
+            }
         }
         return ok(this.toRoomStatus(room))
     }
@@ -446,22 +482,16 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         return this.releaseBattle(status.roomNumber, status.battleSessionId)
     }
 
-    // Narrow release boundary: the room must return to Ready before any battle
-    // runtime is cleared. A refused 4 -> 1 transition keeps the battle facts,
-    // participant snapshot, and SceneReady state, so finish retries stay
-    // authorized and a later finalize, abort, or node-session cleanup can
-    // re-attempt the release. The room meanwhile stays lobby-locked by
-    // raising_state=4, which prevents a new battle from overlapping the
-    // deferred release.
+    // Finish：只释座 + 清 facts/NPC 和 NPC 名册；4→1 只由 HostReturn 触发。
+    // 房主在最后一个 finish 前已请求返回时，内核已 ready，这里立即补 4→1。
     private releaseBattle(roomNumber: string, battleSessionId?: string): boolean {
-        if (!updateRoomState(roomNumber, 1)) {
-            console.warn(`[MULTI] battle release deferred: room=${roomNumber} refused Ready`)
-            return false
-        }
+        const room = getRoom(roomNumber)
+        if (!room) return false
+        // 清 facts 前快照当前参战者：客机 abort 已从 map 移除的不会进入服务矩阵。
+        const battleParticipants = sessionManager.getBattleParticipantsForRoom(roomNumber)
         sessionManager.clearBattleExpectedCount(roomNumber)
         // 一场一换挂点（设计 v2 §4）：release 是 finalize/abort 两路的唯一咽喉，
         // 且先于 host re-enter——NPC 编队清除必须发生在客户端重建视图之前。
-        // battleSessionId 随行：一场一换的一代一闩靠它区分「同战重试」与「新一代释放」
         if (this.onBattleReleased) {
             try {
                 this.onBattleReleased(roomNumber, battleSessionId)
@@ -469,6 +499,18 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 console.warn(`[MULTI] onBattleReleased callback failed: room=${roomNumber}`, describeError(error))
             }
         }
+        if (room.raising_state === 4) {
+            // 座位与成员投影分离：seats 立即释放到房主；battle_participants
+            // 留给 state 4 的服务矩阵，HostReturn 时清空。
+            const serving = battleParticipants.length > 0
+                ? battleParticipants
+                : room.member_participants
+            room.battle_participants = serving.map(member => ({ ...member }))
+            room.member_participants = room.member_participants.filter(
+                member => member.viewerId === room.host_viewer_id,
+            )
+        }
+        reconcileHostReturn(roomNumber)
         return true
     }
 
@@ -538,7 +580,9 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 room.room_number,
             ),
             host,
-            members: Object.freeze(room.member_participants.map(member => Object.freeze({
+            members: Object.freeze((room.raising_state === 4 && room.battle_participants.length > 0
+                ? room.battle_participants
+                : room.member_participants).map(member => Object.freeze({
                 nodeSessionId: member.nodeSessionId as NodeSessionId,
                 viewerId: member.viewerId,
             }))),

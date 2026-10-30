@@ -226,8 +226,15 @@ test("the official release reopens the lobby for the rematch", async t => {
         battleSessionId,
     })
     assert.equal(finalized.ok, true)
-    assert.equal(room.raising_state, 1, "release must return the room to Ready")
+    assert.equal(room.raising_state, 4, "finish keeps Battle until the host returns")
     assert.equal(sessionManager.getActiveBattleSessionId(room.room_number), null)
+
+    const returned = await coordinator.getRoomStatus({
+        participant: client.participant,
+        roomNumber: room.room_number,
+    })
+    assert.equal(returned.ok, true)
+    assert.equal(room.raising_state, 1, "host return is the only 4→1")
 
     handleLobbyMessage(socket, [0, [0, { party: CHANGED_PARTY }]])
     assert.deepEqual(client.yourself.party, CHANGED_PARTY, "Enter must work again after release")

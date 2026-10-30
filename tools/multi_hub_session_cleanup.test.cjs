@@ -192,7 +192,7 @@ for (const mode of ["expiry", "revoke"]) {
         assert.equal(fixture.expire(), 1)
         assert.deepEqual(fixture.cleanupResults, [2])
         for (const room of fixture.rooms) {
-            assert.equal(getRoom(room.roomNumber).raising_state, 1)
+            assert.equal(getRoom(room.roomNumber).raising_state, 4)
             assert.equal(sessionManager.getActiveBattleSessionId(room.roomNumber), null)
             assert.equal(room.guestLobbySocket.destroyed, true)
             assert.equal(room.guestBattleSocket.destroyed, true)
@@ -236,7 +236,7 @@ test("invalidated guest cleanup continues after one room state cleanup throws", 
     assert.deepEqual(fixture.cleanupResults, [2])
     for (const room of fixture.rooms) {
         assert.equal(sessionManager.getActiveBattleSessionId(room.roomNumber), null)
-        assert.equal(getRoom(room.roomNumber).raising_state, 1)
+        assert.equal(getRoom(room.roomNumber).raising_state, 4)
     }
 })
 

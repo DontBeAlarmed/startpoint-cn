@@ -35,7 +35,7 @@ const { HubClient } = require("../src/multi/hub/client")
 const { IdempotencyCache } = require("../src/multi/hub/idempotency")
 const { NodeSessionRegistry } = require("../src/multi/hub/node-sessions")
 const { buildMultiHubControlApp } = require("../src/multi/hub/server")
-const { disbandRoom, getRoom } = require("../src/multi/room/manager")
+const { disbandRoom, getRoom, updateRoomState } = require("../src/multi/room/manager")
 const { sessionManager } = require("../src/multi/state/SessionManager")
 
 const host = Object.freeze({ nodeSessionId: "node-host", viewerId: 101 })
@@ -1459,6 +1459,7 @@ test("production /finish settles through a real HubClient session rotation", asy
         connectionId: "production-finish-rotation-host",
         participant: originalParticipant,
     }], originalParticipant)
+    assert.equal(updateRoomState(remoteRoomNumber, 4), true)
 
     let home
     try {
@@ -1495,7 +1496,7 @@ test("production /finish settles through a real HubClient session rotation", asy
         assert.equal(finished.statusCode, 200, finished.body)
         assert.notEqual(hub.client.getNodeSessionId(), originalParticipant.nodeSessionId)
         assert.equal(getPlayerActiveQuestSync(home.playerId), null)
-        assert.equal(getRoom(remoteRoomNumber).raising_state, 1)
+        assert.equal(getRoom(remoteRoomNumber).raising_state, 4)
         assert.equal(sessionManager.getActiveBattleSessionId(remoteRoomNumber), null)
         assert.equal(typeof storedQuest.battleSessionId, "string")
     } finally {

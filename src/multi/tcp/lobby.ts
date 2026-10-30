@@ -766,6 +766,8 @@ function beginBattle(client: SessionClient): boolean {
     const room = getRoom(client.roomNumber)
     if (!room || !client.participant
         || !sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)) return false
+    // 结算期 state 4 驻留变长：重发 StartBattle 不得在结算中开第二局。
+    if (room.raising_state === 4) return false
     if (sessionManager.hasBattleExpectedCount(client.roomNumber)) return false
 
     const realMembers = client.mates.filter(mate => !mate.comId)

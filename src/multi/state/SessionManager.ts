@@ -726,6 +726,14 @@ export class SessionManager {
         return this.battleParticipants.get(roomNumber)?.get(connectionId)
     }
 
+    /** 当前参战者快照（abort 已移除的客机会从结果里消失）。 */
+    getBattleParticipantsForRoom(roomNumber: string): ParticipantIdentity[] {
+        const participants = this.battleParticipants.get(roomNumber)
+        return participants
+            ? [...participants.values()].map(entry => entry.participant)
+            : []
+    }
+
     isBattleHostParticipant(roomNumber: string, identity: ParticipantIdentity): boolean {
         const host = this.battleHostParticipants.get(roomNumber)
         return host !== undefined

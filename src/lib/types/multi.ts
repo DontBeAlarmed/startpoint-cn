@@ -62,6 +62,8 @@ export interface MultiRoom {
     room_sequence: number
     host_entry_time: number
     member_participants: MultiRoomParticipant[]
+    /** B3：上一场参战者；state 4 的客户服务矩阵用它判断成员，HostReturn 后清空 */
+    battle_participants: MultiRoomParticipant[]
     mates: Array<{ viewer_id: number | null, com_id: number, player_id?: number }>
     share_room_options: number
     /** Wall-clock ms when a battle room last had zero connected participants. */

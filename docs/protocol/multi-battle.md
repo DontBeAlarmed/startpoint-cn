@@ -176,7 +176,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 | 路由 | 当前职责 |
 |---|---|
 | `start` | 重新校验请求节点与房间固定兼容性、玩家成员身份及关卡一致性；兼容性校验在任何本地扣费或 active quest 写入前完成。铃铛进房（请求携 attention_key）经 T2 门票校验（open 且房间/房主匹配且持有效投递行）冻结 cond92 资格并记账 accepted，无 key/无效 key 走实时判定不影响开战。每位真人分别写入 active quest：房主预扣完整体力和 Always 门票，guest 按 Follow 关系计费（互关/可信跨服 0，其余折半后应用 Campaign，见 [同服 Follow 与跨服房间兼容](../systems/follow.md)）；`raising_state=4` 已由 TCP StartBattle 建立 |
-| `finish` | 由 Hub 授权 retained completion fact，再按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；各节点只结算自己的存档，全部剩余真人 Finalize 后由 coordinator 把房间恢复为状态 1 |
+| `finish` | 由 Hub 授权 retained completion fact，再按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；各节点只结算自己的存档；全部剩余真人 Finalize 后 coordinator 只释放座位并清 battle runtime，房间保持 state 4，房主返回（prepare/select/restore）才恢复为状态 1 |
 | `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除并立即重判剩余成员是否全部 Finalize |
 | `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
 
@@ -257,7 +257,7 @@ cooperation_room 拒绝裁决（F-02，2026-10 用户定案）：**日常可恢�
 
 客户端协议中的 `MeetingNotifyMessage.Bye`（Notify index 1）是客户端定义的无参数枚举消息，不是 HTTP 字段，也不等同于“玩家主动退出房间”。客户端停止使用当前 `cooperation_room` 连接时会发送它，主动离开和进入战斗时的连接切换都可能走同一消息；因此服务端必须结合 `raising_state` 解释，不能仅凭名称判断为解散。
 
-成员资格在房间内保存完整 `nodeSessionId + viewerId`，不从当前在线 socket 反推，因此远程成员临时离线后不会退化成 `embedded + viewerId`。结算事实的授权、Finalize 和移除也使用相同复合键；服务端不能在这些状态中只用 viewer 区分成员。成员资格与 socket 在线状态分开保存：战斗前普通网络断开只移除连接，客机立即释放座位，房主保留房间等待重连或老化清理；明确 `Bye` 仍立即释放 guest 或解散 host。进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。`raising_state=4` 期间 lobby 的 Enter、ChangeParty、Ready 和 EnterComs 一律被拒绝（写锁绑定房间生命周期，与 battle socket 是否在线无关）；只有正式 release 把房间转回 1 后，重赛 lobby 写入才重新开放。
+成员资格在房间内保存完整 `nodeSessionId + viewerId`，不从当前在线 socket 反推，因此远程成员临时离线后不会退化成 `embedded + viewerId`。结算事实的授权、Finalize 和移除也使用相同复合键；服务端不能在这些状态中只用 viewer 区分成员。成员资格与 socket 在线状态分开保存：战斗前普通网络断开只移除连接，客机立即释放座位，房主保留房间等待重连或老化清理；明确 `Bye` 仍立即释放 guest 或解散 host。进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。`raising_state=4` 期间 lobby 的 Enter、ChangeParty、Ready 和 EnterComs 一律被拒绝（写锁绑定房间生命周期，与 battle socket 是否在线无关）；只有房主返回（prepare/select/restore）把房间转回 1 后，重赛 lobby 写入才重新开放。
 
 ### 6.2 Battle socket 握手
 
@@ -385,8 +385,8 @@ create_room
   -> raising_state=1 (Ready)
   -> Ready / NPC 招募 / StartBattle
   -> raising_state=4 (Battle)
-  -> 全部剩余真人 Finalize，coordinator release/reset
-  -> raising_state=1 (保留现有房间，允许重赛)
+  -> 全部剩余真人 Finalize，coordinator finish release（保持 state 4）
+  -> 房主返回（prepare/select/restore）才 4→1，保留现有房间，允许重赛
 ```
 
 ### 10.1 Finish
@@ -394,7 +394,7 @@ create_room
 每个玩家的 `finish` 完成以下操作：
 
 - 在本地写事务前查询 Hub 保留的参与者、`battleSessionId` 和 Finalize 完成事实；
-- 通过 coordinator 处理权威房间生命周期；全部真人已 Finalize 时释放当局 battle 状态并把房间恢复为 Ready。释放是窄提交边界：房间先成功转回 Ready，然后才清理 battle runtime；转换被拒时 facts、成员快照与 SceneReady 状态全部保留（finish 重试授权不丢失），由后续 finalize、abort、节点失效清理重试收敛，或最终落入下述 abandoned 战斗房间回收。参与者已全部移除且无人 Finalize 的空战局视为 abandoned，不视为"全部完成"，不会触发成功 release；
+- 通过 coordinator 处理权威房间生命周期；全部真人已 Finalize 时释放座位并清 battle runtime，但房间保持 state 4（state 4 服务矩阵仍认本场参战者为成员），房主返回（prepare/select/restore）才 4→1。finish 的释放以 active battle session 为守卫，迟到的旧代 finalize 不得触碰新局；参与者已全部移除且无人 Finalize 的空战局视为 abandoned，不视为"全部完成"，不会触发成功 release；
 - 在玩家自己的 SQLite 事务内重新比对并消费 active quest，同时结算奖励、关卡进度和任务 tracker；
 - 本地事务失败时整体回滚，active quest 与 Hub 限时保留的完成事实可供重试。
 
@@ -427,11 +427,13 @@ cleaner 默认每 60 秒扫描一次非战斗房间：
 | `state=1/2` 且成员达到 3 | 30 分钟 |
 | `state=4` 且仍有 lobby/battle socket | 跳过（战斗房间不按空闲过期） |
 | `state=4` 且 lobby/battle socket 全空 | 再等待 15 分钟 abandoned 战斗宽限后回收 |
+| `state=4` 且已全部 Finish（结算完成） | 从 Finish 起 15 分钟资源上界，由内核 gcSweep 触发，不要求 socket 全空 |
 
 `state=4` 的房间不再被永久跳过：最后一个 lobby/battle socket 消失时房间记录
 `battle_empty_since_ms`，超过 `abandonedBattleExpiryMs`（默认 15 分钟）后由
 `disbandRoom` 回收并幂等释放 battle facts；宽限覆盖了成员只是落后于 HTTP
-finish 的场景。过期前 30 秒，服务端可以发送 RemainingTime。`state=4` 不存在通用"战斗 10 分钟自动清理"规则。
+finish 的场景。结算完成后 state 4 的 15 分钟资源上界由内核 gcSweep 触发
+（不依赖 socket 全空）；房主返回才 4→1。过期前 30 秒，服务端可以发送 RemainingTime。`state=4` 不存在通用"战斗 10 分钟自动清理"规则。
 
 ## 11. Battle relay 与场景屏障
 

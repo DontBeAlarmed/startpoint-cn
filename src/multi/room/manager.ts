@@ -66,13 +66,19 @@ function cleanExpiredRooms(timing: RoomCleanupTiming) {
     for (const [roomNumber, room] of rooms) {
         // B2b：自检内核的资源 deadline（结算后 15 分钟 / closing 后 5 分钟）。
         // 影子阶段只记录；B3 起由外壳执行 closeRoom/dismiss 效果。
-        lifecycleRegistry.dispatch(roomNumber, generation => ({
+        const lifecycleDecision = lifecycleRegistry.dispatch(roomNumber, generation => ({
             type: "gcSweep",
             generation,
             nowMs: now,
             battleDeadlineMs: LIFECYCLE_BATTLE_DEADLINE_MS,
             closeDeadlineMs: LIFECYCLE_CLOSE_DEADLINE_MS,
         }));
+        if (lifecycleDecision?.state.phase === "closing") {
+            // 内核判定的 state 4 资源上界（结算后 15 分钟）：即使还有 socket
+            // 挂着也回收，避免 finalized 房间被常连 socket 钉死。
+            if (disbandRoom(roomNumber)) cleaned++;
+            continue;
+        }
         if (room.raising_state === 4) {
             // A battle room is only recycled once every participant is gone
             // (no lobby socket, no battle socket) and the bounded grace has
@@ -210,6 +216,7 @@ export function createRoom(
         // R-15=B：入场时刻锚真实时间（见 cleanExpiredRooms 注释）
         host_entry_time: Math.floor(getRealNowMs() / 1000),
         member_participants: [{ ...hostParticipant }],
+        battle_participants: [],
         mates: [],
         share_room_options: 0,
         is_npc_mode: isNpcMode,
@@ -363,6 +370,26 @@ export function updateRoomState(
 
 export function setRoomBattle(roomNumber: string): boolean {
     return updateRoomState(roomNumber, 4);
+}
+
+export function reconcileHostReturn(roomNumber: string): boolean {
+    const room = rooms.get(roomNumber);
+    if (!room || room.raising_state !== 4) return false;
+    const lifecycle = lifecycleRegistry.get(roomNumber);
+    if (!lifecycle || lifecycle.phase !== "ready") return false;
+    // 外壳事实是主判据：battle facts 未释放时绝不 4→1（内核相位只做旁证）。
+    if (sessionManager.getActiveBattleSessionId(roomNumber) !== null) return false;
+    if (!updateRoomState(roomNumber, 1)) return false;
+    room.battle_participants = [];
+    room.mates = [{ viewer_id: room.host_viewer_id, com_id: 0 }];
+    updateHostEntryTime(roomNumber);
+    try {
+        const { syncRoomShareRow } = require("./share-sync") as typeof import("./share-sync");
+        syncRoomShareRow(roomNumber);
+    } catch (error) {
+        console.warn(`[MULTI] host return share sync failed: ${roomNumber}`, describeError(error));
+    }
+    return true;
 }
 
 export function disbandRoom(roomNumber: string): boolean {

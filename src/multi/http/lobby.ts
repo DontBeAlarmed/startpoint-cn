@@ -4,7 +4,6 @@ import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "..
 import { getQuestFromCategorySync } from "../../lib/quest-content"
 import { generateDataHeaders, realSecondsToVirtual } from "../../utils"
 import { getRealNowMs } from "../../runtime/time/game-time"
-import { lifecycleRegistry } from "../lifecycle"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
@@ -318,17 +317,9 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         // - 非成员（房间号直进的局外人）→ 4 已开战弹窗（立即明确）。
         // 房主返回房间经 prepare 路径释放状态（R-6）。
         if (viewerId === room.value.host.viewerId) {
-            const hostIdentity = lifecycleRegistry.hostOf(room.value.roomNumber)
-            if (hostIdentity !== undefined) {
-                lifecycleRegistry.dispatch(room.value.roomNumber, generation => ({
-                    type: "hostReturn",
-                    generation,
-                    identity: hostIdentity,
-                    nowMs: getRealNowMs(),
-                }))
-            }
-            selectData.raising_state = 1
-            console.log(`[MULTI] select_room: host override raising_state → 1`)
+            // 4→1 只在最后一个 finish 后；房主提前返回时给 2，客户端 3s×5 重试。
+            selectData.raising_state = room.value.raisingState === 4 ? 2 : 1
+            console.log(`[MULTI] select_room: host override raising_state → ${selectData.raising_state}`)
         } else if (room.value.raisingState === 4) {
             const isMember = room.value.members.some(
                 member => member.viewerId === viewerId,

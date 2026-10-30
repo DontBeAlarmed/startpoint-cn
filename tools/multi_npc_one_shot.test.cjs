@@ -250,7 +250,7 @@ test("one-shot：无 NPC 房间为 no-op", () => {
     assert.deepEqual(host.mates, before)
 })
 
-test("releaseBattle 挂点：4→1 成功触发回调（携带 session id）、幂等重复触发", () => {
+test("releaseBattle 挂点：只释座/清事实并触发回调（携带 session id），4→1 由 HostReturn 触发", () => {
     const released = []
     const coordinator = new EmbeddedMultiCoordinator({
         onBattleReleased: (roomNumber, battleSessionId) => { released.push([roomNumber, battleSessionId]) },
@@ -263,12 +263,11 @@ test("releaseBattle 挂点：4→1 成功触发回调（携带 session id）、�
     assert.equal(updateRoomState(room.room_number, 4), true, "前置：转 Battle")
 
     // releaseBattle 是私有边界——经实例直接驱动（CJS 运行时无可见性限制）
-    assert.equal(coordinator.releaseBattle(room.room_number, "session-x"), true, "4→1 释放成功")
+    assert.equal(coordinator.releaseBattle(room.room_number, "session-x"), true, "finish 释放成功")
     assert.deepEqual(released, [[room.room_number, "session-x"]], "成功释放触发 onBattleReleased 并携带 session id")
-    assert.equal(getRoom(room.room_number).raising_state, 1)
+    assert.equal(getRoom(room.room_number).raising_state, 4, "finish 不改变 state 4")
 
-    // 重复释放幂等：1→1 无转移仍返回 true、回调再触发，但清除函数以一代一闩
-    // 保证同 session 幂等（不复活、不重复广播内容变化）
+    // 重复释放幂等：回调再触发，但清除函数以一代一闩保证同 session 幂等
     assert.equal(coordinator.releaseBattle(room.room_number, "session-x"), true)
     assert.equal(released.length, 2)
 })

@@ -1503,6 +1503,7 @@ test("real RemoteCoordinator retains finalized facts across room reset and sessi
         { connectionId: "remote-host", participant: hostParticipant },
         { connectionId: "remote-guest", participant: guestParticipant },
     ], hostParticipant)
+    assert.equal(updateRoomState(roomNumber, 4), true)
 
     const hostBattle = await hostCoordinator.startBattle({ participant: hostParticipant, roomNumber, compatibility })
     const guestBattle = await guestCoordinator.startBattle({ participant: guestParticipant, roomNumber, compatibility })
@@ -1528,7 +1529,7 @@ test("real RemoteCoordinator retains finalized facts across room reset and sessi
     })
     assert.equal(finalized.ok, true)
     assert.equal(finalized.value.finalized, true)
-    assert.equal(getRoom(roomNumber).raising_state, 1)
+    assert.equal(getRoom(roomNumber).raising_state, 4)
     assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), null)
 
     const rotatedClient = new HubClient({
@@ -1621,6 +1622,7 @@ test("real RemoteCoordinator removes an aborted guest before host finalization",
         { connectionId: "remote-abort-host", participant: created.value.host },
         { connectionId: "remote-abort-guest", participant: guestParticipant },
     ], created.value.host)
+    assert.equal(updateRoomState(roomNumber, 4), true)
     const hostBattle = await hostRemote.startBattle({
         participant: created.value.host,
         roomNumber,
@@ -1659,7 +1661,7 @@ test("real RemoteCoordinator removes an aborted guest before host finalization",
     })
     assert.equal(finalized.ok, true)
     assert.equal(finalized.value.finalized, true)
-    assert.equal(getRoom(roomNumber).raising_state, 1)
+    assert.equal(getRoom(roomNumber).raising_state, 4)
     assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), null)
     assert.equal((await hostRemote.getBattleStatus({
         participant: created.value.host,
@@ -1744,7 +1746,7 @@ test("real RemoteCoordinator releases after a finalized host loses its guest", a
         participant: guestParticipant,
         roomNumber,
     }), { ok: true, value: undefined })
-    assert.equal(getRoom(roomNumber).raising_state, 1)
+    assert.equal(getRoom(roomNumber).raising_state, 4)
     assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), null)
     assert.equal((await hostRemote.getBattleStatus({
         participant: created.value.host,
@@ -1844,7 +1846,7 @@ test("lost remote guest abort converges after its active session becomes idle", 
 
     target.setNow(10_151)
     assert.equal(target.sessions.sweep(), 1)
-    assert.equal(getRoom(roomNumber).raising_state, 1)
+    assert.equal(getRoom(roomNumber).raising_state, 4)
     assert.equal(sessionManager.getActiveBattleSessionId(roomNumber), null)
     assert.equal((await hostRemote.getBattleStatus({
         participant: created.value.host,
