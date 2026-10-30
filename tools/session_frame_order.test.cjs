@@ -297,7 +297,7 @@ test("rejected coalesced handshake drops queued protocol frames", async t => {
         )
     })
 
-    assert.deepEqual(socket.writes, [[1, "DENIED"]])
+    assert.deepEqual(socket.writes, [[1, "multibattle_room_dismissed"]])
     assert.doesNotMatch(output, /no client found for socket/)
     assert.equal(socket.pauseCalls, 1)
     assert.equal(socket.resumeCalls, 0)

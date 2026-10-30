@@ -2,7 +2,7 @@
 
 // R-09 + 恢复链路补票回归：
 // 1) restore_room 为房内成员重新签发准入（切出切回的握手可正常消费）；
-// 2) 握手拒绝分级——可恢复拒绝走优雅 [1, "DENIED"]，协议错误保留 [3] Fatal。
+// 2) 握手拒绝分级——可恢复拒绝走优雅 [1, ui_string key]，协议错误保留 [3] Fatal。
 
 const assert = require("node:assert/strict")
 const { EventEmitter } = require("node:events")
@@ -136,7 +136,8 @@ test("拒绝分级：房间状态不允许 → 优雅 [1, DENIED]；协议参数
         questCategory: room.category,
         questId: room.quest_id,
     })
-    assert.deepEqual(socket.frames[0], [1, "DENIED"], "房间状态拒绝必须走优雅 Denied")
+    assert.deepEqual(socket.frames[0], [1, "multibattle_room_already_started"],
+        "房间状态拒绝必须走优雅 Denied（合法 UI 文案 key）")
 
     const fatalSocket = new RecordingSocket()
     await handleHandshake(fatalSocket, { socklet: "cooperation_room" }) // 缺参：协议级
@@ -155,5 +156,6 @@ test("拒绝分级：准入缺失（未签发/已消费）→ 优雅 [1, DENIED]
         questCategory: room.category,
         questId: room.quest_id,
     })
-    assert.deepEqual(socket.frames[0], [1, "DENIED"], "准入缺失必须走优雅 Denied（可经 restore_room 补票重试）")
+    assert.deepEqual(socket.frames[0], [1, "multibattle_room_not_found"],
+        "准入缺失必须走优雅 Denied（合法 UI 文案 key，可经 restore_room 补票重试）")
 })

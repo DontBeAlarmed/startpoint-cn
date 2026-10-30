@@ -121,22 +121,32 @@ async function handshake(room, viewerId, extra = {}, options = {}) {
     return socket
 }
 
+const GRACEFUL_DENIAL_TEXT_KEYS = new Set([
+    "multibattle_room_dismissed",
+    "multibattle_room_filled",
+    "multibattle_room_stale_room",
+    "multibattle_room_not_found",
+    "multibattle_room_already_started",
+])
+
 test("room handshake rejects unknown, non-joinable, mismatched and full rooms", async t => {
     const missing = await handshake(null, 201)
     assert.equal(missing.ended, true)
-    assert.deepEqual(missing.messages.at(-1), [1, "DENIED"])
+    assert.deepEqual(missing.messages.at(-1), [1, "multibattle_room_dismissed"])
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(201, "missing-room"), undefined)
 
     const battleRoom = createRoom(101, 1_101, 1, 1, 501, 0, 101)
     updateRoomState(battleRoom.room_number, 4)
     const battle = await handshake(battleRoom, 202)
     assert.equal(battle.ended, true)
+    assert.deepEqual(battle.messages.at(-1), [1, "multibattle_room_already_started"])
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(202, battleRoom.room_number), undefined)
     disbandRoom(battleRoom.room_number)
 
     const mismatchRoom = createRoom(102, 1_102, 1, 1, 502, 0, 101)
     const mismatch = await handshake(mismatchRoom, 203, { questId: 999 })
     assert.equal(mismatch.ended, true)
+    assert.deepEqual(mismatch.messages.at(-1), [1, "multibattle_room_stale_room"])
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(203, mismatchRoom.room_number), undefined)
     disbandRoom(mismatchRoom.room_number)
 
@@ -146,7 +156,13 @@ test("room handshake rejects unknown, non-joinable, mismatched and full rooms", 
     t.after(() => disbandRoom(fullRoom.room_number))
     const full = await handshake(fullRoom, 206)
     assert.equal(full.ended, true)
+    assert.deepEqual(full.messages.at(-1), [1, "multibattle_room_filled"])
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(206, fullRoom.room_number), undefined)
+
+    for (const socket of [missing, battle, mismatch, full]) {
+        assert.equal(GRACEFUL_DENIAL_TEXT_KEYS.has(socket.messages.at(-1)[1]), true,
+            "graceful denial must carry a client ui_string key, never a protocol token")
+    }
 
     const reconnect = await handshake(fullRoom, 204)
     assert.equal(reconnect.ended, false)
@@ -194,8 +210,8 @@ test("room admission is required and consumed once", async t => {
     t.after(() => sessionManager.removeClientBySocket(accepted))
 
     assert.equal(accepted.ended, false)
-    assert.deepEqual(replayed.messages.at(-1), [1, "DENIED"])
-    assert.deepEqual(missing.messages.at(-1), [1, "DENIED"])
+    assert.deepEqual(replayed.messages.at(-1), [1, "multibattle_room_not_found"])
+    assert.deepEqual(missing.messages.at(-1), [1, "multibattle_room_not_found"])
 })
 
 test("issuing an admission records the owner-side join intent", t => {
@@ -242,7 +258,7 @@ test("a handshake ticket from another generation is denied", async t => {
     })
 
     assert.equal(socket.ended, true)
-    assert.deepEqual(socket.messages.at(-1), [1, "DENIED"])
+    assert.deepEqual(socket.messages.at(-1), [1, "multibattle_room_dismissed"])
     assert.equal(released, 1)
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(230, room.room_number), undefined)
 })
@@ -255,7 +271,7 @@ test("a live room without a bound generation is denied", async t => {
     const socket = await handshake(room, 228)
 
     assert.equal(socket.ended, true)
-    assert.deepEqual(socket.messages.at(-1), [1, "DENIED"])
+    assert.deepEqual(socket.messages.at(-1), [1, "multibattle_room_not_found"])
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(228, room.room_number), undefined,
         "an unversioned ticket must not enter a room whose generation is unknown")
 })
@@ -282,7 +298,7 @@ test("room handshake rejects an admission whose participant viewer differs from 
 
     assert.equal(socket.ended, true)
     assert.equal(released, 1)
-    assert.deepEqual(socket.messages.at(-1), [1, "DENIED"])
+    assert.deepEqual(socket.messages.at(-1), [1, "multibattle_room_not_found"])
     assert.equal(sessionManager.getClientByParticipant(room.room_number, {
         nodeSessionId: "node-a",
         viewerId: 227,
@@ -321,7 +337,7 @@ test("an active room participant rejects the same viewer id from a different nod
     })
 
     assert.equal(socketB.ended, true)
-    assert.deepEqual(socketB.messages.at(-1), [1, "DENIED"])
+    assert.deepEqual(socketB.messages.at(-1), [1, "multibattle_room_not_found"])
     assert.equal(sessionManager.getClientByParticipant(room.room_number, nodeA)?.socket, socketA)
     assert.equal(sessionManager.getClientByParticipant(room.room_number, nodeB), undefined)
 

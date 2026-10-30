@@ -242,12 +242,22 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 | 帧 | 结果 | 客户端行为 | 服务端使用 |
 |---|---|---|---|
 | `[0, connectionId, roomNumber]` | Accept | 建立会话，进入 lobby 流程 | 正常路径 |
-| `[1, "DENIED"]` | Denied | 关闭连接，软提示"连接被拒"，可回大厅重试 | 可恢复拒绝（见下表） |
+| `[1, "<ui_string_key>"]` | Denied | 关闭连接，按 key 从 `ui_string` 取文案弹窗后回大厅 | 可恢复拒绝（见下表） |
 | `[2, host, port]` | Reconnect | 拆连接并按服务端给的新地址自动转拨 | 预留（多节点组网时节点转拨；单进程部署无触发场景） |
 | `[3, "HANDSHAKE_DENIED"]` | Exception(Fatal) | `serverError(Fatal)` 错误弹框 | 协议级参数错误与 battle 侧拒绝 |
 | `[4]` | Complete | 静默关闭，无任何 UI 回调 | 预留（"无声关门"场景，当前无使用） |
 
 cooperation_room 拒绝裁决（F-02，2026-10 用户定案）：**日常可恢复拒绝一律走 `[1]`**——房间不存在（`room_missing`，切出期间房主解散/宽限到期被清扫）、房间不在招募态（`room_state_*`）、类别/关卡不一致（`quest_mismatch`）、真人满员（`room_full`）、同 viewer 冲突连接（`viewer_conflict`）、准入券缺失/失效（`admission_unavailable`）与准入身份不符（`admission_viewer_mismatch`）。这些场景是联机日常而非异常，客户端语义里 `[1]` 是唯一"有软提示、能回大厅"的通道（`[4]` 无反馈、`[2]` 是转拨不是拒绝）。同族可恢复拒绝还包括房主席位冲突（`host_seat_conflict`）、加入写入失败（`room_join_*`、`room_member_write_failed`）与未知 socklet。
+
+`[1]` 的第二项是**客户端 `ui_string` 文案 key，不是协议字面量**。客户端 `EnterRoomService.socketInput_denied` 会把它传给 `DialogContent.Text` → `getUiString`；未知 key（例如 `"DENIED"`）会抛 C8601（客户端显示"部分资源文件已损坏"，清缓存无效）。服务端按原因映射：
+
+| 服务端原因 | 客户端 key |
+|---|---|
+| `room_missing`、`room_state_*`（非 4）、`admission_generation_mismatch` | `multibattle_room_dismissed` |
+| `room_state_4` | `multibattle_room_already_started` |
+| `room_full` | `multibattle_room_filled` |
+| `quest_mismatch` | `multibattle_room_stale_room` |
+| `admission_unavailable`、`admission_viewer_mismatch`、`viewer_conflict`、`host_seat_conflict`、`room_join_*`、`room_member_write_failed`、`room_generation_unavailable` | `multibattle_room_not_found` |
 
 保留 Fatal `[3]`：握手协议参数错误（缺 room number / viewer 非法 / connection id 非法——正常客户端发不出来，出现即协议栈级异常）。cooperation_battle 分支整体保留 `[3]`：战斗期拒绝（房间未开战/未知参与者/重复连接）走 HTTP 兜底链，客户端战斗界面有独立处理，不动。
 

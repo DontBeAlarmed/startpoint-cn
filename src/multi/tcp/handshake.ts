@@ -60,9 +60,34 @@ function deny(socket: net.Socket): void {
 
 // R-09 拒绝分级：可恢复拒绝走优雅 Denied（客户端 case1 = 按连接被拒处理，
 // 可提示后回大厅/重试），仅协议级参数错误与内部错误保留 Fatal [3]。
+//
+// 优雅 Denied 的第二项不是协议字面量，而是客户端 ui_string 的文案 key：
+// 客户端 EnterRoomService.socketInput_denied 会把它传给 DialogContent.Text →
+// getUiString；发 "DENIED" 会查不到 key 并抛 C8601（部分资源文件已损坏）。
+const GRACEFUL_DENIAL_TEXT_KEYS: Readonly<Record<string, string>> = Object.freeze({
+    room_missing: "multibattle_room_dismissed",
+    room_full: "multibattle_room_filled",
+    quest_mismatch: "multibattle_room_stale_room",
+    admission_unavailable: "multibattle_room_not_found",
+    admission_viewer_mismatch: "multibattle_room_not_found",
+    viewer_conflict: "multibattle_room_not_found",
+    room_generation_unavailable: "multibattle_room_not_found",
+    admission_generation_mismatch: "multibattle_room_dismissed",
+    host_seat_conflict: "multibattle_room_not_found",
+    room_member_write_failed: "multibattle_room_not_found",
+})
+
+function gracefulDenialTextKey(reason: string): string {
+    if (reason === "room_state_4") return "multibattle_room_already_started"
+    if (reason.startsWith("room_state_")) return "multibattle_room_dismissed"
+    if (reason.startsWith("room_join_")) return "multibattle_room_not_found"
+    return GRACEFUL_DENIAL_TEXT_KEYS[reason] ?? "multibattle_room_not_found"
+}
+
 function denyGracefully(socket: net.Socket, reason: string): void {
-    console.log(`[TCP] handshake denied (graceful): ${reason}`)
-    sessionManager.sendJson(socket, [1, "DENIED"])
+    const textKey = gracefulDenialTextKey(reason)
+    console.log(`[TCP] handshake denied (graceful): ${reason} → ${textKey}`)
+    sessionManager.sendJson(socket, [1, textKey])
     socket.end()
 }
 
