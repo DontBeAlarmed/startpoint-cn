@@ -2,6 +2,7 @@ import { randomBytes, randomInt } from "crypto";
 import { describeError } from "../describe-error";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getRealNowMs } from "../../runtime/time/game-time";
+import { parkDisbandingRoom } from "./room-disband-shadows";
 import { sessionManager } from "../state/SessionManager";
 import type { ParticipantIdentity } from "../coordinator/contracts";
 
@@ -387,7 +388,15 @@ export function disbandRoom(roomNumber: string): boolean {
         console.log(`[MULTI] room deleted: ${roomNumber}`);
         sessionManager.removeRoomState(roomNumber);
         notifiedRooms.delete(roomNumber);
-        notifyRoomDisbanded(roomNumber, room?.host_player_id ?? 0, room?.host_viewer_id ?? 0);
+        // R-6 影子表（5805 根治，2026-10-30 设计定案）：有"已握手未 Enter"的
+        // 在途入房者 → 房间进影子表（对外已消失，仅对在途者可见），其 Enter
+        // 在影子内完成入房后立即 dismiss+关闭；集合空时影子销毁。
+        const inFlightKeys = sessionManager.getInFlightRoomJoiners(roomNumber);
+        if (room && parkDisbandingRoom(room, inFlightKeys)) {
+            console.log(`[MULTI] disband parked: room=${roomNumber} inFlight=${inFlightKeys.length}`);
+        } else {
+            notifyRoomDisbanded(roomNumber, room?.host_player_id ?? 0, room?.host_viewer_id ?? 0);
+        }
     }
     return deleted;
 }

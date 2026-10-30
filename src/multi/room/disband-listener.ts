@@ -3,6 +3,7 @@ import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-s
 import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import { describeError } from "../describe-error"
 import { setRoomDisbandListener, setRoomReleaseListener } from "./manager"
+import { installInFlightJoinAbandonmentHook } from "./room-disband-shadows"
 
 /**
  * Every disband path funnels through manager.disbandRoom, which invokes the
@@ -11,6 +12,7 @@ import { setRoomDisbandListener, setRoomReleaseListener } from "./manager"
  * a second dismissal before deleting the room.
  */
 export function installDisbandLifecycleListener(): void {
+    installInFlightJoinAbandonmentHook(sessionManager)
     // OV-2：战斗释放（4→1）即 host 回房宽限起点；host 重进 Enter 取消
     // （tcp/lobby handleEnter 既有 cancel 点），宽限到期仍未重进 → 解散。
     setRoomReleaseListener((roomNumber, hostNodeSessionId, hostViewerId) => {

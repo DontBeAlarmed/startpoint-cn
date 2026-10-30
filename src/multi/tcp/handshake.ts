@@ -13,6 +13,8 @@ import {
     isRoomViewerMember,
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
+import { resolveShadowRoomForViewer } from "../room/room-disband-shadows"
+import type { MultiRoom } from "../types"
 import type { SessionClient } from "../state/SessionManager"
 import {
     embeddedAdmissionRegistry,
@@ -134,7 +136,21 @@ export async function handleHandshake(
             return
         }
 
-        const room = getRoom(normalizedRoomNumber)
+        let room = getRoom(normalizedRoomNumber)
+        // 解散影子房（R-6 设计，2026-10-30）：主册已摘除但本 viewer 是解散时
+        // 的在途入房者 → 放行其握手（Enter 走 handleEnter 的影子分支完成入房，
+        // 随即 dismiss+关闭）。非在途者照常拒绝（对外=房间已解散）。
+        let shadowRoom: MultiRoom | undefined
+        if (!room) {
+            shadowRoom = resolveShadowRoomForViewer(normalizedRoomNumber, normalizedViewerId, socket)
+            if (shadowRoom) {
+                room = shadowRoom
+                sessionManager.markInFlightRoomJoin(
+                    normalizedRoomNumber,
+                    `socket:${socket.remotePort}`,
+                )
+            }
+        }
         const categoryMatches = data.questCategory === undefined
             || (Number.isSafeInteger(data.questCategory) && data.questCategory === room?.category)
         const questMatches = data.questId === undefined

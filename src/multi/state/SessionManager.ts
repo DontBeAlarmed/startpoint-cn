@@ -139,6 +139,7 @@ export function checkBattleRuntimeInvariants(
 export class SessionManager {
     private clients = new Map<string, SessionClient>()
     private roomClients = new Map<string, Set<string>>()
+    private inFlightRoomJoins = new Map<string, Set<string>>()
     private battleClients = new Map<string, Set<string>>()
     private cidToBattleClient = new Map<string, SessionClient>()
     private socketToClient = new Map<net.Socket, SessionClient>()
@@ -529,9 +530,16 @@ export class SessionManager {
     removeClientBySocket(socket: net.Socket): boolean {
         const client = this.socketToClient.get(socket)
         if (!client) return false
+        // 解散影子表死亡事件口：在途入房者的 socket 死亡 → 名册与影子集合
+        // 同步移除（集合空时影子销毁——事件驱动，无定时器）
+        this.resolveInFlightRoomJoin(client.roomNumber, `socket:${socket.remotePort}`)
+        this.onInFlightJoinAbandoned?.(client.roomNumber, `viewer:${client.viewerId}`)
         this.removeClient(client)
         return true
     }
+
+    /** 影子模块挂的死亡回调（room-disband-shadows 模块注册，避免循环 import） */
+    onInFlightJoinAbandoned: ((roomNumber: string, viewerKey: string) => void) | null = null
 
     getClientsInRoom(roomNumber: string): SessionClient[] {
         const set = this.roomClients.get(roomNumber)
@@ -604,6 +612,30 @@ export class SessionManager {
             this.closeClientSocket(client.socket)
         }
         return detached
+    }
+
+    // 解散影子表消费口：列出"已握手未 Enter"的在途 socket 键
+    // （registered via markInFlightRoomJoin at handshake acceptance）。
+    getInFlightRoomJoiners(roomNumber: string): string[] {
+        const pending = this.inFlightRoomJoins.get(roomNumber)
+        if (!pending) return []
+        return [...pending]
+    }
+
+    markInFlightRoomJoin(roomNumber: string, socketKey: string): void {
+        let set = this.inFlightRoomJoins.get(roomNumber)
+        if (!set) {
+            set = new Set()
+            this.inFlightRoomJoins.set(roomNumber, set)
+        }
+        set.add(socketKey)
+    }
+
+    resolveInFlightRoomJoin(roomNumber: string, socketKey: string): void {
+        const set = this.inFlightRoomJoins.get(roomNumber)
+        if (!set) return
+        set.delete(socketKey)
+        if (set.size === 0) this.inFlightRoomJoins.delete(roomNumber)
     }
 
     closeRoomClients(roomNumber: string): number {
