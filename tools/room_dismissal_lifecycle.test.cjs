@@ -30,13 +30,12 @@ const { getServerTime } = require("../src/utils")
 
 const broadcasts = []
 const closedRooms = []
-const originalBroadcastToRoom = sessionManager.broadcastToRoom
-const originalCloseRoomClients = sessionManager.closeRoomClients
+const originalDismissAndDetach = sessionManager.dismissAndDetachRoomClients
 
-sessionManager.broadcastToRoom = (roomNumber, message) => {
-    broadcasts.push({ roomNumber, message })
-}
-sessionManager.closeRoomClients = roomNumber => {
+// 静默拆除（dismiss-and-detach）路径桩：记录 dismiss 发送与 socket 关闭房间，
+// 不触碰真实 socket
+sessionManager.dismissAndDetachRoomClients = roomNumber => {
+    broadcasts.push({ roomNumber, message: [1, [6, "multibattle_room_dismissed"]] })
     closedRooms.push(roomNumber)
     return 0
 }
@@ -93,8 +92,7 @@ test("disbanding a missing room broadcasts nothing", () => {
 after(() => {
     stopRoomCleanup()
     setRoomDisbandListener(null)
-    sessionManager.broadcastToRoom = originalBroadcastToRoom
-    sessionManager.closeRoomClients = originalCloseRoomClients
+    sessionManager.dismissAndDetachRoomClients = originalDismissAndDetach
     closeDatabase()
     restoreContentSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
