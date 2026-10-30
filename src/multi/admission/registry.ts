@@ -1,7 +1,7 @@
 import type { CoordinatorErrorCode, ParticipantIdentity } from "../coordinator/contracts"
 import type { PlayerSnapshot } from "../snapshot/player-snapshot"
 import { getRoom, getRoomOccupiedMemberCount, isRoomViewerMember } from "../room/manager"
-import { lifecycleRegistry } from "../lifecycle"
+import { identityOf, lifecycleRegistry } from "../lifecycle"
 import { getRealNowMs } from "../../runtime/time/game-time"
 
 const MAX_REAL_ROOM_MEMBERS = 3
@@ -106,6 +106,7 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
                     lifecycleGeneration,
                 }) as RoomAdmission
                 this.admissions.set(admissionKey, refreshed)
+                this.recordAdmissionIntent(roomNumber, refreshed.participant)
                 return { ok: true, value: refreshed }
             }
             return { ok: true, value: existing }
@@ -137,7 +138,24 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         }
         Object.freeze(admission)
         this.admissions.set(admissionKey, admission)
+        this.recordAdmissionIntent(roomNumber, admission.participant)
         return { ok: true, value: admission }
+    }
+
+    /**
+     * 发票即入房流水线的 admitted 阶段：owner 的 AdmissionRegistry 是唯一
+     * 权威，远程节点发票也经这里落内核，避免客机不在 seats/joiners 里。
+     */
+    private recordAdmissionIntent(roomNumber: string, participant: ParticipantIdentity): void {
+        const state = lifecycleRegistry.get(roomNumber)
+        if (!state) return
+        const identity = identityOf(participant)
+        if (state.seats.includes(identity) || state.joiners[identity] !== undefined) return
+        lifecycleRegistry.dispatch(roomNumber, generation => ({
+            type: "admit",
+            generation,
+            identity,
+        }))
     }
 
     consume(roomNumber: string, viewerId: number): RoomAdmission | null {

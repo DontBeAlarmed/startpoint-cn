@@ -198,6 +198,55 @@ test("room admission is required and consumed once", async t => {
     assert.deepEqual(missing.messages.at(-1), [1, "DENIED"])
 })
 
+test("issuing an admission records the owner-side join intent", t => {
+    const room = createRoom(116, 1_116, 1, 1, 516, 0, 101)
+    t.after(() => disbandRoom(room.room_number))
+    const registry = new AdmissionRegistry({ now: () => 1_000 })
+
+    const issued = registry.issue({
+        roomNumber: room.room_number,
+        participant: { nodeSessionId: "embedded", viewerId: 229 },
+        snapshot: snapshot(229),
+        expiresAt: 6_000,
+    })
+
+    assert.equal(issued.ok, true)
+    assert.equal(
+        lifecycleRegistry.get(room.room_number)?.joiners["viewer:229"],
+        "admitted",
+        "owner AdmissionRegistry 发票即记录 admitted（远程票也经这里）",
+    )
+})
+
+test("a handshake ticket from another generation is denied", async t => {
+    const room = createRoom(117, 1_117, 1, 1, 517, 0, 101)
+    t.after(() => disbandRoom(room.room_number))
+    const generation = lifecycleRegistry.get(room.room_number).generation
+    let released = 0
+
+    const socket = await handshake(room, 230, {}, {
+        registry: {
+            consume: () => ({
+                roomNumber: room.room_number,
+                participant: { nodeSessionId: "node-a", viewerId: 230 },
+                snapshot: snapshot(230),
+                expiresAt: 6_000,
+                lifecycleGeneration: generation + 1,
+            }),
+            release: () => {
+                released++
+                return true
+            },
+        },
+        admit: false,
+    })
+
+    assert.equal(socket.ended, true)
+    assert.deepEqual(socket.messages.at(-1), [1, "DENIED"])
+    assert.equal(released, 1)
+    assert.equal(sessionManager.getUniqueRoomClientByViewerId(230, room.room_number), undefined)
+})
+
 test("a live room without a bound generation is denied", async t => {
     const room = createRoom(115, 1_115, 1, 1, 515, 0, 101)
     t.after(() => disbandRoom(room.room_number))

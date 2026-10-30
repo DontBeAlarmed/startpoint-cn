@@ -62,6 +62,7 @@ function addRoomClient(room, socket, viewerId = room.host_viewer_id) {
         `teardown-${viewerId}-${Math.random().toString(16).slice(2)}`,
     )
     client.participant = { nodeSessionId: "embedded", viewerId }
+    client.lifecycleGeneration = lifecycleRegistry.get(room.room_number)?.generation
     const added = sessionManager.addClientToRoom(client)
     assert.equal(added.ok, true)
     return client
@@ -171,6 +172,30 @@ test("a dismissed socket close drives closing → closed", () => {
         socket.close()
         assert.equal(lifecycleRegistry.get(room.room_number), undefined)
     } finally {
+        sessionManager.onDismissedSocketClosed = null
+        setRoomDisbandListener(null)
+    }
+})
+
+test("a stale-generation close does not confirm the current room", () => {
+    lifecycleRegistry.reset()
+    installCloseConfirmation()
+    try {
+        const room = makeRoom()
+        const socket = new FakeSocket()
+        const client = addRoomClient(room, socket)
+        client.lifecycleGeneration = 0
+
+        assert.equal(disbandRoom(room.room_number), true)
+        assert.equal(lifecycleRegistry.get(room.room_number).phase, "closing")
+        socket.close()
+        assert.equal(
+            lifecycleRegistry.get(room.room_number)?.phase,
+            "closing",
+            "旧代次 socket 的迟到关闭不得确认当前房间",
+        )
+    } finally {
+        lifecycleRegistry.reset()
         sessionManager.onDismissedSocketClosed = null
         setRoomDisbandListener(null)
     }
