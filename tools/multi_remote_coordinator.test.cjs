@@ -794,8 +794,13 @@ test("battle-started rooms use the client-native raising_state 4 for select and 
         payload: { viewer_id: 202, room_number: "123456", category: 1, quest_id: 701 },
     }))
 
+    // 2026-10-30 服务矩阵（用户实测钉死）：state 4 期间——
+    // 非成员 select → 4（已开战弹窗）；成员 select/prepare → 2（等待横幅，
+    // prepare 链式 select 解析器对 4 抛 C5001）；非成员 prepare → 4507。
+    // viewer 202 非成员（members 仅 101）。
     assert.equal(select.data.raising_state, 4)
-    assert.equal(prepare.data.raising_state, 4)
+    assert.equal("raising_state" in prepare.data, false)
+    assert.equal(prepare.data_headers.result_code, 4507)
 })
 
 test("local QUEST_NOT_AVAILABLE uses endpoint-specific join mappings", async t => {
