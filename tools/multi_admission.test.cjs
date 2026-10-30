@@ -261,3 +261,33 @@ test("node-session and room teardown clear all pending admissions", () => {
         snapshot: snapshotFixture(303, "Guest B"),
     }).ok, true)
 })
+
+test("kernel-rejected admission (NPC-full room) fails issue and leaves no ticket", () => {
+    const registry = new AdmissionRegistry({ now: () => 1_000 })
+    const { lifecycleRegistry } = require("../src/multi/lifecycle")
+    // NPC 房：1 真人 + 2 NPC = 内核容量 1，第二个真人不得入（D8 语义）
+    lifecycleRegistry.create("777001", "viewer:1")
+    lifecycleRegistry.dispatch("777001", generation => ({
+        type: "setNpcCount", generation, npcCount: 2,
+    }))
+    const full = registry.issue({
+        roomNumber: "777001",
+        participant: { nodeSessionId: "node-a", viewerId: 202 },
+        snapshot: snapshotFixture(202, "Guest A"),
+        expiresAt: 6_000,
+    })
+    assert.equal(full.ok, false)
+    assert.equal(full.ok ? null : full.error, "ROOM_FULL")
+    assert.equal(registry.consume("777001", 202), null)
+
+    // 对照：npc=0 普通房正常发票（内核 admit 落账）
+    lifecycleRegistry.create("777002", "viewer:1")
+    const okIssue = registry.issue({
+        roomNumber: "777002",
+        participant: { nodeSessionId: "node-a", viewerId: 203 },
+        snapshot: snapshotFixture(203, "Guest B"),
+        expiresAt: 6_000,
+    })
+    assert.equal(okIssue.ok, true)
+    assert.ok(registry.consume("777002", 203) !== null)
+})

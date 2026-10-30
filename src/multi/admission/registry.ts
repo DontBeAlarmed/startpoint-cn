@@ -105,8 +105,13 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
                     expiresAt: input.expiresAt,
                     lifecycleGeneration,
                 }) as RoomAdmission
+                const refreshReject = this.recordAdmissionIntent(roomNumber, refreshed.participant)
+                if (refreshReject !== null
+                    && !this.isOccupiedMember(roomNumber, input.participant.viewerId)) {
+                    this.admissions.delete(admissionKey)
+                    return { ok: false, error: refreshReject }
+                }
                 this.admissions.set(admissionKey, refreshed)
-                this.recordAdmissionIntent(roomNumber, refreshed.participant)
                 return { ok: true, value: refreshed }
             }
             return { ok: true, value: existing }
@@ -138,24 +143,41 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         }
         Object.freeze(admission)
         this.admissions.set(admissionKey, admission)
-        this.recordAdmissionIntent(roomNumber, admission.participant)
+        const kernelReject = this.recordAdmissionIntent(roomNumber, admission.participant)
+        // 内核拒绝=该新进入者不能进（NPC 容量/相位变化）：发票必须终止，
+        // 否则票在手、握手/Enter 被内核连拒而外壳继续写成员账。占座成员
+        // （战斗/结算期返场重发票）不受此限——其成员账在外壳、内核座位已
+        // 释放属 B3a 预期，内核拒绝被有意忽略（与 2026-10-30 占座豁免一致）。
+        if (kernelReject !== null
+            && !this.isOccupiedMember(roomNumber, input.participant.viewerId)) {
+            this.admissions.delete(admissionKey)
+            return { ok: false, error: kernelReject }
+        }
         return { ok: true, value: admission }
     }
 
     /**
      * 发票即入房流水线的 admitted 阶段：owner 的 AdmissionRegistry 是唯一
      * 权威，远程节点发票也经这里落内核，避免客机不在 seats/joiners 里。
+     * 返回内核拒绝码（映射到 CoordinatorErrorCode 词汇）；null=内核已接纳
+     * 或无内核条目。NPC 房的真实容量（3-npc）只在内核生效——2026-10-31
+     * 真机 699560：票照发、握手/Enter 被内核连拒而外壳放行，账本裂缝。
      */
-    private recordAdmissionIntent(roomNumber: string, participant: ParticipantIdentity): void {
+    private recordAdmissionIntent(
+        roomNumber: string,
+        participant: ParticipantIdentity,
+    ): CoordinatorErrorCode | null {
         const state = lifecycleRegistry.get(roomNumber)
-        if (!state) return
+        if (!state) return null
         const identity = identityOf(participant)
-        if (state.seats.includes(identity) || state.joiners[identity] !== undefined) return
-        lifecycleRegistry.dispatch(roomNumber, generation => ({
+        if (state.seats.includes(identity) || state.joiners[identity] !== undefined) return null
+        const decision = lifecycleRegistry.dispatch(roomNumber, generation => ({
             type: "admit",
             generation,
             identity,
         }))
+        if (!decision?.rejected) return null
+        return decision.rejected === "ROOM_FULL" ? "ROOM_FULL" : "ROOM_PERMISSION_DENIED"
     }
 
     consume(roomNumber: string, viewerId: number): RoomAdmission | null {

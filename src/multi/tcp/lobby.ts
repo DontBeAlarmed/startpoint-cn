@@ -464,12 +464,22 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     client.enterData = ed
     // B2a 影子：记录 enter；房主首次 enter 在内核里 recruiting → ready。
     if (client.participant) {
-        lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+        const enterDecision = lifecycleRegistry.dispatch(client.roomNumber, generation => ({
             type: "enter",
             generation,
             identity: identityOf(client.participant!),
             nowMs: getRealNowMs(),
         }), client.lifecycleGeneration)
+        // 内核拒绝=握手后座位/相位已变化（迟到 Enter 被顶满）：不回 enter 帧，
+        // dismiss 让客户端走拆除重进流程——外壳成员账不得越过内核账
+        // （2026-10-31 真机 699560："guest entered"写在内核连拒之后）。
+        if (enterDecision?.rejected) {
+            removeRoomMember(client.roomNumber, client.participant!)
+            sessionManager.dismissSingleClient(client)
+            console.log(`[LOBBY] enter rejected by lifecycle: room=${client.roomNumber}`
+                + ` reason=${enterDecision.rejected}`)
+            return
+        }
         // HostReturn 清空 ready 后，房主重进时按客户端当前 ready 重新同步。
         lifecycleRegistry.dispatch(client.roomNumber, generation => ({
             type: "ready",

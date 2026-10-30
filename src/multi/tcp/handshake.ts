@@ -11,6 +11,7 @@ import {
     getRoom,
     hasRoomMemberViewerConflict,
     isRoomViewerMember,
+    removeRoomMember,
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
 import { identityOf, lifecycleRegistry } from "../lifecycle"
@@ -82,6 +83,22 @@ function gracefulDenialTextKey(reason: string): string {
     if (reason.startsWith("room_state_")) return "multibattle_room_dismissed"
     if (reason.startsWith("room_join_")) return "multibattle_room_not_found"
     return GRACEFUL_DENIAL_TEXT_KEYS[reason] ?? "multibattle_room_not_found"
+}
+
+/** 内核握手拒绝 → 优雅拒绝 reason（沿用现有 ui_string 映射表）。 */
+function kernelHandshakeDenialReason(rejected: string, phase: string): string {
+    switch (rejected) {
+        case "ROOM_FULL":
+            return "room_full"
+        case "STALE_GENERATION":
+            return "admission_generation_mismatch"
+        case "ROOM_CLOSING":
+        case "ROOM_CLOSED":
+        case "ROOM_NOT_JOINABLE":
+            return phase === "battle" ? "room_state_4" : "room_state_9"
+        default:
+            return "admission_unavailable"
+    }
 }
 
 function denyGracefully(socket: net.Socket, reason: string): void {
@@ -273,11 +290,23 @@ export async function handleHandshake(
         }
         // B2a 影子：admit 在入场票签发时记录；这里只记录 handshake。
         const viewerKey = identityOf(admission.participant)
-        lifecycleRegistry.dispatch(normalizedRoomNumber, generation => ({
+        const handshakeDecision = lifecycleRegistry.dispatch(normalizedRoomNumber, generation => ({
             type: "handshake",
             generation,
             identity: viewerKey,
         }), client.lifecycleGeneration)
+        // 内核拒绝=该 viewer 已不能进（迟到票/容量/相位在签发后变化）：
+        // 回滚本段全部外壳写入再优雅拒绝——外壳成员账不得越过内核账。
+        if (handshakeDecision?.rejected) {
+            removeRoomMember(normalizedRoomNumber, admission.participant)
+            sessionManager.removeClient(client)
+            releaseAdmission()
+            denyGracefully(socket, kernelHandshakeDenialReason(
+                handshakeDecision.rejected,
+                handshakeDecision.state.phase,
+            ))
+            return
+        }
         sessionManager.sendJson(socket, [0, normalizedConnectionId, normalizedRoomNumber])
         return
     }
