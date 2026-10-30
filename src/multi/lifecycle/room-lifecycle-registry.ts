@@ -28,6 +28,7 @@ export class RoomLifecycleRegistry {
     private rooms = new Map<string, RoomLifecycleState>()
     private nextGeneration = 1
     private rejections = 0
+    private rejectionReasons = new Map<string, number>()
 
     create(roomNumber: string, host: string, npcCount = 0): RoomLifecycleState {
         const state = createLifecycle({
@@ -42,6 +43,11 @@ export class RoomLifecycleRegistry {
 
     get(roomNumber: string): RoomLifecycleState | undefined {
         return this.rooms.get(roomNumber)
+    }
+
+    /** 只读枚举（漂移观测用）：当前内核持有的全部房间号。 */
+    roomNumbers(): readonly string[] {
+        return Object.freeze([...this.rooms.keys()])
     }
 
     hostOf(roomNumber: string): string | undefined {
@@ -59,8 +65,10 @@ export class RoomLifecycleRegistry {
         const decision = decide(state, event)
         if (decision.rejected) {
             this.rejections++
+            const reason = decision.rejected
+            this.rejectionReasons.set(reason, (this.rejectionReasons.get(reason) ?? 0) + 1)
             if (process.env.MULTI_LIFECYCLE_SHADOW_LOG === "1") {
-                console.log(`[LIFECYCLE] reject room=${roomNumber} event=${event.type} reason=${decision.rejected}`)
+                console.log(`[LIFECYCLE] reject room=${roomNumber} event=${event.type} reason=${reason}`)
             }
         }
         if (decision.state !== state) this.rooms.set(roomNumber, decision.state)
@@ -75,10 +83,21 @@ export class RoomLifecycleRegistry {
         this.rooms.clear()
         this.nextGeneration = 1
         this.rejections = 0
+        this.rejectionReasons.clear()
     }
 
-    stats(): { readonly rooms: number; readonly rejections: number } {
-        return { rooms: this.rooms.size, rejections: this.rejections }
+    stats(): {
+        readonly rooms: number
+        readonly rejections: number
+        readonly rejectionReasons: Readonly<Record<string, number>>
+    } {
+        const rejectionReasons: Record<string, number> = {}
+        for (const [reason, count] of this.rejectionReasons) rejectionReasons[reason] = count
+        return Object.freeze({
+            rooms: this.rooms.size,
+            rejections: this.rejections,
+            rejectionReasons: Object.freeze(rejectionReasons),
+        })
     }
 
     /** 清掉超过 closing 期限仍未确认的 detached closing（资源回收，不推导状态）。 */

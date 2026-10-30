@@ -205,6 +205,29 @@ export class SessionManager {
         })
     }
 
+    /**
+     * 只读诊断（切片 0 漂移观测）：同一 viewerId 持有多个活跃大厅 client 的
+     * 统计——多房持有（泄漏）与同房重复（双握手）都会落进这个计数。
+     * 不改行为；调用方（manager 清理 tick）按参数传给漂移采样器。
+     */
+    getRoomClientDuplicateViewerStats(): { readonly viewers: number; readonly maxClients: number } {
+        const perViewer = new Map<number, number>()
+        for (const connections of this.roomClients.values()) {
+            for (const connectionId of connections) {
+                const client = this.clients.get(connectionId)
+                if (!client) continue
+                perViewer.set(client.viewerId, (perViewer.get(client.viewerId) ?? 0) + 1)
+            }
+        }
+        let viewers = 0
+        let maxClients = 0
+        for (const count of perViewer.values()) {
+            if (count > 1) viewers++
+            maxClients = Math.max(maxClients, count)
+        }
+        return Object.freeze({ viewers, maxClients })
+    }
+
     configureBattleTuning(tuning: MultiBattleTuning): void {
         this.assertBattleDuration("loadingLeaseMs", tuning.loadingLeaseMs)
         this.assertBattleDuration("heartbeatLeaseMs", tuning.heartbeatLeaseMs)

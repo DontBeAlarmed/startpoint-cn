@@ -37,6 +37,37 @@ export interface AdminMultiLifecycleStatus {
         readonly ageMs: number
         readonly atMs: number
     } | null
+    readonly drift: AdminLifecycleDriftStatus | null
+    readonly rejections: AdminMultiLifecycleRejections | null
+}
+
+export interface AdminLifecycleDriftSample {
+    readonly roomNumber: string
+    readonly atMs: number
+    readonly detail: string
+}
+
+export interface AdminLifecycleDriftInvariant {
+    readonly current: number
+    readonly total: number
+    readonly lastAtMs: number | null
+    readonly samples: readonly AdminLifecycleDriftSample[]
+}
+
+export interface AdminLifecycleDriftStatus {
+    readonly checkedAtMs: number
+    readonly roomWithoutKernel: AdminLifecycleDriftInvariant
+    readonly kernelWithoutRoomActive: AdminLifecycleDriftInvariant
+    readonly kernelClosingOrphans: AdminLifecycleDriftInvariant
+    readonly memberNotInKernel: AdminLifecycleDriftInvariant
+    readonly memberNotInKernelNpcRooms: AdminLifecycleDriftInvariant
+    readonly viewerMultipleRoomClients: AdminLifecycleDriftInvariant
+    readonly closingPastDeadline: AdminLifecycleDriftInvariant
+}
+
+export interface AdminMultiLifecycleRejections {
+    readonly total: number
+    readonly byReason: Readonly<Record<string, number>>
 }
 
 export interface CompatibilityRejectionDifference {
@@ -207,6 +238,94 @@ function sanitizeLifecycle(value: AdminMultiLifecycleStatus | null): AdminMultiL
         lastSweptClosingAtMs,
         forcedDismissCloses: value.forcedDismissCloses,
         lastForcedClose: safeLastForcedClose,
+        drift: sanitizeLifecycleDrift((value as { readonly drift?: unknown }).drift ?? null),
+        rejections: sanitizeLifecycleRejections(
+            (value as { readonly rejections?: unknown }).rejections ?? null,
+        ),
+    })
+}
+
+const LIFECYCLE_DRIFT_INVARIANT_KEYS = [
+    "roomWithoutKernel",
+    "kernelWithoutRoomActive",
+    "kernelClosingOrphans",
+    "memberNotInKernel",
+    "memberNotInKernelNpcRooms",
+    "viewerMultipleRoomClients",
+    "closingPastDeadline",
+] as const
+const MAX_DRIFT_SAMPLES = 8
+const MAX_DRIFT_DETAIL_LENGTH = 120
+const DRIFT_IDENTITY_PATTERN = /viewer:|session:|token|device/i
+const MAX_REJECTION_REASON_ENTRIES = 32
+const REJECTION_REASON_KEY_PATTERN = /^[\w.-]{1,64}$/
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+    return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+}
+
+function sanitizeLifecycleDrift(value: unknown): AdminLifecycleDriftStatus | null {
+    if (!isRecord(value)) return null
+    if (!isNonNegativeSafeInteger(value.checkedAtMs)) return null
+    const invariants: Partial<Record<(typeof LIFECYCLE_DRIFT_INVARIANT_KEYS)[number], AdminLifecycleDriftInvariant>> = {}
+    for (const key of LIFECYCLE_DRIFT_INVARIANT_KEYS) {
+        const invariant = sanitizeDriftInvariant(value[key])
+        if (invariant === null) return null
+        invariants[key] = invariant
+    }
+    return Object.freeze({
+        checkedAtMs: value.checkedAtMs,
+        ...invariants,
+    } as AdminLifecycleDriftStatus)
+}
+
+function sanitizeDriftInvariant(value: unknown): AdminLifecycleDriftInvariant | null {
+    if (!isRecord(value)) return null
+    if (!isNonNegativeSafeInteger(value.current) || !isNonNegativeSafeInteger(value.total)) return null
+    const lastAtMs = value.lastAtMs === null || isNonNegativeSafeInteger(value.lastAtMs)
+        ? value.lastAtMs as number | null
+        : null
+    if (value.lastAtMs !== null && lastAtMs === null) return null
+    if (!Array.isArray(value.samples)) return null
+    const samples: AdminLifecycleDriftSample[] = []
+    for (const candidate of value.samples.slice(0, MAX_DRIFT_SAMPLES)) {
+        if (!isRecord(candidate)) continue
+        const roomNumber = candidate.roomNumber
+        if (typeof roomNumber !== "string") continue
+        if (roomNumber !== "" && !/^\d{6}$/.test(roomNumber)) continue
+        if (!isNonNegativeSafeInteger(candidate.atMs)) continue
+        if (typeof candidate.detail !== "string") continue
+        if (candidate.detail.length > MAX_DRIFT_DETAIL_LENGTH) continue
+        if (DRIFT_IDENTITY_PATTERN.test(candidate.detail)) continue
+        samples.push(Object.freeze({
+            roomNumber,
+            atMs: candidate.atMs,
+            detail: candidate.detail,
+        }))
+    }
+    return Object.freeze({
+        current: value.current,
+        total: value.total,
+        lastAtMs,
+        samples: Object.freeze(samples),
+    })
+}
+
+function sanitizeLifecycleRejections(value: unknown): AdminMultiLifecycleRejections | null {
+    if (!isRecord(value)) return null
+    if (!isNonNegativeSafeInteger(value.total)) return null
+    if (!isRecord(value.byReason)) return null
+    const entries = Object.entries(value.byReason)
+    if (entries.length > MAX_REJECTION_REASON_ENTRIES) return null
+    const byReason: Record<string, number> = {}
+    for (const [reason, count] of entries) {
+        if (!REJECTION_REASON_KEY_PATTERN.test(reason)) return null
+        if (!isNonNegativeSafeInteger(count)) return null
+        byReason[reason] = count
+    }
+    return Object.freeze({
+        total: value.total,
+        byReason: Object.freeze(byReason),
     })
 }
 

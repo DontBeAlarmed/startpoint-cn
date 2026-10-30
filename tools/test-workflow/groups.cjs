@@ -210,6 +210,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_lifecycle_faults.test.cjs",
             "tools/multi_lifecycle_core.test.cjs",
             "tools/multi_lifecycle_registry.test.cjs",
+            "tools/multi_lifecycle_drift.test.cjs",
             "tools/multi_context_initialization.test.cjs",
             "tools/multi_finish_follow_info.test.cjs",
             "tools/multi_player_context.test.cjs",

@@ -13,6 +13,8 @@ import {
 } from "../../lib/admin-multi-status"
 import { AdmissionRegistry } from "../admission/registry"
 import { embeddedAdmissionRegistry } from "../admission/registry"
+import { lifecycleRegistry } from "../lifecycle"
+import { getLifecycleDriftStatus } from "../lifecycle/drift-monitor"
 import type {
     CoordinatorResult,
     MultiCoordinatorOrigin,
@@ -703,6 +705,7 @@ function localLifecycleStatus(): AdminMultiLifecycleStatus {
     const cleanup = getRoomCleanupDiagnostics()
     const fallback = sessionManager.getDismissFallbackStats()
     const last = fallback.last
+    const stats = lifecycleRegistry.stats()
     return Object.freeze({
         closingRooms: cleanup.closingRooms,
         closingOldestAgeMs: cleanup.closingOldestAgeMs,
@@ -713,6 +716,11 @@ function localLifecycleStatus(): AdminMultiLifecycleStatus {
             roomNumber: last.roomNumber,
             ageMs: last.ageMs,
             atMs: last.atMs,
+        }),
+        drift: getLifecycleDriftStatus(),
+        rejections: Object.freeze({
+            total: stats.rejections,
+            byReason: stats.rejectionReasons,
         }),
     })
 }

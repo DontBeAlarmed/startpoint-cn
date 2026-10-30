@@ -4,6 +4,7 @@ import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getRealNowMs } from "../../runtime/time/game-time";
 import { sessionManager } from "../state/SessionManager";
 import { identityOf, LIFECYCLE_BATTLE_DEADLINE_MS, LIFECYCLE_CLOSE_DEADLINE_MS, lifecycleRegistry } from "../lifecycle";
+import { sampleLifecycleDrift } from "../lifecycle/drift-monitor";
 import type { ParticipantIdentity } from "../coordinator/contracts";
 
 const rooms = new Map<string, MultiRoom>();
@@ -73,6 +74,12 @@ function notifyRoomDisbanded(roomNumber: string, hostPlayerId: number, hostViewe
 
 function cleanExpiredRooms(timing: RoomCleanupTiming) {
     const now = getRealNowMs();
+    // 切片 0：漂移观测（行为不变）——每轮清理 tick 顺带采样五项不变量，
+    // 计数/样本经 server/status 暴露；不派生状态、不触发清理。
+    sampleLifecycleDrift(now, {
+        rooms: [...rooms.values()],
+        viewerRoomClientDuplicates: sessionManager.getRoomClientDuplicateViewerStats(),
+    });
     // R-15=B：房间老化锚真实时间。host_entry_time 写入点（createRoom/
     // updateHostEntryTime）同步改为 getRealNowMs()，偏移换算删除——
     // timeOffset 调整不得使存量房间瞬时全灭或永不过期。
