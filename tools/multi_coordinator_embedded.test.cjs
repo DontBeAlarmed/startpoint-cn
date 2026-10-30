@@ -269,9 +269,12 @@ test("disbandRoom rejects a non-host and lets the host broadcast then remove the
     assert.deepEqual(guestResult, { ok: false, error: "ROOM_PERMISSION_DENIED" })
     assert.notEqual(getRoom(status.roomNumber), undefined)
 
-    const broadcasts = []
-    const originalBroadcast = sessionManager.broadcastToRoom
-    sessionManager.broadcastToRoom = (roomNumber, message) => broadcasts.push({ roomNumber, message })
+    const dismissals = []
+    const originalDismiss = sessionManager.dismissRoomClients
+    sessionManager.dismissRoomClients = roomNumber => {
+        dismissals.push(roomNumber)
+        return 0
+    }
     let hostResult
     try {
         hostResult = await coordinator.disbandRoom({
@@ -279,14 +282,11 @@ test("disbandRoom rejects a non-host and lets the host broadcast then remove the
             roomNumber: status.roomNumber,
         })
     } finally {
-        sessionManager.broadcastToRoom = originalBroadcast
+        sessionManager.dismissRoomClients = originalDismiss
     }
 
     assert.deepEqual(hostResult, { ok: true, value: undefined })
-    assert.deepEqual(broadcasts, [{
-        roomNumber: status.roomNumber,
-        message: [1, [6, "multibattle_room_dismissed"]],
-    }])
+    assert.deepEqual(dismissals, [status.roomNumber])
     assert.equal(getRoom(status.roomNumber), undefined)
 })
 

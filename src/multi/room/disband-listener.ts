@@ -1,18 +1,14 @@
-import { sessionManager } from "../state/SessionManager"
 import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
 import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import { describeError } from "../describe-error"
 import { setRoomDisbandListener, setRoomReleaseListener } from "./manager"
-import { installInFlightJoinAbandonmentHook } from "./room-disband-shadows"
 
 /**
- * Every disband path funnels through manager.disbandRoom, which invokes the
- * registered room disband listener. The listener owns client dismissal,
- * socket teardown and abandoned active-quest release so callers do not emit
- * a second dismissal before deleting the room.
+ * Every disband path funnels through manager.disbandRoom, which now owns the
+ * client dismissal (dismiss-only) and socket teardown. This listener keeps
+ * only persistence cleanup, so there is no second dismissal path.
  */
 export function installDisbandLifecycleListener(): void {
-    installInFlightJoinAbandonmentHook(sessionManager)
     // OV-2：战斗释放（4→1）即 host 回房宽限起点；host 重进 Enter 取消
     // （tcp/lobby handleEnter 既有 cancel 点），宽限到期仍未重进 → 解散。
     setRoomReleaseListener((roomNumber, hostNodeSessionId, hostViewerId) => {
@@ -28,17 +24,7 @@ export function installDisbandLifecycleListener(): void {
         }
     })
     setRoomDisbandListener((roomNumber, hostPlayerId, hostViewerId) => {
-        // 静默拆除（5805 竞态消除，2026-10-30 用户稳定复现定案）：先从广播
-        // 名册摘除全部房间 client，再对每个 socket 恰好发送一次 dismiss 并
-        // 关闭——dismiss 之后该 socket 不会再收到任何房间命令，客户端拆除
-        // 期间（cooperationRoomStatus 已置 None）无消息可命中 5805 的抛点。
-        // 旧序（先广播后关闭）在广播与关闭之间仍会投递 mate/ready 等在途
-        // 房间命令，命中拆除中的客户端。
-        try {
-            sessionManager.dismissAndDetachRoomClients(roomNumber)
-        } catch (error) {
-            console.error(`[MULTI] disband dismiss failed: room=${roomNumber}: ${describeError(error)}`)
-        }
+        // 拆除已在 manager.disbandRoom 完成（dismiss-only）；这里只做持久层清理。
         try {
             releaseAbandonedMultiActiveQuest(hostPlayerId, roomNumber)
         } catch (error) {

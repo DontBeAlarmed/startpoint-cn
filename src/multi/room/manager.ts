@@ -2,7 +2,6 @@ import { randomBytes, randomInt } from "crypto";
 import { describeError } from "../describe-error";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getRealNowMs } from "../../runtime/time/game-time";
-import { parkDisbandingRoom } from "./room-disband-shadows";
 import { sessionManager } from "../state/SessionManager";
 import type { ParticipantIdentity } from "../coordinator/contracts";
 
@@ -384,21 +383,25 @@ export function setRoomBattle(roomNumber: string): boolean {
 export function disbandRoom(roomNumber: string): boolean {
     const room = rooms.get(roomNumber);
     const deleted = rooms.delete(roomNumber);
-    if (deleted) {
-        console.log(`[MULTI] room deleted: ${roomNumber}`);
-        sessionManager.removeRoomState(roomNumber);
-        notifiedRooms.delete(roomNumber);
-        // R-6 影子表（5805 根治，2026-10-30 设计定案）：有"已握手未 Enter"的
-        // 在途入房者 → 房间进影子表（对外已消失，仅对在途者可见），其 Enter
-        // 在影子内完成入房后立即 dismiss+关闭；集合空时影子销毁。
-        const inFlightKeys = sessionManager.getInFlightRoomJoiners(roomNumber);
-        if (room && parkDisbandingRoom(room, inFlightKeys)) {
-            console.log(`[MULTI] disband parked: room=${roomNumber} inFlight=${inFlightKeys.length}`);
-        } else {
-            notifyRoomDisbanded(roomNumber, room?.host_player_id ?? 0, room?.host_viewer_id ?? 0);
+    if (!deleted) {
+        // 并发/重复解散：房间已不在主册，但可能还有残留 client；有才清，
+        // 避免对不存在的房间发空 dismiss（保持“解散缺失房间不发通知”的契约）。
+        if (sessionManager.getClientsInRoom(roomNumber).length > 0
+            || sessionManager.getBattleClientsInRoom(roomNumber).length > 0) {
+            sessionManager.dismissRoomClients(roomNumber);
+            sessionManager.closeBattleClientsForRoom(roomNumber);
         }
+        return false;
     }
-    return deleted;
+    console.log(`[MULTI] room deleted: ${roomNumber}`);
+    // 拆除咽喉：先摘名册发 dismiss，战斗 socket 立即关闭，房间状态最后清。
+    // dismiss-only 由 SessionManager 保证（不在此 destroy 房间 socket）。
+    sessionManager.dismissRoomClients(roomNumber);
+    sessionManager.closeBattleClientsForRoom(roomNumber);
+    sessionManager.removeRoomState(roomNumber);
+    notifiedRooms.delete(roomNumber);
+    notifyRoomDisbanded(roomNumber, room?.host_player_id ?? 0, room?.host_viewer_id ?? 0);
+    return true;
 }
 
 export function updateHostEntryTime(roomNumber: string): boolean {

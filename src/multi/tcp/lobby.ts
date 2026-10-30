@@ -8,7 +8,6 @@ import {
     removeRoomMember,
     updateRoomState,
 } from "../room/manager"
-import { resolveInFlightJoin } from "../room/room-disband-shadows"
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { applyNpcPostFill } from "../npc/release"
@@ -377,17 +376,16 @@ function checkAllReadyAndStart(roomNumber: string): void {
     sessionManager.broadcastToRoom(roomNumber, [1, [10, 2]])
 }
 
-export function notifyRoomDisbanded(roomNumber: string): void {
-    sessionManager.broadcastToRoom(roomNumber, [1, [6, "multibattle_room_dismissed"]])
-}
-
 export async function handleEnterComs(
     client: SessionClient,
     lifecycle: LobbyLifecycleGuard = getLobbyLifecycleGuard(),
     options: { joinBroadcastDelayMs?: number } = {},
 ): Promise<void> {
     const room = getRoom(client.roomNumber)
-    if (!room) return
+    if (!room) {
+        sessionManager.dismissSingleClient(client)
+        return
+    }
     if (roomBattleLocksLobbyMutations(client.roomNumber)) {
         console.log(`[LOBBY] EnterComs rejected: room=${client.roomNumber} battle in progress`)
         return
@@ -533,24 +531,10 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         return
     }
 
-    // 解散影子房（R-6 设计）：主册无此房但在途名册有本连接 → 影子内完成
-    // 入房回包（mate 视图），随即 dismiss+关闭——客户端拆除流程完整走完，
-    // cooperationRoomStatus 生命期安全（5805 根治）。
+    // 房间已删：不再静默丢包，直接 dismiss，让客户端立刻走解散流程。
     if (!getRoom(client.roomNumber)) {
-        const shadowRoom = resolveInFlightJoin(
-            client.roomNumber,
-            `socket:${client.socket.remotePort}`,
-        )
-        if (!shadowRoom) return
-        sessionManager.resolveInFlightRoomJoin(
-            client.roomNumber,
-            `socket:${client.socket.remotePort}`,
-        )
-        const yourself = client.yourself
-        sessionManager.sendJson(client.socket, [1, [0, yourself, [yourself]]])
-        sessionManager.sendJson(client.socket, [1, [6, "multibattle_room_dismissed"]])
-        client.socket.end()
-        console.log(`[LOBBY] shadow enter completed+dismissed: room=${client.roomNumber}`)
+        sessionManager.dismissSingleClient(client)
+        console.log(`[LOBBY] enter after room deleted: room=${client.roomNumber}`)
         return
     }
 

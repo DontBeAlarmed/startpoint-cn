@@ -223,6 +223,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/room_cleanup_lifecycle.test.cjs",
             "tools/startup_sweep.test.cjs",
             "tools/room_dismissal_lifecycle.test.cjs",
+            "tools/room_teardown_contract.test.cjs",
             "tools/session_frame_order.test.cjs",
             "tools/session_server_lifecycle.test.cjs",
             "tools/multi_tcp_guardrails.test.cjs",

@@ -235,7 +235,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             const host = hostIdentityByRoom.get(room)
             if (host?.nodeSessionId === nodeSessionId) {
                 try {
-                    if (this.removeOwnedRoom(room)) removed++
+                    if (this.removeOwnedRoom(room, true)) removed++
                 } catch {
                     this.warnNodeSessionCleanup(room.room_number)
                 }
@@ -380,9 +380,13 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         assertNonEmptyString(input.battleSessionId as BattleSessionId, "battleSessionId")
     }
 
-    private removeOwnedRoom(room: MultiRoom): boolean {
-        sessionManager.broadcastToRoom(room.room_number, [1, [6, "multibattle_room_dismissed"]])
-        sessionManager.closeRoomClients(room.room_number)
+    private removeOwnedRoom(room: MultiRoom, hardClose = false): boolean {
+        // 撤权（node session 失效）必须立即断，不能等 dismiss 兜底；
+        // 正常解散走 manager.disbandRoom 的 dismiss-only。
+        if (hardClose) {
+            sessionManager.broadcastToRoom(room.room_number, [1, [6, "multibattle_room_dismissed"]])
+            sessionManager.closeRoomClients(room.room_number)
+        }
         if (!disbandLocalRoom(room.room_number)) return false
         this.onRoomDisband?.(room.room_number)
         compatibilityByRoom.delete(room)

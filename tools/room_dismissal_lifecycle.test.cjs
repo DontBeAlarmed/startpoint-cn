@@ -29,14 +29,13 @@ const { sessionManager } = require("../src/multi/state/SessionManager")
 const { getServerTime } = require("../src/utils")
 
 const broadcasts = []
-const closedRooms = []
-const originalDismissAndDetach = sessionManager.dismissAndDetachRoomClients
+const dismissedRooms = []
+const originalDismissRoomClients = sessionManager.dismissRoomClients
 
-// 静默拆除（dismiss-and-detach）路径桩：记录 dismiss 发送与 socket 关闭房间，
-// 不触碰真实 socket
-sessionManager.dismissAndDetachRoomClients = roomNumber => {
+// 拆除路径桩：记录 dismiss 发送；dismiss-only 不再销毁 socket
+sessionManager.dismissRoomClients = roomNumber => {
     broadcasts.push({ roomNumber, message: [1, [6, "multibattle_room_dismissed"]] })
-    closedRooms.push(roomNumber)
+    dismissedRooms.push(roomNumber)
     return 0
 }
 
@@ -59,7 +58,7 @@ function dismissedBroadcasts(roomNumber) {
     ))
 }
 
-test("idle-expired rooms broadcast the client dismissal and drop their sockets", () => {
+test("idle-expired rooms dismiss their clients", () => {
     const room = createRoom(101, 201, 1, 1, 301, 1, 401)
     room.host_entry_time = getServerTime() - 10_000
 
@@ -68,19 +67,19 @@ test("idle-expired rooms broadcast the client dismissal and drop their sockets",
     assert.equal(getRoom(room.room_number), undefined, "expired room must be deleted")
     assert.equal(dismissedBroadcasts(room.room_number).length, 1,
         "cleaner disband must tell clients the room is dismissed")
-    assert.equal(closedRooms.filter(roomNumber => roomNumber === room.room_number).length, 1,
-        "cleaner disband must close the room's sockets")
+    assert.equal(dismissedRooms.filter(roomNumber => roomNumber === room.room_number).length, 1,
+        "cleaner disband must dismiss the room's clients")
 })
 
-test("the disband choke point broadcasts for every caller", () => {
+test("the disband choke point dismisses for every caller", () => {
     const room = createRoom(102, 202, 1, 1, 302, 1, 402)
 
     // Direct disbandRoom callers (e.g. aborted multi battle cleanup) funnel
-    // through the same listener as the cleaner.
+    // through the same dismissal point as the cleaner.
     assert.equal(disbandRoom(room.room_number), true)
     assert.equal(getRoom(room.room_number), undefined)
     assert.equal(dismissedBroadcasts(room.room_number).length, 1)
-    assert.equal(closedRooms.filter(roomNumber => roomNumber === room.room_number).length, 1)
+    assert.equal(dismissedRooms.filter(roomNumber => roomNumber === room.room_number).length, 1)
 })
 
 test("disbanding a missing room broadcasts nothing", () => {
@@ -92,7 +91,7 @@ test("disbanding a missing room broadcasts nothing", () => {
 after(() => {
     stopRoomCleanup()
     setRoomDisbandListener(null)
-    sessionManager.dismissAndDetachRoomClients = originalDismissAndDetach
+    sessionManager.dismissRoomClients = originalDismissRoomClients
     closeDatabase()
     restoreContentSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })

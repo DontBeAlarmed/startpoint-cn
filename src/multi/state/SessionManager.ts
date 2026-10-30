@@ -27,8 +27,12 @@ import {
 } from "../runtime/tuning"
 import { getRealNowMs } from "../../runtime/time/game-time"
 
+/** Dismiss 后保留 socket 的资源上界；只回收半开连接，不参与状态判断。 */
+const DISMISS_FALLBACK_MS = 5 * 60_000
+
 export interface SessionManagerOptions {
     readonly battleTuning?: MultiBattleTuning
+    readonly dismissFallbackMs?: number
 }
 
 export interface SessionMate {
@@ -139,7 +143,6 @@ export function checkBattleRuntimeInvariants(
 export class SessionManager {
     private clients = new Map<string, SessionClient>()
     private roomClients = new Map<string, Set<string>>()
-    private inFlightRoomJoins = new Map<string, Set<string>>()
     private battleClients = new Map<string, Set<string>>()
     private cidToBattleClient = new Map<string, SessionClient>()
     private socketToClient = new Map<net.Socket, SessionClient>()
@@ -160,10 +163,24 @@ export class SessionManager {
     private pendingBattleLeaves = new Map<string, Map<number, Set<string>>>()
     private activatedBattleScenes = new Map<string, Map<number, Set<string>>>()
     private battleTuning: MultiBattleTuning
+    private dismissFallbackMs: number
 
     constructor(options: SessionManagerOptions = {}) {
         this.battleTuning = DEFAULT_MULTI_BATTLE_TUNING
+        this.dismissFallbackMs = DISMISS_FALLBACK_MS
         if (options.battleTuning) this.configureBattleTuning(options.battleTuning)
+        if (options.dismissFallbackMs !== undefined) this.configureDismissFallback(options.dismissFallbackMs)
+    }
+
+    configureDismissFallback(ms: number): void {
+        if (!Number.isSafeInteger(ms) || ms <= 0) {
+            throw new TypeError("dismissFallbackMs must be a positive safe integer")
+        }
+        this.dismissFallbackMs = ms
+    }
+
+    resetDismissFallback(): void {
+        this.dismissFallbackMs = DISMISS_FALLBACK_MS
     }
 
     configureBattleTuning(tuning: MultiBattleTuning): void {
@@ -530,16 +547,9 @@ export class SessionManager {
     removeClientBySocket(socket: net.Socket): boolean {
         const client = this.socketToClient.get(socket)
         if (!client) return false
-        // 解散影子表死亡事件口：在途入房者的 socket 死亡 → 名册与影子集合
-        // 同步移除（集合空时影子销毁——事件驱动，无定时器）
-        this.resolveInFlightRoomJoin(client.roomNumber, `socket:${socket.remotePort}`)
-        this.onInFlightJoinAbandoned?.(client.roomNumber, `viewer:${client.viewerId}`)
         this.removeClient(client)
         return true
     }
-
-    /** 影子模块挂的死亡回调（room-disband-shadows 模块注册，避免循环 import） */
-    onInFlightJoinAbandoned: ((roomNumber: string, viewerKey: string) => void) | null = null
 
     getClientsInRoom(roomNumber: string): SessionClient[] {
         const set = this.roomClients.get(roomNumber)
@@ -592,50 +602,56 @@ export class SessionManager {
         return true
     }
 
-    // 静默拆除（5805 竞态消除）：把房间全部 client 从广播名册摘除（后续
-    // broadcastToRoom 不再命中它们），对每个 socket 恰好同步发送一次 dismiss
-    // ——它成为该 socket 收到的最后一条房间命令——并立即销毁 socket。
-    // 立即关闭是关键：客户端收到 dismiss 后先走正常拆除（cooperationRoomStatus
-    // 仍有值，close 事件安全），随后才置 None；若延迟销毁，close 事件落在
-    // 置 None 之后，客户端断连回调会抛 5805（2026-10-30 复现实测）。
-    dismissAndDetachRoomClients(roomNumber: string): number {
+    // 拆除（5805 修复）：dismiss 是每个房间 socket 收到的最后一条房间命令。
+    // 只摘名册、发一条 dismiss、保留 socket 由客户端自己关闭；兜底定时器只
+    // 回收半开连接，不参与状态判断。禁止在这里 destroy——同 tick 的 close
+    // 会和 dismiss 一起进客户端队列，dismiss 清 status 后 close 的 Error 命中 5805。
+    dismissRoomClients(roomNumber: string): number {
         const clients = this.getClientsInRoom(roomNumber)
-        let detached = 0
         for (const client of clients) {
+            this.dismissClient(client)
+        }
+        this.roomClients.delete(roomNumber)
+        return clients.length
+    }
+
+    dismissSingleClient(client: SessionClient): void {
+        this.dismissClient(client)
+    }
+
+    private dismissClient(client: SessionClient): void {
+        this.removeClient(client)
+        this.sendJson(client.socket, [1, [6, "multibattle_room_dismissed"]])
+        this.armDismissedSocketFallback(client.socket)
+    }
+
+    private armDismissedSocketFallback(socket: net.Socket): void {
+        if (socket.destroyed) return
+        const timer = setTimeout(() => {
+            if (socket.destroyed) return
             try {
-                this.sendJson(client.socket, [1, [6, "multibattle_room_dismissed"]])
+                socket.destroy()
             } catch {
-                // 发送失败即关闭，忽略单 socket 异常
+                // 资源回收失败不影响房间状态
             }
-            if (this.removeRoomClientIndexes(client)) detached++
+        }, this.dismissFallbackMs)
+        timer.unref?.()
+        if (typeof socket.once === "function") {
+            socket.once("close", () => clearTimeout(timer))
+        }
+    }
+
+    closeBattleClientsForRoom(roomNumber: string): number {
+        const clients = this.getBattleClientsInRoom(roomNumber)
+        let closed = 0
+        for (const client of clients) {
+            if (this.cidToBattleClient.get(client.connectionId) !== client) continue
             this.removeClient(client)
             this.closeClientSocket(client.socket)
+            closed++
         }
-        return detached
-    }
-
-    // 解散影子表消费口：列出"已握手未 Enter"的在途 socket 键
-    // （registered via markInFlightRoomJoin at handshake acceptance）。
-    getInFlightRoomJoiners(roomNumber: string): string[] {
-        const pending = this.inFlightRoomJoins.get(roomNumber)
-        if (!pending) return []
-        return [...pending]
-    }
-
-    markInFlightRoomJoin(roomNumber: string, socketKey: string): void {
-        let set = this.inFlightRoomJoins.get(roomNumber)
-        if (!set) {
-            set = new Set()
-            this.inFlightRoomJoins.set(roomNumber, set)
-        }
-        set.add(socketKey)
-    }
-
-    resolveInFlightRoomJoin(roomNumber: string, socketKey: string): void {
-        const set = this.inFlightRoomJoins.get(roomNumber)
-        if (!set) return
-        set.delete(socketKey)
-        if (set.size === 0) this.inFlightRoomJoins.delete(roomNumber)
+        this.battleClients.delete(roomNumber)
+        return closed
     }
 
     closeRoomClients(roomNumber: string): number {
