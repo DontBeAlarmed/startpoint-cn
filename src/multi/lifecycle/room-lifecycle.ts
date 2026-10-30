@@ -21,6 +21,8 @@ export interface RoomLifecycleState {
     readonly finished: readonly Identity[]
     readonly battleSessionId: string | null
     readonly battleFinalized: boolean
+    /** 房主已经请求返回；等最后一个 Finish 到齐后再 4→1 */
+    readonly hostReturnPending: boolean
     readonly npcCount: number
     readonly hostOnline: boolean
     readonly hostEntryTimeMs: number | null
@@ -46,6 +48,7 @@ export type RoomEvent =
         readonly identity: Identity
         readonly nowMs: number
         readonly battleDeadlineMs: number
+        readonly battleSessionId: string
     }
     | {
         readonly type: "abort"
@@ -54,6 +57,7 @@ export type RoomEvent =
         readonly nowMs: number
         readonly battleDeadlineMs: number
         readonly closeDeadlineMs: number
+        readonly battleSessionId: string
     }
     | { readonly type: "hostReturn"; readonly generation: number; readonly identity: Identity; readonly nowMs: number }
     | {
@@ -64,6 +68,7 @@ export type RoomEvent =
         readonly closeDeadlineMs: number
     }
     | { readonly type: "socketLost"; readonly generation: number; readonly identity: Identity }
+    | { readonly type: "setNpcCount"; readonly generation: number; readonly npcCount: number }
     | { readonly type: "closeConfirmed"; readonly generation: number; readonly identity: Identity }
     | {
         readonly type: "gcSweep"
@@ -113,6 +118,7 @@ export function createLifecycle(input: CreateLifecycleInput): RoomLifecycleState
         finished: [],
         battleSessionId: null,
         battleFinalized: false,
+        hostReturnPending: false,
         npcCount,
         hostOnline: true,
         hostEntryTimeMs: null,
@@ -197,6 +203,24 @@ function finalizeBattle(
         finishedAtMs: nowMs,
         seats: [state.host],
         ready: [],
+    }
+}
+
+function applyHostReturn(state: RoomLifecycleState, nowMs: number): RoomLifecycleState {
+    return {
+        ...state,
+        phase: "ready",
+        seats: [state.host],
+        ready: [],
+        joiners: {},
+        battleParticipants: [],
+        finished: [],
+        battleSessionId: null,
+        battleFinalized: false,
+        hostReturnPending: false,
+        finishedAtMs: null,
+        hostOnline: true,
+        hostEntryTimeMs: nowMs,
     }
 }
 
@@ -375,9 +399,8 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
         case "startBattle": {
             if (event.identity !== state.host) return reject(state, "HOST_ONLY")
             if (state.phase !== "ready") return reject(state, "ROOM_NOT_READY")
-            if (state.seats.some(seat => !state.ready.includes(seat))) {
-                return reject(state, "NOT_ALL_READY")
-            }
+            // readiness 是客户端 UI/自动准备策略；legacy 服务端不拦，
+            // 内核也不把它当房间状态不变量（否则 B3 会拒绝合法开战）。
             return {
                 state: {
                     ...state,
@@ -398,6 +421,9 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
 
         case "finish": {
             if (state.phase !== "battle") return reject(state, "NOT_IN_BATTLE")
+            if (event.battleSessionId !== state.battleSessionId) {
+                return reject(state, "STALE_BATTLE")
+            }
             if (!state.battleParticipants.includes(event.identity)) {
                 return reject(state, "NOT_A_PARTICIPANT")
             }
@@ -409,8 +435,20 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
                 return { state: { ...state, finished }, effects: [] }
             }
 
+            const finalized = finalizeBattle(state, finished, event.nowMs)
+            if (finalized.hostReturnPending) {
+                return {
+                    state: applyHostReturn(finalized, event.nowMs),
+                    effects: [
+                        { type: "releaseSeats" },
+                        { type: "persistBattleRelease" },
+                        { type: "broadcastMates" },
+                        { type: "updateShareRow" },
+                    ],
+                }
+            }
             return {
-                state: finalizeBattle(state, finished, event.nowMs),
+                state: finalized,
                 effects: [
                     { type: "releaseSeats" },
                     { type: "persistBattleRelease" },
@@ -423,6 +461,9 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
 
         case "abort": {
             if (state.phase === "battle") {
+                if (event.battleSessionId !== state.battleSessionId) {
+                    return reject(state, "STALE_BATTLE")
+                }
                 if (event.identity === state.host) {
                     return enterClosing(state, event.nowMs, event.closeDeadlineMs)
                 }
@@ -453,12 +494,24 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
                         ],
                     }
                 }
+                const finalized = finalizeBattle(
+                    { ...state, battleParticipants },
+                    finished,
+                    event.nowMs,
+                )
+                if (finalized.hostReturnPending) {
+                    return {
+                        state: applyHostReturn(finalized, event.nowMs),
+                        effects: [
+                            { type: "releaseSeats" },
+                            { type: "persistBattleRelease" },
+                            { type: "broadcastMates" },
+                            { type: "updateShareRow" },
+                        ],
+                    }
+                }
                 return {
-                    state: finalizeBattle(
-                        { ...state, battleParticipants },
-                        finished,
-                        event.nowMs,
-                    ),
+                    state: finalized,
                     effects: [
                         { type: "releaseSeats" },
                         { type: "persistBattleRelease" },
@@ -492,22 +545,15 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
         case "hostReturn": {
             if (event.identity !== state.host) return reject(state, "HOST_ONLY")
             if (state.phase !== "battle") return reject(state, "NOT_IN_BATTLE")
-            if (!state.battleFinalized) return reject(state, "BATTLE_NOT_FINALIZED")
+            if (!state.battleFinalized) {
+                if (state.hostReturnPending) return { state, effects: [] }
+                return {
+                    state: { ...state, hostReturnPending: true },
+                    effects: [],
+                }
+            }
             return {
-                state: {
-                    ...state,
-                    phase: "ready",
-                    seats: [state.host],
-                    ready: [],
-                    joiners: {},
-                    battleParticipants: [],
-                    finished: [],
-                    battleSessionId: null,
-                    battleFinalized: false,
-                    finishedAtMs: null,
-                    hostOnline: true,
-                    hostEntryTimeMs: event.nowMs,
-                },
+                state: applyHostReturn(state, event.nowMs),
                 effects: [
                     { type: "broadcastMates" },
                     { type: "updateShareRow" },
@@ -558,6 +604,16 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
                 }
             }
             return { state, effects: [] }
+        }
+
+        case "setNpcCount": {
+            if (state.phase !== "recruiting" && state.phase !== "ready") {
+                return reject(state, "INVALID_PHASE")
+            }
+            return {
+                state: { ...state, npcCount: Math.max(0, Math.trunc(event.npcCount)) },
+                effects: [],
+            }
         }
 
         case "closeConfirmed": {

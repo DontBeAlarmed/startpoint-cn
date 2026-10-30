@@ -1,6 +1,7 @@
 import { getRoom } from "../room/manager"
 import { describeError } from "../describe-error"
 import { sessionManager } from "../state/SessionManager"
+import { lifecycleRegistry } from "../lifecycle"
 import { advanceRecruitmentGeneration } from "../tcp/lobby"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 
@@ -51,6 +52,11 @@ export function clearRoomNpcRoster(roomNumber: string, battleSessionId?: string)
         clearedBattleSessions.set(roomNumber, latchKey)
 
         room.npc_count = 0
+        lifecycleRegistry.dispatch(roomNumber, generation => ({
+            type: "setNpcCount",
+            generation,
+            npcCount: 0,
+        }))
         advanceRecruitmentGeneration(room)
 
         const hostClient = sessionManager.getRoomHostClient(roomNumber)

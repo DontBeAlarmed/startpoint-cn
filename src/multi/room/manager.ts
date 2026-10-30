@@ -3,6 +3,7 @@ import { describeError } from "../describe-error";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getRealNowMs } from "../../runtime/time/game-time";
 import { sessionManager } from "../state/SessionManager";
+import { identityOf, LIFECYCLE_CLOSE_DEADLINE_MS, lifecycleRegistry } from "../lifecycle";
 import type { ParticipantIdentity } from "../coordinator/contracts";
 
 const rooms = new Map<string, MultiRoom>();
@@ -219,6 +220,8 @@ export function createRoom(
     };
     sessionManager.initRoomState(roomNumber, RoomState.Filled)
     rooms.set(roomNumber, room);
+    // B2a 影子：内核记录生命周期；B3 起成为权威。
+    lifecycleRegistry.create(roomNumber, identityOf(hostParticipant))
     console.log(`[MULTI] room created: room=${roomNumber} category=${category} quest=${questId}`);
     return room;
 }
@@ -382,6 +385,13 @@ export function setRoomBattle(roomNumber: string): boolean {
 
 export function disbandRoom(roomNumber: string): boolean {
     const room = rooms.get(roomNumber);
+    lifecycleRegistry.dispatch(roomNumber, generation => ({
+        type: "disband",
+        generation,
+        identity: null,
+        nowMs: getRealNowMs(),
+        closeDeadlineMs: LIFECYCLE_CLOSE_DEADLINE_MS,
+    }));
     const deleted = rooms.delete(roomNumber);
     if (!deleted) {
         // 并发/重复解散：房间已不在主册，但可能还有残留 client；有才清，
@@ -391,6 +401,7 @@ export function disbandRoom(roomNumber: string): boolean {
             sessionManager.dismissRoomClients(roomNumber);
             sessionManager.closeBattleClientsForRoom(roomNumber);
         }
+        lifecycleRegistry.remove(roomNumber);
         return false;
     }
     console.log(`[MULTI] room deleted: ${roomNumber}`);
@@ -401,6 +412,7 @@ export function disbandRoom(roomNumber: string): boolean {
     sessionManager.removeRoomState(roomNumber);
     notifiedRooms.delete(roomNumber);
     notifyRoomDisbanded(roomNumber, room?.host_player_id ?? 0, room?.host_viewer_id ?? 0);
+    lifecycleRegistry.remove(roomNumber);
     return true;
 }
 

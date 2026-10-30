@@ -17,6 +17,7 @@ import { safeEvolutionImgLevel } from "../safe-display-fields"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import type { MultiRoom } from "../../lib/types"
 import { RoomState } from "../types"
+import { identityOf, lifecycleRegistry } from "../lifecycle"
 import {
     getLobbyLifecycleGuard,
     LobbyLifecycleGuard,
@@ -330,12 +331,28 @@ export function checkHostAutoReady(roomNumber: string): void {
             hostMate.state = [1]
             sessionManager.broadcastToRoom(roomNumber, [1, [2, hostMate.connectionId, [1]]])
             console.log(`[LOBBY] host auto-ready: room=${roomNumber}`)
+            if (hostClient.participant) {
+                lifecycleRegistry.dispatch(roomNumber, generation => ({
+                    type: "ready",
+                    generation,
+                    identity: identityOf(hostClient.participant!),
+                    ready: true,
+                }))
+            }
         }
     } else {
         if (hostMate.state?.[0] === 1) {
             hostMate.state = [0]
             sessionManager.broadcastToRoom(roomNumber, [1, [2, hostMate.connectionId, [0]]])
             console.log(`[LOBBY] host auto-ready cancelled: room=${roomNumber}`)
+            if (hostClient.participant) {
+                lifecycleRegistry.dispatch(roomNumber, generation => ({
+                    type: "ready",
+                    generation,
+                    identity: identityOf(hostClient.participant!),
+                    ready: false,
+                }))
+            }
         }
     }
     checkAllReadyAndStart(roomNumber)
@@ -405,6 +422,11 @@ export async function handleEnterComs(
     // 配额在每次招募激活时重算（3 − 当前真人）：上一轮成员变动（离开/加入）后的
     // 缺口在重新开启招募/注入的这一次提交中补齐（用户定案语义，非离开瞬间补位）
     room.npc_count = Math.max(0, 3 - initialRealMates.length)
+    lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+        type: "setNpcCount",
+        generation,
+        npcCount: room.npc_count,
+    }))
     ensureNpcRoster(room, room.npc_count)
 
     const initialActiveCount = getAvailableNpcSlotCount(room, initialRealMates)
@@ -556,6 +578,22 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (ed.dashBehaviorMode !== undefined) client.yourself.dashBehaviorMode = ed.dashBehaviorMode;
     if (ed.allowHealFromOtherPlayers !== undefined) client.yourself.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
     client.enterData = ed
+    // B2a 影子：记录 enter；房主首次 enter 在内核里 recruiting → ready。
+    if (client.participant) {
+        lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+            type: "enter",
+            generation,
+            identity: identityOf(client.participant!),
+            nowMs: getRealNowMs(),
+        }))
+        // HostReturn 清空 ready 后，房主重进时按客户端当前 ready 重新同步。
+        lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+            type: "ready",
+            generation,
+            identity: identityOf(client.participant!),
+            ready: client.isReady,
+        }))
+    }
 
     if (isHost) {
         updateRoomState(client.roomNumber, 1)
@@ -654,6 +692,14 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
         && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
     const room = getRoom(client.roomNumber)
     const preserveActiveBattle = room?.raising_state === 4
+    // B2a 影子：state 4 的内核会忽略 socketLost（战斗 socket 才是存活判据）。
+    if (client.participant) {
+        lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+            type: "socketLost",
+            generation,
+            identity: identityOf(client.participant!),
+        }))
+    }
 
     if (client.participant) cancelReconnectLease(client.participant)
     if (preserveActiveBattle) {
@@ -800,6 +846,14 @@ function handleReady(_socket: net.Socket, client: SessionClient, data: any[]): v
     }
     const readyState = Array.isArray(data[1]) ? data[1][0] : data[1]
     client.isReady = readyState === 1
+    if (client.participant) {
+        lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+            type: "ready",
+            generation,
+            identity: identityOf(client.participant!),
+            ready: client.isReady,
+        }))
+    }
 
     const mate = client.mates.find(m => m.viewerId === client.viewerId)
     if (mate) {
@@ -858,6 +912,13 @@ function beginBattle(client: SessionClient): boolean {
         sessionManager.clearBattleExpectedCount(client.roomNumber)
         return false
     }
+    // B2a 影子：记录开战；B3 起由内核决定 4→1。
+    lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+        type: "startBattle",
+        generation,
+        identity: identityOf(client.participant!),
+        battleSessionId: sessionManager.getActiveBattleSessionId(client.roomNumber) ?? "",
+    }))
     // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底
     // W1a：异步形状——同步上下文 fire-and-forget（拒绝就地捕获，try/catch
     // 不接 async 拒绝）

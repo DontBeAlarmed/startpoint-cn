@@ -11,6 +11,13 @@ import {
     updateHostEntryTime,
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
+import {
+    identityOf,
+    LIFECYCLE_BATTLE_DEADLINE_MS,
+    LIFECYCLE_CLOSE_DEADLINE_MS,
+    lifecycleRegistry,
+} from "../lifecycle"
+import { getRealNowMs } from "../../runtime/time/game-time"
 import { compareCompatibility } from "../compatibility"
 import {
     MULTI_PROTOCOL_VERSION,
@@ -224,6 +231,15 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         }
         const factRemoval = sessionManager.removeBattleFactParticipant(input)
         if (!factRemoval.ok) return factRemoval
+        lifecycleRegistry.dispatch(input.roomNumber, generation => ({
+            type: "abort",
+            generation,
+            identity: identityOf(input.participant),
+            nowMs: getRealNowMs(),
+            battleDeadlineMs: LIFECYCLE_BATTLE_DEADLINE_MS,
+            closeDeadlineMs: LIFECYCLE_CLOSE_DEADLINE_MS,
+            battleSessionId: sessionManager.getActiveBattleSessionId(input.roomNumber) ?? "",
+        }))
         sessionManager.removeBattleParticipant(input.roomNumber, input.participant)
         if (factRemoval.value) this.releaseIfFullyFinalized(factRemoval.value)
         return ok(undefined)
@@ -246,6 +262,19 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 room.room_number,
                 nodeSessionId,
             )
+            // B2a 影子：撤权删成员等价于战斗/座位上的 Abort，避免内核留下永不 finish 的参与者。
+            const activeBattleSessionId = sessionManager.getActiveBattleSessionId(room.room_number) ?? ""
+            for (const participant of invalidatedParticipants) {
+                lifecycleRegistry.dispatch(room.room_number, generation => ({
+                    type: "abort",
+                    generation,
+                    identity: identityOf(participant),
+                    nowMs: getRealNowMs(),
+                    battleDeadlineMs: LIFECYCLE_BATTLE_DEADLINE_MS,
+                    closeDeadlineMs: LIFECYCLE_CLOSE_DEADLINE_MS,
+                    battleSessionId: activeBattleSessionId,
+                }))
+            }
             let factStatus: BattleStatus | null = null
             let roomRemoved = false
             try {
@@ -317,6 +346,15 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
 
     async finalizeBattle(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>> {
         this.assertBattleInput(input)
+        // B2a 影子：记录本参与者的 Finish；内核保持 state 4，等 HostReturn。
+        lifecycleRegistry.dispatch(input.roomNumber, generation => ({
+            type: "finish",
+            generation,
+            identity: identityOf(input.participant),
+            nowMs: getRealNowMs(),
+            battleDeadlineMs: LIFECYCLE_BATTLE_DEADLINE_MS,
+            battleSessionId: String(input.battleSessionId),
+        }))
         const result = sessionManager.getBattleStatus(input)
         if (!result.ok || !result.value.finalized) return result
         this.releaseIfFullyFinalized(result.value)

@@ -13,6 +13,7 @@ import {
     isRoomViewerMember,
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
+import { identityOf, lifecycleRegistry } from "../lifecycle"
 import type { SessionClient } from "../state/SessionManager"
 import {
     embeddedAdmissionRegistry,
@@ -229,6 +230,13 @@ export async function handleHandshake(
             denyGracefully(socket, "room_member_write_failed")
             return
         }
+        // B2a 影子：admit 在入场票签发时记录；这里只记录 handshake。
+        const viewerKey = identityOf(admission.participant)
+        lifecycleRegistry.dispatch(normalizedRoomNumber, generation => ({
+            type: "handshake",
+            generation,
+            identity: viewerKey,
+        }))
         try {
             const lobby = require("./lobby") as {
                 handleParticipantReconnect?: (candidate: SessionClient) => void

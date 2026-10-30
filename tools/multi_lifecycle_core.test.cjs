@@ -70,6 +70,7 @@ function finishBoth(state) {
         identity: GUEST,
         nowMs: T0 + 10,
         battleDeadlineMs: BATTLE_DEADLINE,
+        battleSessionId: "battle-1",
     })
     result = ok(result.state, {
         type: "finish",
@@ -77,6 +78,7 @@ function finishBoth(state) {
         identity: HOST,
         nowMs: T0 + 20,
         battleDeadlineMs: BATTLE_DEADLINE,
+        battleSessionId: "battle-1",
     })
     return result
 }
@@ -110,7 +112,7 @@ test("join pipeline: admit → handshake → enter; host enter flips ready", () 
     assert.ok(result.effects.some(effect => effect.type === "sendEnterReply" && effect.identity === HOST))
 })
 
-test("startBattle is host-only and requires every seat ready", () => {
+test("startBattle is host-only; readiness is a shell policy", () => {
     let state = readyRoom()
     bad(state, {
         type: "startBattle",
@@ -120,14 +122,6 @@ test("startBattle is host-only and requires every seat ready", () => {
     }, "HOST_ONLY")
 
     state = ok(state, { type: "ready", generation: GEN, identity: GUEST, ready: false }).state
-    bad(state, {
-        type: "startBattle",
-        generation: GEN,
-        identity: HOST,
-        battleSessionId: "battle-1",
-    }, "NOT_ALL_READY")
-
-    state = ok(state, { type: "ready", generation: GEN, identity: GUEST, ready: true }).state
     const result = ok(state, {
         type: "startBattle",
         generation: GEN,
@@ -147,6 +141,7 @@ test("finish releases seats but keeps battle participants and state 4", () => {
         identity: GUEST,
         nowMs: T0 + 10,
         battleDeadlineMs: BATTLE_DEADLINE,
+        battleSessionId: "battle-1",
     })
     assert.equal(result.state.battleFinalized, false)
     assert.deepEqual(result.state.seats, [HOST, GUEST])
@@ -157,6 +152,7 @@ test("finish releases seats but keeps battle participants and state 4", () => {
         identity: HOST,
         nowMs: T0 + 20,
         battleDeadlineMs: BATTLE_DEADLINE,
+        battleSessionId: "battle-1",
     })
     assert.equal(result.state.battleFinalized, true)
     assert.equal(result.state.phase, "battle")
@@ -169,37 +165,42 @@ test("finish releases seats but keeps battle participants and state 4", () => {
     assert.ok(result.effects.some(effect => effect.type === "scheduleGc" && effect.ms === BATTLE_DEADLINE))
 })
 
-test("hostReturn is the only 4→1 and requires a finalized battle", () => {
+test("hostReturn is latched until the battle finalizes; it is the only 4→1", () => {
     const battle = battleRoom()
     bad(battle, {
         type: "hostReturn",
         generation: GEN,
-        identity: HOST,
-        nowMs: T0 + 30,
-    }, "BATTLE_NOT_FINALIZED")
+        identity: GUEST,
+        nowMs: T0 + 4,
+    }, "HOST_ONLY")
 
-    const finalized = finishBoth(battle).state
+    const pending = ok(battle, {
+        type: "hostReturn",
+        generation: GEN,
+        identity: HOST,
+        nowMs: T0 + 5,
+    })
+    assert.equal(pending.state.phase, "battle")
+    assert.equal(pending.state.hostReturnPending, true)
+    assert.deepEqual(pending.effects, [])
+
+    const finalized = finishBoth(pending.state).state
+    assert.equal(finalized.phase, "ready")
+    assert.equal(projectRaisingState(finalized), 1)
+    assert.deepEqual(finalized.seats, [HOST])
+    assert.deepEqual(finalized.battleParticipants, [])
+    assert.equal(finalized.battleSessionId, null)
+    assert.equal(finalized.battleFinalized, false)
+    assert.equal(finalized.hostReturnPending, false)
+    assert.equal(finalized.hostEntryTimeMs, T0 + 20)
+    assert.equal(isServingMember(finalized, GUEST), false)
+
     bad(finalized, {
         type: "hostReturn",
         generation: GEN,
-        identity: GUEST,
-        nowMs: T0 + 40,
-    }, "HOST_ONLY")
-
-    const result = ok(finalized, {
-        type: "hostReturn",
-        generation: GEN,
         identity: HOST,
-        nowMs: T0 + 50,
-    })
-    assert.equal(result.state.phase, "ready")
-    assert.equal(projectRaisingState(result.state), 1)
-    assert.deepEqual(result.state.seats, [HOST])
-    assert.deepEqual(result.state.battleParticipants, [])
-    assert.equal(result.state.battleSessionId, null)
-    assert.equal(result.state.battleFinalized, false)
-    assert.equal(result.state.hostEntryTimeMs, T0 + 50)
-    assert.equal(isServingMember(result.state, GUEST), false)
+        nowMs: T0 + 40,
+    }, "NOT_IN_BATTLE")
 })
 
 test("stale generation is rejected without effects", () => {
@@ -214,6 +215,14 @@ test("npcCount reduces the real capacity", () => {
     const state = make(2)
     assert.equal(capacityOf(state), 1)
     assert.equal(isJoinable(state), false)
+    bad(state, { type: "admit", generation: GEN, identity: GUEST }, "ROOM_FULL")
+})
+
+test("setNpcCount updates the real capacity", () => {
+    let state = make()
+    assert.equal(capacityOf(state), 3)
+    state = ok(state, { type: "setNpcCount", generation: GEN, npcCount: 2 }).state
+    assert.equal(capacityOf(state), 1)
     bad(state, { type: "admit", generation: GEN, identity: GUEST }, "ROOM_FULL")
 })
 
@@ -307,6 +316,7 @@ test("guest abort removes the participant and finalizes when the rest finished",
         identity: HOST,
         nowMs: T0 + 10,
         battleDeadlineMs: BATTLE_DEADLINE,
+        battleSessionId: "battle-1",
     }).state
 
     const result = ok(state, {
@@ -316,6 +326,7 @@ test("guest abort removes the participant and finalizes when the rest finished",
         nowMs: T0 + 20,
         battleDeadlineMs: BATTLE_DEADLINE,
         closeDeadlineMs: CLOSE_DEADLINE,
+        battleSessionId: "battle-1",
     })
     assert.equal(result.state.battleFinalized, true)
     assert.deepEqual(result.state.battleParticipants, [HOST])
