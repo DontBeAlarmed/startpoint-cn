@@ -1,4 +1,5 @@
 import * as net from "net"
+import { randomUUID } from "crypto"
 import { describeError } from "../describe-error"
 import { sessionManager, SessionClient, SessionMate } from "../state/SessionManager"
 import {
@@ -8,6 +9,7 @@ import {
     removeRoomMember,
     updateHostEntryTime,
     updateRoomState,
+    updateRoomStateFromKernel,
 } from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
@@ -616,7 +618,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     }
 
     if (isHost) {
-        updateRoomState(client.roomNumber, 1)
+        updateRoomStateFromKernel(client.roomNumber)
         updateHostEntryTime(client.roomNumber)
         // 房内切换编队的即时刷新：重写 open 招募的房主快照（角色 = 本次上报
         // 编队一号位）。尽力而为：失败由 15s 重发兜底。进化等级按房间主人的
@@ -924,32 +926,35 @@ function beginBattle(client: SessionClient): boolean {
             participant: member.participant,
         })
     }
-    if (!sessionManager.getRoomState(client.roomNumber).canTransition(RoomState.Battle)) {
-        console.warn(`[LOBBY] StartBattle rejected: room=${client.roomNumber} cannot enter Battle`)
+    // 2b.2:内核先行——预生成会话 id,先派发 startBattle;被拒(世代失效/
+    // 相位不符)则零发布直接返回,通过后才发布运行时并派生写入 raising_state
+    const battleSessionId = randomUUID()
+    const startDecision = lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+        type: "startBattle",
+        generation,
+        identity: identityOf(client.participant!),
+        battleSessionId,
+    }), client.lifecycleGeneration)
+    if (!startDecision || startDecision.rejected) {
+        console.warn(`[LOBBY] StartBattle rejected by kernel: room=${client.roomNumber}`
+            + ` reason=${startDecision?.rejected ?? "no-entry"}`)
         return false
     }
 
     advanceRecruitmentGeneration(room)
     try {
-        sessionManager.setBattleParticipants(client.roomNumber, participants, client.participant)
+        sessionManager.setBattleParticipants(client.roomNumber, participants, client.participant, battleSessionId)
     } catch (error) {
         const reason = error instanceof Error ? error.message : String(error)
         console.error(`[LOBBY] StartBattle rejected: room=${client.roomNumber} reason=${reason}`)
         sessionManager.clearBattleExpectedCount(client.roomNumber)
         return false
     }
-    if (!updateRoomState(client.roomNumber, 4)) {
+    if (!updateRoomStateFromKernel(client.roomNumber)) {
         console.warn(`[LOBBY] StartBattle rolled back: room=${client.roomNumber} refused Battle`)
         sessionManager.clearBattleExpectedCount(client.roomNumber)
         return false
     }
-    // B2a 影子：记录开战；B3 起由内核决定 4→1。
-    lifecycleRegistry.dispatch(client.roomNumber, generation => ({
-        type: "startBattle",
-        generation,
-        identity: identityOf(client.participant!),
-        battleSessionId: sessionManager.getActiveBattleSessionId(client.roomNumber) ?? "",
-    }), client.lifecycleGeneration)
     // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底。
     // 切片 1 第③步：开关启用后由执行器消费内核 startBattle 的
     // closeRecruitment effect，此处停用（回退=摘掉 MULTI_EFFECT_SWITCHES）。

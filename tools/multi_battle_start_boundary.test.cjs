@@ -134,15 +134,12 @@ function countStartFrames(socket) {
 
 test.after(() => restoreContentSnapshot())
 
-test("a rejected Battle transition rolls the freshly published runtime back", t => {
+test("a kernel-rejected Battle start publishes no runtime (2b.2 stale generation)", t => {
     const { room, socket, client } = createHostRoom(t)
-    const originalUpdateRoomState = roomManager.updateRoomState
-    roomManager.updateRoomState = () => false
-    try {
-        handleLobbyMessage(socket, [0, [6]])
-    } finally {
-        roomManager.updateRoomState = originalUpdateRoomState
-    }
+    // 2b.2:拒绝权在内核——世代失效的房主 [6] 被 STALE_GENERATION 拒绝,
+    // 运行时零发布(battle participants/facts 不落)、不广播、enterData 不消费
+    client.lifecycleGeneration = (client.lifecycleGeneration ?? 1) + 999
+    handleLobbyMessage(socket, [0, [6]])
 
     assert.equal(room.raising_state, 1, "the room must stay in preparation")
     assertNoBattleRuntime(room)

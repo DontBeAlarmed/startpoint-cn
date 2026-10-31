@@ -1183,6 +1183,7 @@ export class SessionManager {
             participant: ParticipantIdentity
         }>,
         hostParticipant: ParticipantIdentity,
+        battleSessionId?: string,
     ): void {
         const participantMap = new Map<string, BattleParticipant>()
         for (const participant of participants) {
@@ -1197,6 +1198,7 @@ export class SessionManager {
                 roomNumber,
                 host: hostParticipant,
                 participants: [...participantMap.values()].map(value => value.participant),
+                battleSessionId,
             })
         }
         this.battleParticipants.set(roomNumber, participantMap)

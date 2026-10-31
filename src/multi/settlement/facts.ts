@@ -33,6 +33,8 @@ export interface StartBattleFactsInput {
     readonly roomNumber: string
     readonly host: ParticipantIdentity
     readonly participants: readonly ParticipantIdentity[]
+    /** 2b.2:内核先行的预生成会话 id;缺省由 store 生成 */
+    readonly battleSessionId?: string
 }
 
 export interface BattleFactStoreOptions {
@@ -86,7 +88,7 @@ export class BattleFactStore {
             throw new Error("battle fact capacity is exhausted")
         }
 
-        const battleSessionId = this.createBattleSessionId() as BattleSessionId
+        const battleSessionId = (input.battleSessionId ?? this.createBattleSessionId()) as BattleSessionId
         if (typeof battleSessionId !== "string"
             || battleSessionId.trim().length === 0
             || this.records.has(battleSessionId)) {

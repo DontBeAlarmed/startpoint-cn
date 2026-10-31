@@ -447,6 +447,32 @@ export function setRoomBattle(roomNumber: string): boolean {
     return updateRoomState(roomNumber, 4);
 }
 
+/**
+ * 2b.2：raising_state 由内核相位派生写入（内核先行——调用方已派发内核事件）。
+ * 派生表与漂移观测 INV-6 同源：recruiting→2、ready→1、battle/closing→4、
+ * closed→不写（房间待删除）。RoomStateMachine 校验在迁移期保留作 oracle。
+ */
+export function updateRoomStateFromKernel(roomNumber: string): boolean {
+    const lifecycle = lifecycleRegistry.get(roomNumber);
+    if (!lifecycle) return false;
+    let derived: 1 | 2 | 4;
+    switch (lifecycle.phase) {
+        case "recruiting":
+            derived = 2;
+            break;
+        case "ready":
+            derived = 1;
+            break;
+        case "battle":
+        case "closing":
+            derived = 4;
+            break;
+        default:
+            return false;
+    }
+    return updateRoomState(roomNumber, derived);
+}
+
 export function reconcileHostReturn(roomNumber: string): boolean {
     const room = rooms.get(roomNumber);
     if (!room || room.raising_state !== 4) return false;
@@ -454,7 +480,8 @@ export function reconcileHostReturn(roomNumber: string): boolean {
     if (!lifecycle || lifecycle.phase !== "ready") return false;
     // 外壳事实是主判据：battle facts 未释放时绝不 4→1（内核相位只做旁证）。
     if (sessionManager.getActiveBattleSessionId(roomNumber) !== null) return false;
-    if (!updateRoomState(roomNumber, 1)) return false;
+    // 2b.2:调用方已派发 hostReturn,raising_state 由相位派生
+    if (!updateRoomStateFromKernel(roomNumber)) return false;
     room.battle_participants = [];
     room.mates = [{ viewer_id: room.host_viewer_id, com_id: 0 }];
     updateHostEntryTime(roomNumber);

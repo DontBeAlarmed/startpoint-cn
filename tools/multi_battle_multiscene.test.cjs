@@ -16,6 +16,7 @@ const { SessionManager, sessionManager } = require("../src/multi/state/SessionMa
 const { handleBattleMessage } = require("../src/multi/tcp/battle")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
 const { handleMessage: handleLobbyMessage } = require("../src/multi/tcp/lobby")
+const { lifecycleRegistry } = require("../src/multi/lifecycle")
 
 class FakeSocket {
     constructor() {
@@ -590,6 +591,10 @@ test("battle handshake requires an identity from the host StartBattle snapshot",
     lobbyClient.mates = [lobbyClient.yourself]
     sessionManager.addClientToRoom(lobbyClient)
     sessionManager.claimRoomHostParticipant(room.room_number, lobbyClient.participant)
+    // 2b.2 内核先行:[6] 前房主必须已内核 enter(生产序)
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "enter", generation, identity: "viewer:800000101", nowMs: 1_000,
+    }))
     handleLobbyMessage(lobbySocket, [0, [6]])
     assert.equal(room.raising_state, 4)
 
@@ -662,6 +667,10 @@ test("only the room host can freeze the StartBattle participant snapshot", () =>
     sessionManager.claimRoomHostParticipant(room.room_number, host.participant)
     cleanup.push({ clients: [], lobbyClients: [host, guest], room })
 
+    // 2b.2 内核先行:房主 enter 使 ready,guest 的 [6] 因 HOST_ONLY 被拒
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "enter", generation, identity: "viewer:800000201", nowMs: 1_000,
+    }))
     handleLobbyMessage(guestSocket, [0, [6]])
     assert.equal(room.raising_state, 2)
 
