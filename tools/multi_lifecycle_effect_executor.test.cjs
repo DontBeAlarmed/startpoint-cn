@@ -45,7 +45,9 @@ test("EFFECT_INVENTORY covers all nine effects, all pending, sites documented", 
         ],
     )
     for (const entry of EFFECT_INVENTORY) {
-        assert.equal(entry.state, "pending", entry.effect)
+        // closeRecruitment 已切换（switch 1/9）；其余按收口裁定保持 pending
+        const expectedState = entry.effect === "closeRecruitment" ? "switched" : "pending"
+        assert.equal(entry.state, expectedState, entry.effect)
         assert.ok(entry.handWrittenSites.length >= 1, entry.effect)
         for (const site of entry.handWrittenSites) {
             assert.equal(typeof site, "string")

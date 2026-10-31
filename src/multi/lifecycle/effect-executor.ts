@@ -81,11 +81,11 @@ export const EFFECT_INVENTORY: readonly EffectInventoryEntry[] = Object.freeze([
     Object.freeze({
         effect: "closeRecruitment" as const,
         handWrittenSites: Object.freeze([
-            "tcp/lobby.ts beginBattle（开战）",
-            "room/disband-listener.ts（解散）+ http/room.ts HTTP 兜底（幂等重复）",
-            "npc/release.ts applyNpcPostFill（内核无对应事件——执行器不能吞）",
+            "tcp/lobby.ts beginBattle（开战）——已门控到 MULTI_EFFECT_SWITCHES",
+            "room/disband-listener.ts（解散）+ http/room.ts HTTP 兜底——已门控",
+            "npc/release.ts applyNpcPostFill（内核无对应事件——外壳保留）",
         ]),
-        state: "pending" as const,
+        state: "switched" as const,
     }),
     Object.freeze({
         effect: "scheduleGc" as const,
@@ -128,6 +128,13 @@ let events = 0
 let lastEventAtMs: number | null = null
 let lastEvent: EffectDryRunEventSample | null = null
 
+// 8 个 pending 的阻断原因（切片 1 收口裁定,2026-10-31）：时序耦合
+// （updateShareRow/broadcastMates——外壳在 mates 重建后同步,dispatch 点执行
+// 拿到旧名册;且 socketLost/编队设置/one-shot 无内核事件）、形状未建模
+// （sendEnterReply——Welcome 单元素 mates）、5805 核心路径（sendDismiss——
+// 按连接拆除≠按内核身份名单）、两段式+R-01 守卫（releaseSeats/
+// persistBattleRelease）、轮询已覆盖（scheduleGc）、解散咽喉自身（closeRoom）。
+// 划入切片 2 的内核事件扩展再逐个收口。
 // 切片 1 第③步：单 effect 切换开关。MULTI_EFFECT_SWITCHES=closeRecruitment,...
 // （逗号分隔）；列出的 effect 由执行器（apply-effects）唯一执行，对应外壳
 // 手写路径同时关闭；回退=从环境变量摘掉该名字重启。未列出的 effect 继续
