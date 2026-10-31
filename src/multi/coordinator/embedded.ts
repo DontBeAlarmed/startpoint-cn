@@ -347,6 +347,23 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
 
     async finalizeBattle(input: BattleSessionInput): Promise<CoordinatorResult<BattleStatus>> {
         this.assertBattleInput(input)
+        // 2a1.2：NPC 参战者由真人 finish 驱动虚拟 finish（幂等）——必须先于
+        // 真人 finish 派发，否则最后一个真人的 allFinished 检查看不到尚未
+        // finish 的 NPC 而漏 finalize（NPC 战斗会挂到 15 分钟 GC）。
+        const lifecycleState = lifecycleRegistry.get(input.roomNumber)
+        if (lifecycleState !== undefined && lifecycleState.phase === "battle") {
+            for (const identity of lifecycleState.battleParticipants) {
+                if (!identity.startsWith("npc:")) continue
+                lifecycleRegistry.dispatch(input.roomNumber, generation => ({
+                    type: "finish",
+                    generation,
+                    identity,
+                    nowMs: getRealNowMs(),
+                    battleDeadlineMs: LIFECYCLE_BATTLE_DEADLINE_MS,
+                    battleSessionId: String(input.battleSessionId),
+                }))
+            }
+        }
         // B2a 影子：记录本参与者的 Finish；内核保持 state 4，等 HostReturn。
         lifecycleRegistry.dispatch(input.roomNumber, generation => ({
             type: "finish",

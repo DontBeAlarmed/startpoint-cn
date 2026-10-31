@@ -14,6 +14,7 @@ import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { applyNpcPostFill } from "../npc/release"
 import { closeRecruitmentForRoom, updateOpenRecruitmentSnapshotForRoom } from "../../data/domains/attention"
 import { isEffectSwitched } from "../lifecycle/effect-executor"
+import { npcIdentityOf } from "../npc/identity"
 import { incrementFollowBonusForBattle } from "../../lib/follow-bonus"
 import { safeEvolutionImgLevel } from "../safe-display-fields"
 import { getRealNowMs } from "../../runtime/time/game-time"
@@ -163,9 +164,12 @@ function getConnectedRealMates(client: SessionClient, room: MultiRoom): any[] {
 }
 
 function getAvailableNpcSlotCount(room: MultiRoom, realMates: any[]): number {
-    const authoritativeViewerIds = new Set(room.member_participants.map(member => member.viewerId))
-    for (const mate of realMates) authoritativeViewerIds.add(mate.viewerId)
-    return Math.max(0, Math.min(room.npc_count, 3 - authoritativeViewerIds.size))
+    // 2a1.2：空闲名额改读内核（容量恒 3，seats 含已入座 NPC，joiners 含真人
+    // pending 票——票先占座阻断后续 NPC admit，D8 语义）。无内核条目（旧房
+    // 兜底）退回真人计数。
+    const state = lifecycleRegistry.get(room.room_number)
+    if (!state) return Math.max(0, 3 - realMates.length)
+    return Math.max(0, 3 - state.seats.length - Object.keys(state.joiners).length)
 }
 
 // 招募代存活判定：一场一换只在战斗 release 时清 NPC（one-shot clearRoomNpcRoster，
@@ -177,8 +181,11 @@ function hasLiveNpcRecruitment(room: MultiRoom): boolean {
 }
 
 function limitLobbyMates(mates: any[], hostViewerId: number): any[] {
+    // 2a1.2：已入座 NPC 是占座参与者，不再被真人挤掉（D8：先到先得，抢输
+    // 才销毁——销毁只发生在虚拟 admit 被拒的提交点，见 handleEnterComs）。
+    // 展示上限仍 3：真人全保留，NPC 按剩余展示位截尾。
     const realMates = selectRealMates(mates, hostViewerId)
-    const npcSlots = 3 - realMates.length
+    const npcSlots = Math.max(0, 3 - realMates.length)
     const npcMates = npcSlots > 0
         ? mates.filter(mate => !!mate.comId).slice(-npcSlots)
         : []
@@ -333,10 +340,48 @@ export async function handleEnterComs(
     const activeCount = getAvailableNpcSlotCount(room, currentRealMates)
     const assignments = getActiveNpcRoster(room, activeCount)
 
+    // 2a1.2：NPC 以占座参与者身份走与真人相同的 admit→handshake→enter 流水线
+    // （提交点同步三连派发，无 I/O）。admit 被拒=真人先到/满员 → 抢输销毁：
+    // 该 NPC 移出 roster、不入 mates（先到先得，D8）。
+    const seatedAssignments: typeof assignments = []
+    for (const assignment of assignments) {
+        const npcIdentity = npcIdentityOf(client.roomNumber, assignment.com_id)
+        const admitDecision = lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+            type: "admit",
+            generation,
+            identity: npcIdentity,
+        }))
+        const destroy = (): void => {
+            const index = room.npc_roster.indexOf(assignment)
+            if (index >= 0) room.npc_roster.splice(index, 1)
+        }
+        if (admitDecision === null || admitDecision.rejected !== undefined) {
+            destroy()
+            continue
+        }
+        lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+            type: "handshake",
+            generation,
+            identity: npcIdentity,
+        }))
+        const enterDecision = lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+            type: "enter",
+            generation,
+            identity: npcIdentity,
+            nowMs: getRealNowMs(),
+        }))
+        if (enterDecision === null || enterDecision.rejected !== undefined) {
+            // 防御分支（admit 已锁定 joiner 名额，理论不可达）：抢输销毁
+            destroy()
+            continue
+        }
+        seatedAssignments.push(assignment)
+    }
+
     const npcMates: any[] = []
     const recruitedByComId = new Map(recruitResult.recruitedMates.map(mate => [mate.com_id, mate]))
-    for (let i = 0; i < assignments.length; i++) {
-        const assignment = assignments[i]
+    for (let i = 0; i < seatedAssignments.length; i++) {
+        const assignment = seatedAssignments[i]
         const recruited = recruitedByComId.get(assignment.com_id)
         const comId = assignment.com_id
         const viewerId = recruited?.viewer_id ?? (900000000 + comId)
