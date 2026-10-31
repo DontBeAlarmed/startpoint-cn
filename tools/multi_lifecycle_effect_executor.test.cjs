@@ -228,3 +228,45 @@ test("admin status sanitizes effectDryRun and tolerates legacy shapes", () => {
     })
     assert.equal(legacy.lifecycle.effectDryRun, null)
 })
+
+test("effect switches: closeRecruitment executes only when switched, with applied accounting", () => {
+    fresh()
+    const { applyEffects, setApplyEffectsDependenciesForTest } = require("../src/multi/lifecycle/apply-effects")
+    const { isEffectSwitched, setEffectSwitchedForTest } = require("../src/multi/lifecycle/effect-executor")
+    const { setLifecycleEffectApplier } = require("../src/multi/lifecycle/room-lifecycle-registry")
+    const closeRecruitmentCalls = []
+    // 生产由 tcp/server 启动接线；测试内显式接线，测试后摘除
+    setLifecycleEffectApplier(applyEffects)
+    setApplyEffectsDependenciesForTest({
+        closeRecruitment: async (hostViewerId, roomNumber) => {
+            closeRecruitmentCalls.push({ hostViewerId, roomNumber })
+        },
+    })
+
+    lifecycleRegistry.create("654321", "viewer:7")
+    const decision = dispatch("654321", generation => ({
+        type: "disband", generation, identity: "viewer:7", nowMs: 8_000, closeDeadlineMs: 300_000,
+    }))
+    const closeRecruitmentEffects = decision.effects.filter(effect => effect.type === "closeRecruitment")
+    assert.equal(closeRecruitmentEffects.length, 1)
+
+    // 开关关闭（默认）：执行器不执行，appliedTotals 为空
+    assert.equal(isEffectSwitched("closeRecruitment"), false)
+    assert.equal(closeRecruitmentCalls.length, 0)
+    assert.equal(getEffectDryRunStatus().appliedTotals.closeRecruitment, undefined)
+
+    // 开关打开：同一内核 effect 语义下执行器执行且对账
+    setEffectSwitchedForTest("closeRecruitment", true)
+    try {
+        lifecycleRegistry.create("654322", "viewer:7")
+        dispatch("654322", generation => ({
+            type: "disband", generation, identity: "viewer:7", nowMs: 9_000, closeDeadlineMs: 300_000,
+        }))
+        assert.deepEqual(closeRecruitmentCalls, [{ hostViewerId: 7, roomNumber: "654322" }])
+        assert.equal(getEffectDryRunStatus().appliedTotals.closeRecruitment, 1)
+    } finally {
+        setEffectSwitchedForTest("closeRecruitment", false)
+        setApplyEffectsDependenciesForTest({ closeRecruitment: undefined })
+        setLifecycleEffectApplier(null)
+    }
+})

@@ -13,6 +13,7 @@ import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { applyNpcPostFill } from "../npc/release"
 import { closeRecruitmentForRoom, updateOpenRecruitmentSnapshotForRoom } from "../../data/domains/attention"
+import { isEffectSwitched } from "../lifecycle/effect-executor"
 import { incrementFollowBonusForBattle } from "../../lib/follow-bonus"
 import { safeEvolutionImgLevel } from "../safe-display-fields"
 import { getRealNowMs } from "../../runtime/time/game-time"
@@ -820,12 +821,16 @@ function beginBattle(client: SessionClient): boolean {
         identity: identityOf(client.participant!),
         battleSessionId: sessionManager.getActiveBattleSessionId(client.roomNumber) ?? "",
     }), client.lifecycleGeneration)
-    // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底
+    // 开战关招募（设计 §9.e）：战斗中铃铛必须停止；T1 阶段门只是投递侧兜底。
+    // 切片 1 第③步：开关启用后由执行器消费内核 startBattle 的
+    // closeRecruitment effect，此处停用（回退=摘掉 MULTI_EFFECT_SWITCHES）。
     // W1a：异步形状——同步上下文 fire-and-forget（拒绝就地捕获，try/catch
     // 不接 async 拒绝）
-    void closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber).catch(error => {
-        console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, describeError(error))
-    })
+    if (!isEffectSwitched("closeRecruitment")) {
+        void closeRecruitmentForRoom(room.host_viewer_id, client.roomNumber).catch(error => {
+            console.warn(`[LOBBY] close recruitment on battle start failed: room=${client.roomNumber}`, describeError(error))
+        })
+    }
     // 关注奖励（v4）：每局恰好一次的本提交边界为计数点——局内真实成员间
     // 每条已存在的关注方向行 +10（单事务）。失败仅告警，不回滚开战。
     try {

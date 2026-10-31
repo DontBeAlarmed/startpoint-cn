@@ -3,6 +3,9 @@ import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import { describeError } from "../describe-error"
 import { sessionManager } from "../state/SessionManager"
 import { identityOf, lifecycleRegistry } from "../lifecycle"
+import { isEffectSwitched } from "../lifecycle/effect-executor"
+import { applyEffects } from "../lifecycle/apply-effects"
+import { setLifecycleEffectApplier } from "../lifecycle/room-lifecycle-registry"
 import { setRoomDisbandListener } from "./manager"
 
 /**
@@ -11,6 +14,8 @@ import { setRoomDisbandListener } from "./manager"
  * only persistence cleanup, so there is no second dismissal path.
  */
 export function installDisbandLifecycleListener(): void {
+    // 切片 1 第③步：效果执行器接线（注入式——registry 不静态 import DB 层）
+    setLifecycleEffectApplier(applyEffects)
     // dismissed socket 关闭 → 内核 closeConfirmed；全部确认或到期后 closed。
     sessionManager.onDismissedSocketClosed = (roomNumber, viewerId, lifecycleGeneration) => {
         const decision = lifecycleRegistry.dispatch(roomNumber, generation => ({
@@ -35,9 +40,13 @@ export function installDisbandLifecycleListener(): void {
             console.error(`[MULTI] room share disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
         }
         // W1a：closeRecruitmentForRoom 为异步形状——同步 listener 内
-        // fire-and-forget（拒绝就地捕获，不得成为 unhandled rejection）
-        void closeRecruitmentForRoom(hostViewerId, roomNumber).catch(error => {
-            console.error(`[MULTI] recruitment disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
-        })
+        // fire-and-forget（拒绝就地捕获，不得成为 unhandled rejection）。
+        // 切片 1 第③步：开关启用后由执行器消费内核 disband 的
+        // closeRecruitment effect，此处停用（回退=摘掉 MULTI_EFFECT_SWITCHES）。
+        if (!isEffectSwitched("closeRecruitment")) {
+            void closeRecruitmentForRoom(hostViewerId, roomNumber).catch(error => {
+                console.error(`[MULTI] recruitment disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
+            })
+        }
     })
 }

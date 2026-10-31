@@ -81,6 +81,7 @@ export interface AdminEffectDryRunStatus {
     readonly mode: "dry-run"
     readonly events: number
     readonly totals: Readonly<Record<string, number>>
+    readonly appliedTotals: Readonly<Record<string, number>>
     readonly lastEventAtMs: number | null
     readonly lastEvent: AdminEffectDryRunEventSample | null
 }
@@ -360,6 +361,15 @@ function sanitizeEffectDryRun(value: unknown): AdminEffectDryRunStatus | null {
         if (!isNonNegativeSafeInteger(count)) return null
         totals[effect] = count
     }
+    // 执行器已真实执行的 effect 计数（第③步切换后与 totals 对账）；旧形状容忍缺失
+    const appliedEntries = Object.entries(isRecord(value.appliedTotals) ? value.appliedTotals : {})
+    if (appliedEntries.length > MAX_REJECTION_REASON_ENTRIES) return null
+    const appliedTotals: Record<string, number> = {}
+    for (const [effect, count] of appliedEntries) {
+        if (!REJECTION_REASON_KEY_PATTERN.test(effect)) return null
+        if (!isNonNegativeSafeInteger(count)) return null
+        appliedTotals[effect] = count
+    }
     const lastEventAtMs = value.lastEventAtMs === null || isNonNegativeSafeInteger(value.lastEventAtMs)
         ? value.lastEventAtMs as number | null
         : null
@@ -384,6 +394,7 @@ function sanitizeEffectDryRun(value: unknown): AdminEffectDryRunStatus | null {
         mode: "dry-run",
         events: value.events,
         totals: Object.freeze(totals),
+        appliedTotals: Object.freeze(appliedTotals),
         lastEventAtMs,
         lastEvent,
     })

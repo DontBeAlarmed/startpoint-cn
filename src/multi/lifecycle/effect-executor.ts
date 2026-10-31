@@ -117,14 +117,45 @@ export interface EffectDryRunStatus {
     readonly mode: "dry-run"
     readonly events: number
     readonly totals: Readonly<Record<string, number>>
+    readonly appliedTotals: Readonly<Record<string, number>>
     readonly lastEventAtMs: number | null
     readonly lastEvent: EffectDryRunEventSample | null
 }
 
 const totals = new Map<RoomEffectType, number>()
+const appliedTotals = new Map<RoomEffectType, number>()
 let events = 0
 let lastEventAtMs: number | null = null
 let lastEvent: EffectDryRunEventSample | null = null
+
+// 切片 1 第③步：单 effect 切换开关。MULTI_EFFECT_SWITCHES=closeRecruitment,...
+// （逗号分隔）；列出的 effect 由执行器（apply-effects）唯一执行，对应外壳
+// 手写路径同时关闭；回退=从环境变量摘掉该名字重启。未列出的 effect 继续
+// dry-run（外壳手写路径仍是唯一执行者）。
+function loadSwitchedEffectsFromEnv(): Set<RoomEffectType> {
+    const switched = new Set<RoomEffectType>()
+    const raw = process.env.MULTI_EFFECT_SWITCHES ?? ""
+    for (const name of raw.split(",").map(part => part.trim())) {
+        if (name.length > 0) switched.add(name as RoomEffectType)
+    }
+    return switched
+}
+
+const switchedEffects = loadSwitchedEffectsFromEnv()
+
+export function isEffectSwitched(effect: RoomEffectType): boolean {
+    return switchedEffects.has(effect)
+}
+
+export function setEffectSwitchedForTest(effect: RoomEffectType, on: boolean): void {
+    if (on) switchedEffects.add(effect)
+    else switchedEffects.delete(effect)
+}
+
+/** 执行器每次真实执行 effect 时计数（与内核 totals 对账）。 */
+export function recordEffectApplied(effect: RoomEffectType): void {
+    appliedTotals.set(effect, (appliedTotals.get(effect) ?? 0) + 1)
+}
 
 /**
  * registry.dispatch 在 decision 非拒绝且带 effects 时调用；只记账，不执行。
@@ -151,10 +182,13 @@ export function recordEffectsDryRun(
 export function getEffectDryRunStatus(): EffectDryRunStatus {
     const totalsSnapshot: Record<string, number> = {}
     for (const [effect, count] of totals) totalsSnapshot[effect] = count
+    const appliedSnapshot: Record<string, number> = {}
+    for (const [effect, count] of appliedTotals) appliedSnapshot[effect] = count
     return Object.freeze({
         mode: "dry-run",
         events,
         totals: Object.freeze(totalsSnapshot),
+        appliedTotals: Object.freeze(appliedSnapshot),
         lastEventAtMs,
         lastEvent,
     })
@@ -163,6 +197,7 @@ export function getEffectDryRunStatus(): EffectDryRunStatus {
 /** 测试隔离：清空 dry-run 记账（不影响内核注册表与手写路径）。 */
 export function resetEffectDryRunForTest(): void {
     totals.clear()
+    appliedTotals.clear()
     events = 0
     lastEventAtMs = null
     lastEvent = null

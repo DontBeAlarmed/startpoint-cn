@@ -9,6 +9,21 @@ import {
     type RoomLifecycleState,
 } from "./room-lifecycle"
 import { recordEffectsDryRun } from "./effect-executor"
+
+// 效果执行器经注入接线（composition root = tcp/server 启动时的
+// installDisbandLifecycleListener），而非静态 import——执行器要触 DB 层
+// （attention 域），静态挂进本图会让所有轻量测试进程背上 DB 初始化。
+export type LifecycleEffectApplier = (
+    roomNumber: string,
+    eventType: string,
+    decision: RoomLifecycleDecision,
+) => void
+
+let effectApplier: LifecycleEffectApplier | null = null
+
+export function setLifecycleEffectApplier(applier: LifecycleEffectApplier | null): void {
+    effectApplier = applier
+}
 import { getRealNowMs } from "../../runtime/time/game-time"
 
 /** 房间资源上界：结算后 15 分钟、closing 后 5 分钟（只回收，不推导状态）。 */
@@ -74,10 +89,12 @@ export class RoomLifecycleRegistry {
             }
         }
         if (decision.state !== state) this.rooms.set(roomNumber, decision.state)
-        // 切片 1 dry-run：非拒绝且带 effects 的 decision 记账不执行——
-        // 外壳手写路径仍是唯一执行者，这里只回答"内核认为该发生什么"。
+        // 切片 1：非拒绝且带 effects 的 decision 记账 + 按开关执行。
+        // 未切换的 effect 处 dry-run（外壳手写路径仍是唯一执行者）；
+        // 执行器未接线（轻量测试）时只记账。
         if (!decision.rejected && decision.effects.length > 0) {
             recordEffectsDryRun(roomNumber, event.type, decision)
+            effectApplier?.(roomNumber, event.type, decision)
         }
         return decision
     }

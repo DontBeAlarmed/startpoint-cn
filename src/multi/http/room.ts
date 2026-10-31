@@ -14,6 +14,7 @@ import {
 } from "./join-result";
 import { issueRoomAdmission } from "./room-admission";
 import { projectRaisingStateForViewer } from "../room/raising-state-projection";
+import { isEffectSwitched } from "../lifecycle/effect-executor";
 import {
     buildEstablisherSnapshot,
     closeRecruitmentForRoom,
@@ -482,11 +483,15 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         console.log(result.ok ? "[MULTI] room disbanded" : "[MULTI] room already absent");
         if (result.ok) {
             // 尽力而为的铃铛卫生操作：绝不能让招募关闭失败破坏解散主流程
-            // （W1a：异步形状——async handler 内 await，try/catch 有效）
-            try {
-                await closeRecruitmentForRoom(viewerId, body.room_number);
-            } catch (error) {
-                console.warn("[MULTI] close recruitment on disband failed", describeError(error));
+            // （W1a：异步形状——async handler 内 await，try/catch 有效）。
+            // 切片 1 第③步：开关启用后由执行器消费内核 disband 的
+            // closeRecruitment effect，此处停用（回退=摘掉 MULTI_EFFECT_SWITCHES）。
+            if (!isEffectSwitched("closeRecruitment")) {
+                try {
+                    await closeRecruitmentForRoom(viewerId, body.room_number);
+                } catch (error) {
+                    console.warn("[MULTI] close recruitment on disband failed", describeError(error));
+                }
             }
         }
 
