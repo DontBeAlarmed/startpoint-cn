@@ -658,7 +658,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (ed.dashBehaviorMode !== undefined) client.yourself.dashBehaviorMode = ed.dashBehaviorMode;
     if (ed.allowHealFromOtherPlayers !== undefined) client.yourself.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
     client.enterData = ed
-    // B2a 影子：记录 enter；房主首次 enter 在内核里 recruiting → ready。
+    // 记录 enter;房主首次 enter 在内核里 recruiting → ready。
     if (client.participant) {
         const enterDecision = lifecycleRegistry.dispatch(client.roomNumber, generation => ({
             type: "enter",
@@ -780,7 +780,7 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
         && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
     const room = getRoom(client.roomNumber)
     const preserveActiveBattle = room?.raising_state === 4
-    // B2a 影子：state 4 的内核会忽略 socketLost（战斗 socket 才是存活判据）。
+    // state 4 的内核会忽略 socketLost（战斗 socket 才是存活判据）。
     if (client.participant) {
         lifecycleRegistry.dispatch(client.roomNumber, generation => ({
             type: "socketLost",

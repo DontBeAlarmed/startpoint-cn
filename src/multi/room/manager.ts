@@ -111,7 +111,7 @@ function cleanExpiredRooms(timing: RoomCleanupTiming) {
     }
     let cleaned = 0;
     for (const [roomNumber, room] of rooms) {
-        // B2b：自检内核的资源 deadline（结算后 15 分钟 / closing 后 5 分钟）。
+        // 自检内核的资源 deadline（结算后 15 分钟 / closing 后 5 分钟）。
         // 影子阶段只记录；B3 起由外壳执行 closeRoom/dismiss 效果。
         const lifecycleDecision = lifecycleRegistry.dispatch(roomNumber, generation => ({
             type: "gcSweep",
@@ -301,7 +301,7 @@ export function createRoom(
         npc_roster: [],
     };
     rooms.set(roomNumber, room);
-    // B2a 影子：内核记录生命周期；B3 起成为权威。
+    // 内核记录生命周期(唯一状态权威)。
     lifecycleRegistry.create(roomNumber, identityOf(hostParticipant))
     console.log(`[MULTI] room created: room=${roomNumber} category=${category} quest=${questId}`);
     return room;

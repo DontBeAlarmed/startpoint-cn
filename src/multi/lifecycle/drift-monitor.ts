@@ -11,7 +11,7 @@
 //         rooms、内核保留 closing 直到 closeConfirmed/5 分钟，按字面算会把
 //         每次正常解散误报成漂移）
 //   INV-3 room.member_participants 不在内核成员账。判据 = seats ∪ joiners，
-//         battle 相位并上 battleParticipants——B3a 起 finish 释放座位后
+//         battle 相位并上 battleParticipants——finish 释放座位后
 //         seats 为空、参战者保留在 battleParticipants 直到 HostReturn 清空；
 //         不并入它会把每个结算等待房误报成漂移（与 INV-2 的排除同一原则）。
 //         NPC 房（npc_count>0）子集单独计数：2a 参与者模型前预期非零。

@@ -264,7 +264,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 room.room_number,
                 nodeSessionId,
             )
-            // B2a 影子：撤权删成员等价于战斗/座位上的 Abort，避免内核留下永不 finish 的参与者。
+            // 撤权删成员等价于战斗/座位上的 Abort，避免内核留下永不 finish 的参与者。
             const activeBattleSessionId = sessionManager.getActiveBattleSessionId(room.room_number) ?? ""
             for (const participant of invalidatedParticipants) {
                 lifecycleRegistry.dispatch(room.room_number, generation => ({
@@ -365,7 +365,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 }))
             }
         }
-        // B2a 影子：记录本参与者的 Finish；内核保持 state 4，等 HostReturn。
+        // 记录本参与者的 Finish；内核保持 state 4，等 HostReturn。
         lifecycleRegistry.dispatch(input.roomNumber, generation => ({
             type: "finish",
             generation,

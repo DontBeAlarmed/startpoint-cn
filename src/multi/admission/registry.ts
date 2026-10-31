@@ -150,7 +150,7 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         // 内核拒绝=该新进入者不能进（NPC 容量/相位变化）：发票必须终止，
         // 否则票在手、握手/Enter 被内核连拒而外壳继续写成员账。占座成员
         // （战斗/结算期返场重发票）不受此限——其成员账在外壳、内核座位已
-        // 释放属 B3a 预期，内核拒绝被有意忽略（与 2026-10-30 占座豁免一致）。
+        // 释放属结算语义预期，内核拒绝被有意忽略（与占座豁免一致）。
         if (kernelReject !== null
             && !this.isOccupiedMember(roomNumber, input.participant.viewerId)) {
             recordEntryStage("issueRejected")

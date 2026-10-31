@@ -293,7 +293,7 @@ export async function handleHandshake(
             denyGracefully(socket, "room_member_write_failed")
             return
         }
-        // B2a 影子：admit 在入场票签发时记录；这里只记录 handshake。
+        // admit 在入场票签发时记录;这里只记录 handshake。
         const viewerKey = identityOf(admission.participant)
         const handshakeDecision = lifecycleRegistry.dispatch(normalizedRoomNumber, generation => ({
             type: "handshake",
