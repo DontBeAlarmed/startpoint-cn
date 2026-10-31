@@ -1,4 +1,5 @@
 import { getRoom } from "../room/manager"
+import { syncRoomShareRow } from "../room/share-sync"
 import { describeError } from "../describe-error"
 import { sessionManager } from "../state/SessionManager"
 import { lifecycleRegistry } from "../lifecycle"
@@ -73,7 +74,6 @@ export function clearRoomNpcRoster(roomNumber: string, battleSessionId?: string)
             room.mates = room.mates.filter(mate => (mate.com_id ?? 0) <= 0)
         }
         try {
-            const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
             syncRoomShareRow(roomNumber)
         } catch (error) {
             console.warn(`[MULTI] one-shot share sync failed: room=${roomNumber}`, describeError(error))

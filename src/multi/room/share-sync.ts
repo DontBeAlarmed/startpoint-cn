@@ -10,15 +10,21 @@ import { describeError } from "../describe-error"
  * 可见性的房没有注册行，refresh 是 no-op，静默跳过。失败只 WARN——注册
  * 表是显示/发现数据，进房的权威校验在 select_room/prepare。
  *
- * 惰性 require room manager：本模块被 manager 的钩子调用，顶层 require
- * 会形成 manager → share-sync → manager 循环。
+ * 房间读取经注入槽（setShareRoomLookup，由 manager 安装时传入）：本模块
+ * 被 manager 的钩子调用，顶层/惰性 require manager 都会形成
+ * manager → share-sync → manager 循环——注入是消环手段（切片 3）。
  */
+type ShareRoomLookup = (roomNumber: string) => import("../../lib/types").MultiRoom | undefined
+let shareRoomLookup: ShareRoomLookup = () => undefined
+
+export function setShareRoomLookup(lookup: ShareRoomLookup): void {
+    shareRoomLookup = lookup
+}
 export function syncRoomShareRow(roomNumber: string): void {
     // W1a：内部异步、对外 fire-and-forget——调用点（TCP 断连/房间钩子）是
     // 同步上下文，注册表是显示/发现数据，失败 WARN 不阻断主流程
     void (async () => {
-        const { getRoom } = require("./manager") as typeof import("./manager")
-        const room = getRoom(roomNumber)
+        const room = shareRoomLookup(roomNumber)
         if (!room) return
         await refreshRoomShareRowAsync(
             roomNumber,
@@ -47,9 +53,8 @@ export function openRoomShareRow(input: {
     // W1a：fire-and-forget 同上（HTTP 调用方为 async handler，但门面保持
     // 同步签名让 TCP/HTTP 两侧调用点形状统一）
     void (async () => {
-        const { getRoom } = require("./manager") as typeof import("./manager")
         const { upsertRoomShareRowAsync } = require("../../data/domains/social-room-shares") as typeof import("../../data/domains/social-room-shares")
-        const room = getRoom(input.roomNumber)
+        const room = shareRoomLookup(input.roomNumber)
         await upsertRoomShareRowAsync({
             roomNumber: input.roomNumber,
             hostViewerId: input.hostViewerId,

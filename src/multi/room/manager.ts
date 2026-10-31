@@ -6,6 +6,7 @@ import { sessionManager } from "../state/SessionManager";
 import { identityOf, LIFECYCLE_BATTLE_DEADLINE_MS, LIFECYCLE_CLOSE_DEADLINE_MS, lifecycleRegistry } from "../lifecycle";
 import { sampleLifecycleDrift } from "../lifecycle/drift-monitor";
 import { recordCleanupRun, registerCleanupTask } from "../lifecycle/cleanup-scheduler";
+import { setShareRoomLookup, syncRoomShareRow } from "./share-sync";
 import type { ParticipantIdentity } from "../coordinator/contracts";
 
 const rooms = new Map<string, MultiRoom>();
@@ -259,6 +260,9 @@ export function generateRoomAccessToken(): string {
     return token;
 }
 
+// 切片 3:share-sync 的房间读取注入(manager→share-sync→manager 环消解)
+setShareRoomLookup(getRoom);
+
 export function createRoom(
     hostViewerId: number,
     hostPlayerId: number,
@@ -426,7 +430,6 @@ export function updateRoomState(
     }
     // 好友房间大厅注册行同步（未开放列表可见的房无行，no-op）
     try {
-        const { syncRoomShareRow } = require("./share-sync") as typeof import("./share-sync")
         syncRoomShareRow(roomNumber)
     } catch (error) {
         console.warn(`[MULTI] room share sync failed: ${roomNumber}`, describeError(error))
@@ -477,7 +480,6 @@ export function reconcileHostReturn(roomNumber: string): boolean {
     room.mates = [{ viewer_id: room.host_viewer_id, com_id: 0 }];
     updateHostEntryTime(roomNumber);
     try {
-        const { syncRoomShareRow } = require("./share-sync") as typeof import("./share-sync");
         syncRoomShareRow(roomNumber);
     } catch (error) {
         console.warn(`[MULTI] host return share sync failed: ${roomNumber}`, describeError(error));

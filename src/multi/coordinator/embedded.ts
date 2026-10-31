@@ -1,4 +1,5 @@
 import type { MultiRoom, QuestCategory } from "../types"
+import { syncRoomShareRow } from "../room/share-sync"
 import { describeError } from "../describe-error"
 import {
     createRoom as createLocalRoom,
@@ -565,7 +566,6 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             sessionManager.broadcastToRoom(room.room_number, [1, [1, hostClient.mates]])
         }
         try {
-            const { syncRoomShareRow } = require("../room/share-sync") as typeof import("../room/share-sync")
             syncRoomShareRow(room.room_number)
         } catch (error) {
             console.warn(`[MULTI] node cleanup share sync failed: room=${room.room_number}`, describeError(error))

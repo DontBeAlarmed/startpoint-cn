@@ -1,6 +1,7 @@
 import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
 import { closeRecruitmentForRoom } from "../../data/domains/attention"
 import { describeError } from "../describe-error"
+import { deleteRoomShareRowForDisband } from "./share-sync"
 import { sessionManager } from "../state/SessionManager"
 import { identityOf, lifecycleRegistry } from "../lifecycle"
 import { isEffectSwitched } from "../lifecycle/effect-executor"
@@ -34,7 +35,6 @@ export function installDisbandLifecycleListener(): void {
         }
         try {
             // 好友房间大厅注册行清理（覆盖 timer 等全部解散路径）
-            const { deleteRoomShareRowForDisband } = require("./share-sync") as typeof import("./share-sync")
             deleteRoomShareRowForDisband(roomNumber)
         } catch (error) {
             console.error(`[MULTI] room share disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
