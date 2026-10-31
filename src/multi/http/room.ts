@@ -13,6 +13,7 @@ import {
     restoreRoomUnavailableRaisingState,
 } from "./join-result";
 import { issueRoomAdmission } from "./room-admission";
+import { projectRaisingStateForViewer } from "../room/raising-state-projection";
 import {
     buildEstablisherSnapshot,
     closeRecruitmentForRoom,
@@ -151,24 +152,24 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
         // 返回房间或超时判定已解散，prepare 远端 3s×5 轮询对 2 有内建重试）；
         // 非成员 → A-error 4507（Failure 弹窗）——不可回 4：prepare 远端的链式
         // select 解析器对 4 抛 C5001（mac-c 实测）。房主返回经此路径释放状态。
-        if (viewerId === room.value.host.viewerId) {
-            // 4→1 只在最后一个 finish 后；闩锁期间房主 prepare 得 2，客户端 3s×5 重试。
-            data.raising_state = room.value.raisingState === 4 ? 2 : 1
-        } else if (room.value.raisingState === 4) {
-            const isMember = room.value.members.some(
+        // 决策表统一收敛在 raising-state-projection（切片 1 第②步）。
+        const prepareProjection = projectRaisingStateForViewer({
+            state: room.value.raisingState,
+            isHost: viewerId === room.value.host.viewerId,
+            isMember: room.value.members.some(
                 member => member.viewerId === viewerId,
-            )
-            if (isMember) {
-                data.raising_state = 2
-                console.log(`[MULTI] prepare: member waits during battle → 2`)
-            } else {
-                // 战斗/结算期间非成员 prepare → A-error 4507（Failure 弹窗）；
-                // 不可回 4——prepare 远端链式 select 解析器对 4 抛 C5001
-                return prepareFailure(reply, viewerId, body.room_number || "", "QUEST_NOT_AVAILABLE")
-            }
-        } else if (!room.value.hostOnline) {
-            data.raising_state = 2
-            console.log(`[MULTI] prepare: host offline, guest polls raising_state → 2`)
+            ),
+            hostOnline: room.value.hostOnline,
+            flow: "prepare",
+        })
+        if (prepareProjection.prepareFailure4507) {
+            // 战斗/结算期间非成员 prepare → A-error 4507（Failure 弹窗）；
+            // 不可回 4——prepare 远端链式 select 解析器对 4 抛 C5001
+            return prepareFailure(reply, viewerId, body.room_number || "", "QUEST_NOT_AVAILABLE")
+        }
+        if (prepareProjection.raisingState !== data.raising_state) {
+            data.raising_state = prepareProjection.raisingState
+            console.log(`[MULTI] prepare: projected raising_state → ${prepareProjection.raisingState}`)
         }
 
         reply.header("content-type", "application/x-msgpack");
@@ -301,11 +302,17 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             ...serializeRoomStatusConnection(room.value, context.tcpEndpoint?.()),
             is_same_room: true,
         };
-        if (viewerId === room.value.host.viewerId) {
-            data.raising_state = room.value.raisingState === 4 ? 2 : 1
-        } else if (!room.value.hostOnline) {
-            data.raising_state = 2
-            console.log(`[MULTI] restore_room: host offline, guest polls raising_state → 2`)
+        // 非成员已在上方 13 门返回；决策表统一收敛在 raising-state-projection。
+        const restoreProjection = projectRaisingStateForViewer({
+            state: room.value.raisingState,
+            isHost: viewerId === room.value.host.viewerId,
+            isMember: true,
+            hostOnline: room.value.hostOnline,
+            flow: "restore",
+        })
+        if (restoreProjection.raisingState !== data.raising_state) {
+            data.raising_state = restoreProjection.raisingState
+            console.log(`[MULTI] restore_room: projected raising_state → ${restoreProjection.raisingState}`)
         }
 
         // 恢复链路补票：原始入场的准入券在首次握手时已被 consume 删除，

@@ -121,3 +121,67 @@ test("room owner keeps the persistable state union exhaustive and typed", () => 
         "updateRoomState must not accept an untyped state",
     )
 })
+
+test("unified raising_state projection decision table (slice 1 step 2)", () => {
+    const { projectRaisingStateForViewer } = require("../src/multi/room/raising-state-projection")
+    const project = overrides => projectRaisingStateForViewer({
+        state: 2, isHost: false, isMember: false, hostOnline: true, flow: "select", ...overrides,
+    })
+
+    // 房主:4→2(等待横幅),其余→1
+    assert.deepEqual(project({ isHost: true, state: 4 }), { raisingState: 2, prepareFailure4507: false })
+    assert.deepEqual(project({ isHost: true, state: 1 }), { raisingState: 1, prepareFailure4507: false })
+    assert.deepEqual(project({ isHost: true, state: 2 }), { raisingState: 1, prepareFailure4507: false })
+
+    // state 4 非房主:select 成员→2 局外人→4;prepare 成员→2 局外人→4507;
+    // restore 成员→4(客户端 restore case 4=Battle 恢复通道)
+    assert.equal(project({ state: 4, isMember: true, flow: "select" }).raisingState, 2)
+    assert.equal(project({ state: 4, isMember: false, flow: "select" }).raisingState, 4)
+    assert.equal(project({ state: 4, isMember: true, flow: "prepare" }).raisingState, 2)
+    assert.deepEqual(project({ state: 4, isMember: false, flow: "prepare" }), {
+        raisingState: 4, prepareFailure4507: true,
+    })
+    assert.equal(project({ state: 4, isMember: true, flow: "restore" }).raisingState, 4)
+
+    // 房主离线未开战→2;其余透传(异节点注册值原样)
+    assert.equal(project({ hostOnline: false }).raisingState, 2)
+    assert.equal(project({ state: 1 }).raisingState, 1)
+    assert.equal(project({ state: 9 }).raisingState, 9)
+
+    // 列表流:无 viewer 上下文,4 直通(不按离线投影成 2)、离线→2、透传
+    assert.equal(project({ state: 4, flow: "list" }).raisingState, 4)
+    assert.equal(project({ hostOnline: false, flow: "list" }).raisingState, 2)
+    assert.equal(project({ state: 1, flow: "list" }).raisingState, 1)
+})
+
+test("projection parity locks (dual-review P1/P2): restore offline-first and falsified-assertion guard", () => {
+    const { projectRaisingStateForViewer } = require("../src/multi/room/raising-state-projection")
+    const project = overrides => projectRaisingStateForViewer({
+        state: 2, isHost: false, isMember: true, hostOnline: true, flow: "restore", ...overrides,
+    })
+
+    // 双审 P1 锁:restore × state4 × 房主离线 → 2(旧链离线覆盖先于透传)
+    assert.deepEqual(project({ state: 4, hostOnline: false }), {
+        raisingState: 2, prepareFailure4507: false,
+    })
+    // 对照:在线时 restore 成员透传 4(旧链 parity,客户端终态弹窗)
+    assert.deepEqual(project({ state: 4, hostOnline: true }), {
+        raisingState: 4, prepareFailure4507: false,
+    })
+    // restore 非战斗离线 → 2
+    assert.equal(project({ state: 1, hostOnline: false }).raisingState, 2)
+    // select/prepare × state4 × 离线:state4 分支先于离线(顺序锁)
+    assert.equal(project({ state: 4, isMember: true, flow: "select", hostOnline: false }).raisingState, 2)
+    assert.equal(project({ state: 4, isMember: false, flow: "select", hostOnline: false }).raisingState, 4)
+    assert.deepEqual(project({ state: 4, isMember: false, flow: "prepare", hostOnline: false }), {
+        raisingState: 4, prepareFailure4507: true,
+    })
+    // 房主 × state 9/13 → 1(房主分支不透传非 4 值)
+    assert.equal(project({ isHost: true, state: 9 }).raisingState, 1)
+    assert.equal(project({ isHost: true, state: 13 }).raisingState, 1)
+    // state 13 非房主透传;输出冻结
+    assert.equal(project({ state: 13 }).raisingState, 13)
+    assert.ok(Object.isFrozen(project({ state: 4 })))
+    // list 流离线时 prepareFailure4507 恒 false
+    assert.equal(project({ hostOnline: false, flow: "list" }).prepareFailure4507, false)
+})

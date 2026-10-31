@@ -16,6 +16,7 @@ import { getSharedFollowRelationAsync } from "../../data/domains/social-follow"
 import { parseEstablisherSnapshot } from "../../data/domains/attention"
 import { resolveBattlePartyLeaderCharacterIdSync } from "../../lib/battle-party-leader"
 import { projectLobbyRaisingState } from "../room/lobby-projection"
+import { projectRaisingStateForViewer } from "../room/raising-state-projection"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
@@ -316,20 +317,20 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
         //   select 解析器对 4 抛 C5001（mac-c 实测）。
         // - 非成员（房间号直进的局外人）→ 4 已开战弹窗（立即明确）。
         // 房主返回房间经 prepare 路径释放状态（R-6）。
-        if (viewerId === room.value.host.viewerId) {
-            // 4→1 只在最后一个 finish 后；房主提前返回时给 2，客户端 3s×5 重试。
-            selectData.raising_state = room.value.raisingState === 4 ? 2 : 1
-            console.log(`[MULTI] select_room: host override raising_state → ${selectData.raising_state}`)
-        } else if (room.value.raisingState === 4) {
-            const isMember = room.value.members.some(
+        // 决策表统一收敛在 raising-state-projection（切片 1 第②步）：
+        // 房主 4?2:1 / state4 成员→2 局外人→4 / 房主离线→2 / 其余透传。
+        const selectProjection = projectRaisingStateForViewer({
+            state: room.value.raisingState,
+            isHost: viewerId === room.value.host.viewerId,
+            isMember: room.value.members.some(
                 member => member.viewerId === viewerId,
-            )
-            selectData.raising_state = isMember ? 2 : 4
-            console.log(`[MULTI] select_room: room in battle → state=${selectData.raising_state}`
-                + ` member=${isMember}`)
-        } else if (!room.value.hostOnline) {
-            selectData.raising_state = 2
-            console.log(`[MULTI] select_room: host offline, guest polls raising_state → 2`)
+            ),
+            hostOnline: room.value.hostOnline,
+            flow: "select",
+        })
+        if (selectProjection.raisingState !== selectData.raising_state) {
+            selectData.raising_state = selectProjection.raisingState
+            console.log(`[MULTI] select_room: projected raising_state → ${selectProjection.raisingState}`)
         }
 
         console.log(`[MULTI] select_room served room=${room.value.roomNumber}`

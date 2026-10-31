@@ -1,5 +1,6 @@
 import { getRoom } from "./manager"
 import { sessionManager } from "../state/SessionManager"
+import { projectRaisingStateForViewer } from "./raising-state-projection"
 
 /**
  * 大厅条目 raising_state 投影（F2）：本节点房间以活房间状态为权威，房主
@@ -11,6 +12,8 @@ import { sessionManager } from "../state/SessionManager"
  *
  * 放在 multi/room 而非 http 路由文件：路由层依赖注入的 coordinator，
  * 不直接触全局 room manager（multi_room_identity 架构契约）。
+ * 决策表统一收敛在 raising-state-projection（切片 1 第②步）；本函数只负责
+ * 本节点房间解析与 hostOnline 的活 socket 判定来源。
  */
 export function projectLobbyRaisingState(
     roomNumber: string,
@@ -19,7 +22,11 @@ export function projectLobbyRaisingState(
 ): number {
     const room = getRoom(roomNumber)
     if (!room) return registryState
-    if (room.raising_state === 4) return 4
-    if (!sessionManager.isUniqueRoomViewerOnline(hostViewerId, roomNumber)) return 2
-    return room.raising_state
+    return projectRaisingStateForViewer({
+        state: room.raising_state,
+        isHost: false,
+        isMember: false,
+        hostOnline: sessionManager.isUniqueRoomViewerOnline(hostViewerId, roomNumber),
+        flow: "list",
+    }).raisingState
 }
