@@ -856,7 +856,8 @@ test("rematch slot reconciliation rejects a pending recruitment from the previou
     )
 })
 
-test("rematch recruitment preserves a disconnected authoritative real-player seat", async t => {
+// [2a1/2a2 语义迁移 skip] 前提废除:内核只认票(seats∪joiners),无票成员不预约座位(D8 票先占座);重连走完整入场
+test.skip("rematch recruitment preserves a disconnected authoritative real-player seat", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 526)
     addRoomMember(room.room_number, { nodeSessionId: "embedded", viewerId: 626 })
@@ -918,7 +919,8 @@ test("a disconnected guest frees its seat immediately for the rematch fill", asy
     )
 })
 
-test("rematch NPC recruitment syncs the committed roster to every entered real client", async t => {
+// [2a1/2a2 语义迁移 skip] 同步机制已由 rebuild 0ms 广播任务(2a2.3)承载;restore 即时回房无 500/2000 定时器;2b 重估
+test.skip("rematch NPC recruitment syncs the committed roster to every entered real client", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 534, [634, 635])
     const survivingGuest = guests[0]
@@ -1133,7 +1135,8 @@ test("a released guest TCP cannot re-enter and displace an authoritative NPC", a
     ])
 })
 
-test("a superseded rematch recruitment timer cannot occupy lobby slots", async t => {
+// [2a1/2a2 语义迁移 skip] 500ms rematch 定时器已删除(2a2 restore 即时回房);双重入幂等由已在座跳过守卫覆盖;2b 重估
+test.skip("a superseded rematch recruitment timer cannot occupy lobby slots", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 527)
     room.npc_count = 2
@@ -1188,7 +1191,8 @@ test("first EnterComs assigns one stable roster synchronously before recruitment
     await flushPromises()
 })
 
-test("a guest entering while recruitment awaits survives the current NPC commit", async t => {
+// [2a1/2a2 语义迁移 skip] 提交幸存不变量已由 T-794(挂起招募世代守卫拒绝)与 pending-joiner 占座语义覆盖;原断言锁旧双 NPC 补满,2b 重估
+test.skip("a guest entering while recruitment awaits survives the current NPC commit", async t => {
     startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 516)
     room.npc_count = 2
@@ -1231,7 +1235,8 @@ test("a guest entering while recruitment awaits survives the current NPC commit"
     ])
 })
 
-test("repeated EnterComs only lets the latest recruitment timers broadcast", async t => {
+// [2a1/2a2 语义迁移 skip] 最新代次独占广播已由世代守卫(T-794/T-987:旧 commit 被拒)覆盖;原断言锁双提交并存,新模型后到者代次失效
+test.skip("repeated EnterComs only lets the latest recruitment timers broadcast", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 517)
     host.client.enterData = { party: {} }
@@ -1296,7 +1301,8 @@ test("repeated EnterComs only lets the latest recruitment timers broadcast", asy
     )
 })
 
-test("a full real-player room strips existing NPCs before skipping recruitment", async t => {
+// [2a1/2a2 语义迁移 skip] D8 废除挤位:已入座 NPC 不被等待真人替换,名单保持 host+2NPC(新覆盖=npc 座位测试+rebuild 重建分支);2b 迁移时重估
+test.skip("a full real-player room strips existing NPCs before skipping recruitment", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 520)
     room.npc_count = 2
@@ -1412,7 +1418,8 @@ test("a fourth real guest cannot expand an already full real-player lobby", asyn
     ])
 })
 
-test("a pending newer EnterComs request does not invalidate committed NPC timers", async t => {
+// [2a1/2a2 语义迁移 skip] 定时器幸存不变量待 2b 统一清理调度器时重估(新调度器归属 2d);世代守卫已由 T-794/T-987 覆盖
+test.skip("a pending newer EnterComs request does not invalidate committed NPC timers", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 523)
     host.client.enterData = { party: {} }
@@ -1509,7 +1516,8 @@ test("a late older recruitment cannot overwrite a newer committed response", asy
     assert.equal(timers.length, 2)
 })
 
-test("a stale Ready timer skips an NPC removed by a newly entered guest", async t => {
+// [2a1/2a2 语义迁移 skip] 前提废除:NPC 不再被真人挤掉(D8),仅虚拟 admit 被拒时销毁;ready 广播对全部已入座 NPC(见 rebuild ready 任务)
+test.skip("a stale Ready timer skips an NPC removed by a newly entered guest", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 518)
     room.npc_count = 2
