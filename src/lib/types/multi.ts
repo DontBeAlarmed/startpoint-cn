@@ -41,6 +41,8 @@ export interface RoomNpcAssignment {
     name: string
     /** 2c.1:招募发布分配的投影 viewerId(9xx 段);缺省=合成 900000000+com_id */
     viewer_id?: number
+    /** 2c.2:NPC 就绪状态(投影权威,跨重建持久;补位倒计时任务/续战回房置位) */
+    ready?: boolean
 }
 
 export interface MultiRoomParticipant {

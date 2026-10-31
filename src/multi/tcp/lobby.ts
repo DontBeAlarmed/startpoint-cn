@@ -190,7 +190,7 @@ function limitLobbyMates(mates: any[], hostViewerId: number): any[] {
     return [...realMates, ...npcMates]
 }
 
-function commitRoomMates(client: SessionClient, room: MultiRoom, mates: any[]): void {
+export function commitRoomMates(client: SessionClient, room: MultiRoom, mates: any[]): void {
     client.mates = mates
     const hostClient = findHostClient(client.roomNumber)
     if (hostClient) hostClient.mates = client.mates
@@ -282,7 +282,7 @@ function checkAllReadyAndStart(roomNumber: string): void {
  * 尚未入座)按 joiner 序追尾。真机回归的排序问题([房主|B|NPC] 应为
  * [房主|NPC|B])即由本函数统一:任何重建/合并路径不得再自行排序。
  */
-function projectRoomMatesFromKernel(roomNumber: string, forClient: SessionClient): any[] {
+export function projectRoomMatesFromKernel(roomNumber: string, forClient: SessionClient): any[] {
     const room = getRoom(roomNumber)
     if (!room) return forClient.mates
     const state = lifecycleRegistry.get(roomNumber)
@@ -296,12 +296,8 @@ function projectRoomMatesFromKernel(roomNumber: string, forClient: SessionClient
             const comId = Number(identity.slice("npc:".length + roomNumber.length + 1))
             const assignment = room.npc_roster.find(candidate => candidate.com_id === comId)
             if (assignment) {
-                const mate = buildNpcLobbyMate(forClient, roomNumber, assignment)
-                // 2c.2:重建不重置 NPC 的准备状态——沿用既有投影条目的 state
-                // (重建前 NPC 已 ready 则保持 ready;真机:B 重入致 NPC 取消准备)
-                const prior = forClient.mates.find(candidate => candidate.connectionId === mate.connectionId)
-                if (prior?.state !== undefined) mate.state = prior.state
-                projected.push(mate)
+                // 2c.2:ready 权威在 roster(assignment.ready),重建天然保持
+                projected.push(buildNpcLobbyMate(forClient, roomNumber, assignment))
             }
             continue
         }
@@ -334,7 +330,7 @@ function projectRoomMatesFromKernel(roomNumber: string, forClient: SessionClient
 function buildNpcLobbyMate(
     client: SessionClient,
     roomNumber: string,
-    assignment: { com_id: number, name: string, viewer_id?: number },
+    assignment: { com_id: number, name: string, viewer_id?: number, ready?: boolean },
     recruitedViewerId?: number,
 ): any {
     const hostMate = client.yourself ?? client.mates[0]
@@ -359,7 +355,7 @@ function buildNpcLobbyMate(
         skillAbilityBehaviorMode: 1,
         dashBehaviorMode: 1,
         allowHealFromOtherPlayers: true,
-        state: [0],
+        state: [assignment.ready ? 1 : 0],
         entryTime: getRealNowMs(),
         isNewbie: false,
         isHost: false,
@@ -600,6 +596,8 @@ export async function handleEnterComs(
             )
             for (const npc of currentNpcMates) {
                 npc.state = [1]
+                const assignment = room.npc_roster.find(candidate => candidate.com_id === npc.comId)
+                if (assignment) assignment.ready = true
                 sessionManager.broadcastToRoom(client.roomNumber, [1, [2, npc.connectionId, [1]]])
             }
             if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)

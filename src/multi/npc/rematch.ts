@@ -29,6 +29,7 @@ export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
     if (!rematchEnabled) return
     const state = lifecycleRegistry.get(roomNumber)
     if (!state || state.phase !== "ready") return
+    let seatedCount = 0
     for (const assignment of [...room.npc_roster] as RoomNpcAssignment[]) {
         const identity = npcIdentityOf(roomNumber, assignment.com_id)
         if (state.seats.includes(identity)) continue
@@ -48,5 +49,22 @@ export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
             continue
         }
         assignment.viewer_id = assignment.viewer_id ?? (900000000 + assignment.com_id)
+        assignment.ready = true
+        seatedCount += 1
     }
+    if (seatedCount === 0) return
+    // NPC 续战回房即就绪(与玩家开续战自动准备一致):翻转投影 + auto-ready。
+    // lobby 内部函数经惰性 require 引入(本模块被 embedded 持有,避免加载环)。
+    const lobby = require("../tcp/lobby") as typeof import("../tcp/lobby")
+    const { sessionManager } = require("../state/SessionManager") as typeof import("../state/SessionManager")
+    const hostClient = sessionManager.getRoomHostClient(roomNumber)
+    if (!hostClient) return
+    const projected = lobby.projectRoomMatesFromKernel(roomNumber, hostClient)
+    hostClient.mates = projected
+    room.mates = projected.map(mate => ({ viewer_id: mate.viewerId ?? null, com_id: mate.comId ?? 0 }))
+    for (const mate of projected) {
+        if (!mate.comId) continue
+        sessionManager.broadcastToRoom(roomNumber, [1, [2, mate.connectionId, [1]]])
+    }
+    lobby.checkHostAutoReady(roomNumber)
 }
