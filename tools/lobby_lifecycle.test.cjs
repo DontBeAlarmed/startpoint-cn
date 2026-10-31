@@ -1831,3 +1831,34 @@ test.skip("restore path does not grow the roster for absent members (device 2a r
     }))
     assert.equal(decision.rejected, undefined)
 })
+
+test("probe: B leave preserves the seated NPC ready state server-side", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host, guests } = createLobbyRoom(t, 545, [645])
+    const guest = guests[0]
+    room.npc_count = 1
+    room.npc_roster = [{ com_id: 1, name: "探针甲" }]
+    stubRecruitment(t, [{ viewer_id: 990000001, com_id: 1 }])
+
+    handleMessage(host.socket, [0, [10, []]])
+    await flushPromises()
+    // 可见节奏:填充后 NPC 未准备(出现态)
+    const npcAtFill = host.client.mates.find(mate => mate.comId)
+    assert.ok(npcAtFill, "NPC 在名单")
+    assert.equal(npcAtFill.state?.[0], 0, "填充后 NPC 未准备(出现态)")
+
+    // 500ms ready 任务:翻转为准备态(roster 置位)
+    const readyTask = timers.find(timer => timer.delayMs === 2_500)
+    assert.ok(readyTask)
+    readyTask.callback()
+    await flushPromises()
+    const npcReady = host.client.mates.find(mate => mate.comId)
+    assert.equal(npcReady.state?.[0], 1, "500ms 后翻转 ready")
+    assert.equal(room.npc_roster[0].ready, true, "roster 权威置位")
+
+    handleSocketDisconnect(guest.socket)
+    await flushPromises()
+    const npcAfter = host.client.mates.find(mate => mate.comId)
+    assert.ok(npcAfter, "B 离开后 NPC 仍在名单")
+    assert.equal(npcAfter.state?.[0], 1, "B 离开后 NPC 准备态保持")
+})

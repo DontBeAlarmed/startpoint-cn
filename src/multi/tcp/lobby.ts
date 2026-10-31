@@ -588,13 +588,20 @@ export async function handleEnterComs(
             if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
             const currentHostClient = findHostClient(client.roomNumber)
             if (!currentHostClient) return
-            // ①只有准备状态:NPC 入座即 ready([1] 随投影)——500ms 时点
-            // =进场剧场到自动开战的固定间隔(让 NPC 玩家看起来更像真人
-            // 玩家,维护者裁定保留)。本任务职责=把 ready 帧补发给客户端
-            // (客户端成员对象的准备态由 [2] 帧驱动,仅靠名单 state 不刷
-            // 新 UI)+auto-ready 检查。
-            for (const npc of currentHostClient.mates) {
-                if (!npc.comId) continue
+            // ①NPC 可见节奏=真人:出现(未准备)→ 500ms 后自动准备
+            // (assignment.ready 置位→投影 [1])+ [2] ready 帧(客户端成员
+            // 对象的准备态由 [2] 帧驱动)+auto-ready 检查(500ms 时点=
+            // 进场剧场到自动开战的固定间隔,让 NPC 玩家看起来更像真人玩家)
+            const recruitedNpcKeys = new Set(npcMates.map(npc =>
+                `${npc.comId}:${npc.viewerId}:${npc.connectionId}`
+            ))
+            const currentNpcMates = currentHostClient.mates.filter(npc =>
+                recruitedNpcKeys.has(`${npc.comId}:${npc.viewerId}:${npc.connectionId}`)
+            )
+            for (const npc of currentNpcMates) {
+                npc.state = [1]
+                const assignment = room.npc_roster.find(candidate => candidate.com_id === npc.comId)
+                if (assignment) assignment.ready = true
                 sessionManager.broadcastToRoom(client.roomNumber, [1, [2, npc.connectionId, [1]]])
             }
             if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
