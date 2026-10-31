@@ -7,6 +7,7 @@ const test = require("node:test")
 require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { sessionManager } = require("../src/multi/state/SessionManager")
+const { lifecycleRegistry } = require("../src/multi/lifecycle")
 const {
     addRoomMember,
     createRoom,
@@ -107,6 +108,16 @@ function createLobbyClient(room, viewerId, connectionId, nodeSessionId = "embedd
     client.mates = [client.yourself]
     sessionManager.addClientToRoom(client)
     addRoomMember(room.room_number, client.participant)
+    // 2a1/2a2:夹具对齐生产——生产环境每个 TCP client 都经握手在内核留有
+    // joiner 记录(票先占座)。夹具直建 client 会绕过内核,让 NPC 抢走
+    // 实际已被真人占用的名额。房主已在内核座位(admit 拒绝无害,忽略)。
+    const identity = `viewer:${viewerId}`
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "admit", generation, identity,
+    }))
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "handshake", generation, identity,
+    }))
     return { client, socket }
 }
 
@@ -560,27 +571,35 @@ test("an async lobby timer callback cannot mutate state after its generation sto
         disbandRoom(room.room_number)
     })
 
-    const recruitment = deferred()
+    // 2a2:EnterComs 直接提交(provider 即时 resolve),挂 joinDelay(2000)
+    // 广播与 npc ready(2500)两个定时器;世代停止后回调不得改状态。
+    room.npc_roster = [
+        { com_id: 1, name: "世代甲" },
+        { com_id: 2, name: "世代乙" },
+    ]
     const originalOnRecruit = NpcMateProvider.prototype.onRecruit
-    NpcMateProvider.prototype.onRecruit = () => recruitment.promise
+    NpcMateProvider.prototype.onRecruit = () => Promise.resolve({
+        recruitedMates: [
+            { viewer_id: 900000001, com_id: 1 },
+            { viewer_id: 900000002, com_id: 2 },
+        ],
+    })
     try {
-        handleMessage(socket, [0, [0, { party: {} }]])
-        assert.equal(timers.length, 1)
-        timers[0].callback()
+        handleMessage(socket, [0, [10, []]])
         await new Promise(resolve => setImmediate(resolve))
+        assert.equal(timers.length, 2)
+        const matesAfterCommit = client.mates.length
+        assert.equal(matesAfterCommit, 3)
 
         stopLobbyLifecycle()
         startLobbyLifecycle()
-        recruitment.resolve({
-            recruitedMates: [
-                { viewer_id: 900000001, com_id: 1 },
-                { viewer_id: 900000002, com_id: 2 },
-            ],
-        })
+        timers[0].callback()
+        timers[1].callback()
         await new Promise(resolve => setImmediate(resolve))
 
-        assert.equal(client.mates.length, 1)
-        assert.equal(timers.length, 1)
+        // 世代已停止:旧定时器回调不得再改任何状态
+        assert.equal(client.mates.length, matesAfterCommit)
+        assert.equal(timers.length, 2)
     } finally {
         NpcMateProvider.prototype.onRecruit = originalOnRecruit
     }
@@ -768,11 +787,11 @@ test("automatic rematch recruitment restores contributor names without hardcoded
         { viewer_id: 960000002, com_id: 2 },
     ])
 
+    // 2a2:续战回房走 restore 路径(即时虚拟回房,joinDelay 0),无 500ms
+    // 招募定时器——定时器只剩 npc ready(500)
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    assert.equal(timers.length, 1)
-    assert.equal(timers[0].delayMs, 500)
-    timers[0].callback()
     await flushPromises()
+    assert.deepEqual(timers.map(timer => timer.delayMs), [0, 500])
 
     assert.deepEqual(
         host.client.mates.filter(mate => mate.comId).map(mate => mate.name),
@@ -806,9 +825,19 @@ test("rematch slot reconciliation rejects a pending recruitment from the previou
     handleMessage(host.socket, [0, [10, []]])
     assert.equal(recruitCalls, 1)
 
+    // 2a2:房主重入走 restore 即时招募(新请求代次),挂起的旧招募延迟
+    // resolve 后其提交必须被世代守卫拒绝
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    assert.equal(timers.length, 1)
-    assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [525])
+    await flushPromises()
+    assert.equal(recruitCalls, 2)
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 525, comId: 0 },
+            { viewerId: 961000001, comId: 1 },
+            { viewerId: 961000002, comId: 2 },
+        ],
+    )
 
     previousRecruitment.resolve({
         recruitedMates: [
@@ -817,11 +846,6 @@ test("rematch slot reconciliation rejects a pending recruitment from the previou
         ],
     })
     await flushPromises()
-    assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [525])
-
-    timers[0].callback()
-    await flushPromises()
-    assert.equal(recruitCalls, 2)
     assert.deepEqual(
         host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
         [
@@ -877,13 +901,12 @@ test("a disconnected guest frees its seat immediately for the rematch fill", asy
 
     assert.equal(handleSocketDisconnect(guest.socket), true)
     assert.equal(isRoomMember(room, guest.client.participant), false)
+    // 2a2:客机断线只重算真人,无自动补 NPC 定时器
+    assert.equal(timers.filter(timer => timer.delayMs === 500).length, 0)
 
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    const rematchTimer = timers.find(timer => timer.delayMs === 500)
-    assert.ok(rematchTimer)
-    rematchTimer.callback()
     await flushPromises()
-
+    // 房主重入 → restore 即时虚拟回房(空位先到先得,无 500ms 招募定时器)
     assert.equal(getRecruitCalls(), 1)
     assert.deepEqual(
         host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
@@ -969,8 +992,14 @@ test("a disconnected guest's seat is free before the rematch recruitment", async
     assert.equal(isRoomMember(room, guest.client.participant), false)
     assert.equal(timers.filter(timer => timer.delayMs === 500).length, 0)
 
+    // 2a2:roster 为空(无存活招募代)→ 房主重入不自动招募、无任何 NPC 定时器
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    assert.equal(timers.filter(timer => timer.delayMs === 500).length, 1)
+    await flushPromises()
+    assert.equal(timers.filter(timer => timer.delayMs === 500).length, 0)
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [{ viewerId: 530, comId: 0 }],
+    )
 })
 
 test("a previous-round host Enter cannot authorize the next rematch generation", async t => {
@@ -987,35 +1016,48 @@ test("a previous-round host Enter cannot authorize the next rematch generation",
         { viewer_id: 967000002, com_id: 2 },
     ])
 
+    // 2a2:第一代 restore 即时招募(provider 挂起),开战→结算→房主重入,
+    // 第二代 restore 用新请求代次招募;第一代挂起的 resolve 被世代守卫拒绝
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    assert.equal(timers.filter(timer => timer.delayMs === 500).length, 1)
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 1)
     handleMessage(host.socket, [0, [6]])
     assert.equal(room.raising_state, 4)
+
+    // 内核真路 4→1:全员 finish → hostReturn(applyHostReturn 释放 NPC 座位)
+    const battleState = lifecycleRegistry.get(room.room_number)
+    assert.equal(battleState.phase, "battle")
+    for (const identity of battleState.battleParticipants) {
+        lifecycleRegistry.dispatch(room.room_number, generation => ({
+            type: "finish", generation, identity, nowMs: 2_500,
+            battleDeadlineMs: 900_000, battleSessionId: battleState.battleSessionId,
+        }))
+    }
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "hostReturn", generation, identity: "viewer:532", nowMs: 2_600,
+    }))
 
     // 释放（R-6 新模型：结算即清非房主座位）→ host 立即重进（正常重赛）
     updateRoomState(room.room_number, 1)
     assert.equal(isRoomMember(room, guest.client.participant), false,
         "R-6：结算释放非房主座位，客机座位随结算清空")
     handleMessage(host.socket, [0, [0, { party: {} }]])
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 2, "重赛 Enter 按当前世代招募")
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 532, comId: 0 },
+            { viewerId: 967000001, comId: 1 },
+            { viewerId: 967000002, comId: 2 },
+        ],
+    )
 
     // guest 断线：座位已在结算释放，无移除动作、无补位 join
     assert.equal(handleSocketDisconnect(guest.socket), true)
     await new Promise(resolve => setTimeout(resolve, 40))
     assert.equal(isRoomMember(room, guest.client.participant), false)
-
-    // 前一代 Enter 的 NPC join 定时器不得授权新一代招募（世代守卫）
-    // （R-6 下补位 join 不再由 guest 移除触发——结算已清座，重赛 Enter
-    //   的 reconcile 按剩余空位补位）
-    const joinTimers = timers.filter(timer => timer.delayMs === 500)
-    assert.equal(joinTimers.length, 2, "两次 host Enter 各安排一次 NPC join")
-    joinTimers[0].callback()
-    await flushPromises()
-    assert.equal(getRecruitCalls(), 0, "前一代 Enter 不得授权新一代招募")
-
-    // T2（重进 Enter 的挂起 join）是当前世代：招募生效
-    joinTimers[1].callback()
-    await flushPromises()
-    assert.equal(getRecruitCalls(), 1, "重赛 Enter 按当前世代招募")
+    assert.equal(getRecruitCalls(), 2, "guest 断线不触发招募")
 })
 
 test("a released real member with a stale TCP client cannot occupy a rematch seat", async t => {
@@ -1024,6 +1066,10 @@ test("a released real member with a stale TCP client cannot occupy a rematch sea
     const releasedGuest = guests[0]
     addRoomMember(room.room_number, releasedGuest.client.participant)
     assert.equal(removeRoomMember(room.room_number, releasedGuest.client.participant), true)
+    // 成员移除伴随内核 socketLost(joiner 清理)——生产由 TCP 关闭触发
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "socketLost", generation, identity: `viewer:${releasedGuest.client.viewerId}`,
+    }))
     room.npc_count = 2
     room.npc_roster = [
         { com_id: 1, name: "权威甲" },
@@ -1034,10 +1080,8 @@ test("a released real member with a stale TCP client cannot occupy a rematch sea
         { viewer_id: 965000002, com_id: 2 },
     ])
 
+    // 2a2:restore 即时虚拟回房——released 成员在内核无预约,不占位
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    const rematchTimer = timers.find(timer => timer.delayMs === 500)
-    assert.ok(rematchTimer)
-    rematchTimer.callback()
     await flushPromises()
 
     assert.deepEqual(
@@ -1055,6 +1099,9 @@ test("a released guest TCP cannot re-enter and displace an authoritative NPC", a
     const { room, host, guests } = createLobbyRoom(t, 531, [631])
     const releasedGuest = guests[0]
     assert.equal(removeRoomMember(room.room_number, releasedGuest.client.participant), true)
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "socketLost", generation, identity: `viewer:${releasedGuest.client.viewerId}`,
+    }))
     room.npc_count = 2
     room.npc_roster = [
         { com_id: 1, name: "防回流甲" },
@@ -1065,10 +1112,8 @@ test("a released guest TCP cannot re-enter and displace an authoritative NPC", a
         { viewer_id: 966000002, com_id: 2 },
     ])
 
+    // 2a2:restore 即时虚拟回房
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    const rematchTimer = timers.find(timer => timer.delayMs === 500)
-    assert.ok(rematchTimer)
-    rematchTimer.callback()
     await flushPromises()
     const authoritativeMates = host.client.mates.map(mate => ({
         viewerId: mate.viewerId,
@@ -1101,19 +1146,21 @@ test("a superseded rematch recruitment timer cannot occupy lobby slots", async t
         { viewer_id: 963000002, com_id: 2 },
     ])
 
+    // 2a2:两次 host Enter 各触发一次 restore;已入座 NPC 在第二次 restore
+    // 中被"已在座跳过"守卫保留,招募幂等、名单稳定
     handleMessage(host.socket, [0, [0, { party: {} }]])
     handleMessage(host.socket, [0, [0, { party: {} }]])
-    assert.equal(timers.length, 2)
-
-    timers[0].callback()
     await flushPromises()
-    assert.equal(getRecruitCalls(), 0)
-    assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [527])
 
-    timers[1].callback()
-    await flushPromises()
-    assert.equal(getRecruitCalls(), 1)
-    assert.equal(host.client.mates.length, 3)
+    assert.ok(getRecruitCalls() >= 1, "restore 路径发起招募")
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 527, comId: 0 },
+            { viewerId: 963000001, comId: 1 },
+            { viewerId: 963000002, comId: 2 },
+        ],
+    )
 })
 
 test("first EnterComs assigns one stable roster synchronously before recruitment awaits", async t => {
@@ -1504,7 +1551,9 @@ test("a stale Ready timer skips an NPC removed by a newly entered guest", async 
 
 test("active com_id 2 selects the second configured NPC party", async t => {
     startCapturedLobbyLifecycle()
-    const { room, host } = createLobbyRoom(t, 519, [619])
+    // 2a2:无 pending 真人(free=2)——两名 NPC 都入座,com_id→编队映射不变量
+    // (2a1 起 pending 真人票会占一个名额,带 guest 时 com_id 2 不再入座)
+    const { room, host } = createLobbyRoom(t, 519)
     room.npc_count = 2
     room.npc_roster = [
         { com_id: 1, name: "队伍甲" },

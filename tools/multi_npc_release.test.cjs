@@ -42,7 +42,7 @@ const {
 } = require("../src/data/domains/attention")
 const { applyNpcPostFill, scheduleNpcRelease } = require("../src/multi/npc/release")
 const NPC_VIEWER_FLOOR = 900000000
-const { handleEnterComs, handleSocketDisconnect } = require("../src/multi/tcp/lobby")
+const { handleEnterComs, handleSocketDisconnect, handleMessage: handleLobbyMessage } = require("../src/multi/tcp/lobby")
 const { isBellDeliveryEligible } = require("../src/multi/bell-gate")
 const { QuestCategory } = require("../src/lib/types")
 const roomManager = require("../src/multi/room/manager")
@@ -382,11 +382,12 @@ test("一场一换：清零后回房/reconcile 不复活 NPC，仅重开招募�
     live.mates = [{ viewer_id: hostViewer, com_id: 0 }]
     const lifecycle = require("../src/multi/tcp/lobby-lifecycle").getLobbyLifecycleGuard()
 
-    // 回房/rematch reconcile 路径：npc_count=0 → getAvailableNpcSlotCount=0 → 不触发 EnterComs
-    const { reconcileRematchSlots } = require("../src/multi/tcp/lobby")
-    reconcileRematchSlots(host, live)
+    // 2a2:回房(房主 TCP Enter)——roster 空 = 无存活招募代,restore 闸门
+    // 关闭,不自动招募、不复活 NPC(原 reconcileRematchSlots 自动补位按
+    // D8 触发矩阵删除:guest 断线/回房不新增)
+    handleLobbyMessage(host.socket, [0, [0, { party: {} }]])
     await wait(300)
-    assert.equal(npcCount(host.mates), 0, "回房 reconcile 不得复活 NPC")
+    assert.equal(npcCount(host.mates), 0, "回房不得复活 NPC")
     assert.equal(live.npc_count, 0)
 
     // 重新开启招募（summon/注入路径的 EnterComs）→ 才补齐

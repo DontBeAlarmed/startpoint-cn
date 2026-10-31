@@ -176,8 +176,10 @@ function getAvailableNpcSlotCount(room: MultiRoom, realMates: any[]): number {
 // npc_count→0 + 过滤 com_id>0）。因此 npc_count>0 且 room.mates 残留 com_id>0 投影
 // ⇒ 自上次招募提交后未开战，此刻的 host Enter 是重连恢复而非 rematch。
 function hasLiveNpcRecruitment(room: MultiRoom): boolean {
-    return room.npc_count > 0
-        && room.mates.some(mate => (mate.com_id ?? 0) > 0)
+    // 2a2:招募代存活改读 roster——rematch ON 时 4→1 不清 roster,房主重入
+    // 走 restore 虚拟回房(joinDelay 0,不重演招募剧场);rematch OFF 清空后
+    // 为 false,不自动重演招募(招募只由房主主动发起)。
+    return room.npc_roster.length > 0 && room.npc_count > 0
 }
 
 function limitLobbyMates(mates: any[], hostViewerId: number): any[] {
@@ -198,17 +200,6 @@ function commitRoomMates(client: SessionClient, room: MultiRoom, mates: any[]): 
     if (hostClient) hostClient.mates = client.mates
     room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
     syncShareRow(room.room_number)
-}
-
-export function reconcileRematchSlots(client: SessionClient, room: MultiRoom): void {
-    const revision = advanceRecruitmentGeneration(room)
-    const realMates = getConnectedRealMates(client, room)
-    commitRoomMates(client, room, realMates)
-    if (revision === null || getAvailableNpcSlotCount(room, realMates) <= 0) return
-    scheduleLobbyTask(lifecycle => {
-        if (!isCommittedRecruitment(client.roomNumber, room, revision)) return
-        handleEnterComs(client, lifecycle).catch(() => console.error("[LOBBY] EnterComs timer failed"))
-    }, 500)
 }
 
 export function checkHostAutoReady(roomNumber: string): void {
@@ -337,8 +328,22 @@ export async function handleEnterComs(
 
     // Real players may enter while the provider is pending. Rebuild from current room state.
     const currentRealMates = getConnectedRealMates(client, room)
-    const activeCount = getAvailableNpcSlotCount(room, currentRealMates)
-    const assignments = getActiveNpcRoster(room, activeCount)
+    // 2a1.2/2a2:名单重建必须包含"已入座"的 roster 条目(restore/重入时
+    // free=0 但 NPC 已在座——只按空位取会清掉 mates 里的 NPC);新 admits
+    // 只补 free 名额,已在座者直接保留。
+    const kernelStateNow = lifecycleRegistry.get(client.roomNumber)
+    const seatedNow: typeof room.npc_roster = []
+    const unseated: typeof room.npc_roster = []
+    for (const assignment of room.npc_roster) {
+        const npcIdentity = npcIdentityOf(client.roomNumber, assignment.com_id)
+        if (kernelStateNow !== undefined && kernelStateNow.seats.includes(npcIdentity)) {
+            seatedNow.push(assignment)
+        } else {
+            unseated.push(assignment)
+        }
+    }
+    const freeSlots = getAvailableNpcSlotCount(room, currentRealMates)
+    const assignments = [...seatedNow, ...unseated.slice(0, freeSlots)]
 
     // 2a1.2：NPC 以占座参与者身份走与真人相同的 admit→handshake→enter 流水线
     // （提交点同步三连派发，无 I/O）。admit 被拒=真人先到/满员 → 抢输销毁：
@@ -346,6 +351,12 @@ export async function handleEnterComs(
     const seatedAssignments: typeof assignments = []
     for (const assignment of assignments) {
         const npcIdentity = npcIdentityOf(client.roomNumber, assignment.com_id)
+        // 已在座(restore/重入路径):直接保留,不重复派发
+        const kernelNow = lifecycleRegistry.get(client.roomNumber)
+        if (kernelNow !== undefined && kernelNow.seats.includes(npcIdentity)) {
+            seatedAssignments.push(assignment)
+            continue
+        }
         const admitDecision = lifecycleRegistry.dispatch(client.roomNumber, generation => ({
             type: "admit",
             generation,
@@ -578,14 +589,17 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (isHost) {
         if (room) {
             if (hasLiveNpcRecruitment(room)) {
-                // 重连恢复（切出未开战 → 招募代仍存活）：立即重注入 NPC 并即时广播。
-                // rematch 的 500ms 调度 + joinDelay 广播会把切回后的空房窗拉长到约 2.5s，
-                // 用户感知为"NPC 被清空"——恢复路径不该重演招募剧场。
+                // 2a2 续战/恢复路径（切出未开战或 4→1 后 roster 仍存活）：
+                // 立即虚拟回房已入座 NPC 并即时广播（joinDelay 0,不重演招募
+                // 剧场）。已入座者跳过,空位先到先得,抢输 NPC 销毁。
                 void handleEnterComs(client, getLobbyLifecycleGuard(), { joinBroadcastDelayMs: 0 })
                     .catch(() => console.error("[LOBBY] EnterComs reconnect restore failed"))
-            } else {
-                reconcileRematchSlots(client, room)
             }
+            // 无存活招募代（rematch OFF 清空/从未招募）:不自动重演招募——
+            // 招募只由房主主动发起（D8 触发矩阵:host reconnect 不新增）。
+            // 但房主本人的 mates 投影仍需重建（原 reconcile 的 commit 部分,
+            // 2a2 教训:删函数时把投影提交一起删了→beginBattle realMembers=0）。
+            commitRoomMates(client, room, getConnectedRealMates(client, room))
         }
         if (client.mates.length > 1) {
             sessionManager.broadcastMateListToRoom(client.roomNumber, client.mates, client)
@@ -652,10 +666,9 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
         sessionManager.removeClient(client)
         if (!isHost && client.participant) {
             // 客机宽限已删除：网络断开即释放座位；重连走完整准备/入场。
-            if (removeRoomMember(client.roomNumber, client.participant)) {
-                const hostClient = findHostClient(client.roomNumber)
-                if (hostClient?.enterData && room) reconcileRematchSlots(hostClient, room)
-            }
+            // 2a2:客机断线只重算真人,不自动补 NPC（D8 触发矩阵:guest
+            // disconnect 不新增,除非房主主动重开招募）。
+            removeRoomMember(client.roomNumber, client.participant)
         }
         console.log(`[LOBBY] client disconnected: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
         return
