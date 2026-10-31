@@ -765,6 +765,11 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (!isHost) {
         const mates = hostClient?.mates ?? client.mates
         sessionManager.broadcastMateListToRoom(client.roomNumber, mates)
+    } else {
+        // 2c.2:房主重入(尤其 NPC 续战回房发生在 TCP enter 之前的场景)必须
+        // 给房主自己的新 socket 补发全名单帧——Welcome 是单元素帧,NPC 不会
+        // 出现在房主界面里(真机:房间外 2 人、房内看不到 NPC)
+        sessionManager.sendJson(client.socket, [1, [1, client.mates]])
     }
 
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} entered: room=${client.roomNumber}`)

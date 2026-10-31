@@ -195,7 +195,9 @@ test("a host entering after a guest receives Welcome before excluded mate update
         .filter(message => message[0] === 1 && [0, 1].includes(message[1]?.[0]))
         .map(message => message[1][0])
 
-    assert.deepEqual(hostInitializationTags, [0])
+    // 2c.2:房主初始化=[Welcome, 全名单帧]——重入房间含 NPC/客机时
+    // Welcome(单元素)不完整,房主自己的 socket 也要收名单帧(与客机对称)
+    assert.deepEqual(hostInitializationTags, [0, 1])
     assert.deepEqual(guestInitializationTags, [0, 1])
 })
 
