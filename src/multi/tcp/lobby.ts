@@ -318,7 +318,7 @@ function buildNpcLobbyMate(
 export async function handleEnterComs(
     client: SessionClient,
     lifecycle: LobbyLifecycleGuard = getLobbyLifecycleGuard(),
-    options: { joinBroadcastDelayMs?: number } = {},
+    options: { joinBroadcastDelayMs?: number, restore?: boolean } = {},
 ): Promise<void> {
     const room = getRoom(client.roomNumber)
     if (!room) {
@@ -344,9 +344,15 @@ export async function handleEnterComs(
     // 配额在每次招募激活时重算（3 − 当前真人）：上一轮成员变动（离开/加入）后的
     // 缺口在重新开启招募/注入的这一次提交中补齐（用户定案语义，非离开瞬间补位）。
     // 2a1 step 1：内核 setNpcCount 事件已删（容量恒 3，NPC 以占座参与者身份
-    // 经虚拟 admit/enter 入座——step 2 接线）；npc_count 只剩投影兼容字段。
-    room.npc_count = Math.max(0, 3 - initialRealMates.length)
-    ensureNpcRoster(room, room.npc_count)
+    // 经虚拟 admit/enter 入座）；npc_count 只剩投影兼容字段。
+    // 2a2 修复（真机:续战下一场补 2 NPC 把未回房真人挡在门外）：restore 路径
+    // （房主重入自动回填）不重算配额、不扩充 roster——只回填存活 roster
+    // （D8 触发矩阵:host reconnect 恢复已有,不新增）;配额重算属于房主主动
+    // 招募（summon/W/EnterComs 帧）。
+    if (!options.restore) {
+        room.npc_count = Math.max(0, 3 - initialRealMates.length)
+        ensureNpcRoster(room, room.npc_count)
+    }
 
     // 2a2:早退闸门只在"零空位且无已入座 NPC"时跳过——free=0 但 seats 里
     // 有 NPC(restore/重入)仍需重建 mates 投影,否则第二次 EnterComs 会把
@@ -659,7 +665,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
                 // 立即虚拟回房已入座 NPC 并即时广播（joinDelay 0,不重演招募
                 // 剧场）。已入座者跳过,空位先到先得,抢输 NPC 销毁。
                 // 注意:restore 的 rebuild 是同步提交——本分支不得再覆盖投影。
-                void handleEnterComs(client, getLobbyLifecycleGuard(), { joinBroadcastDelayMs: 0 })
+                void handleEnterComs(client, getLobbyLifecycleGuard(), { joinBroadcastDelayMs: 0, restore: true })
                     .catch(() => console.error("[LOBBY] EnterComs reconnect restore failed"))
             } else {
                 // 无存活招募代（rematch OFF 清空/从未招募）:不自动重演招募——

@@ -1751,3 +1751,46 @@ test("battle release keeps the room without a return lease", async t => {
     await new Promise(resolve => setTimeout(resolve, 40))
     assert.equal(getRoom(room.room_number), room, "no 25s lease disbands the room")
 })
+
+test("restore path does not grow the roster for absent members (device 2a regression)", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host, guests } = createLobbyRoom(t, 540, [640])
+    const guest = guests[0]
+    room.npc_count = 1
+    room.npc_roster = [{ com_id: 1, name: "存活甲" }]
+    stubRecruitment(t, [
+        { viewer_id: 970000001, com_id: 1 },
+        { viewer_id: 970000002, com_id: 2 },
+    ])
+
+    // 第一场:1 真+1 NPC 入座
+    handleMessage(host.socket, [0, [10, []]])
+    await flushPromises()
+    assert.equal(host.client.mates.length, 3)
+
+    // 开战 → 客机 socket 关闭(生产:BattleStart 后大厅 socket 关闭)→ 4→1
+    handleMessage(host.socket, [0, [6]])
+    handleSocketDisconnect(guest.socket)
+    updateRoomState(room.room_number, 1)
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+
+    // 房主重入 → restore:只回填存活 roster(1 NPC),不得按"连接真人=1"
+    // 把配额重算成 2 而补进第二名 NPC(把未回房真人挡在门外)
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    await flushPromises()
+
+    assert.equal(room.npc_roster.length, 1, "restore 不扩充 roster")
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 540, comId: 0 },
+            // restore 无招募发布:NPC viewerId 落合成段(仅 serializer 层)
+            { viewerId: 900000001, comId: 1 },
+        ],
+    )
+    // 真人回房仍有座位:内核 free=3-2=1,admit 接纳
+    const decision = lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "admit", generation, identity: "viewer:640",
+    }))
+    assert.equal(decision.rejected, undefined)
+})
