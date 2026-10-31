@@ -3,7 +3,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    deletePlayerEquipmentsByIdsSync, deletePlayerEquipmentSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync,
+    deletePlayerEquipmentsByIdsSync, getPlayerEquipmentsByIdsSync,
     normalizeEquipmentBatchIds, updatePlayerEquipmentStacksToZeroSync, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import { getSession } from "../../data/domains/session";
@@ -150,11 +150,29 @@ const routes = async (fastify: FastifyInstance) => {
 
     // ── sell_equipment (single equipment, all stacks) ──────────────────
     fastify.post("/sell_equipment", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as SellBody
+        if (request.body === null || typeof request.body !== "object" || Array.isArray(request.body)) {
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
+        }
+        const body = request.body as Partial<SellBody>
 
         const viewerId = body.viewer_id
         const toSellEquipmentList = body.equipment_list
-        if (isNaN(viewerId) || !toSellEquipmentList) {
+        if (
+            typeof viewerId !== "number"
+            || !Number.isSafeInteger(viewerId)
+            || viewerId <= 0
+            || !Array.isArray(toSellEquipmentList)
+        ) {
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
+        }
+        const uniqueEquipmentIds = normalizeEquipmentBatchIds(
+            toSellEquipmentList.map(toSell => (
+                toSell !== null && typeof toSell === "object" && !Array.isArray(toSell)
+                    ? toSell.equipment_id
+                    : undefined
+            )),
+        )
+        if (uniqueEquipmentIds === null) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
         }
 
@@ -168,14 +186,10 @@ const routes = async (fastify: FastifyInstance) => {
         let totalCraftPoints = 0
         let totalStarGrains = 0
         const totalAbilitySouls: Record<number, number> = {}
-        const soldIds: number[] = []
-        const seen = new Set<number>()
+        const equipmentSnapshot = getPlayerEquipmentsByIdsSync(playerId, uniqueEquipmentIds)
 
-        for (const toSell of toSellEquipmentList) {
-            const equipmentId = toSell.equipment_id
-            if (seen.has(equipmentId)) continue
-            seen.add(equipmentId)
-            const equipment = getPlayerEquipmentSync(playerId, equipmentId)
+        for (const equipmentId of uniqueEquipmentIds) {
+            const equipment = equipmentSnapshot[equipmentId]
             if (!equipment) {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
             }
@@ -193,14 +207,12 @@ const routes = async (fastify: FastifyInstance) => {
             for (const [soulId, count] of Object.entries(rewards.abilitySouls)) {
                 totalAbilitySouls[parseInt(soulId)] = (totalAbilitySouls[parseInt(soulId)] ?? 0) + count
             }
-
-            soldIds.push(equipmentId)
         }
 
         const rewardSettlement = getDb().transaction(() => {
-            const deleted = deletePlayerEquipmentsByIdsSync(playerId, soldIds)
-            if (deleted !== soldIds.length) {
-                throw new Error(`sell_equipment expected to remove ${soldIds.length} equipment rows, removed ${deleted}`)
+            const deleted = deletePlayerEquipmentsByIdsSync(playerId, uniqueEquipmentIds)
+            if (deleted !== uniqueEquipmentIds.length) {
+                throw new Error(`sell_equipment expected to remove ${uniqueEquipmentIds.length} equipment rows, removed ${deleted}`)
             }
             return grantDissolveRewardsWithinTransactionSync(
                 playerId,

@@ -322,6 +322,33 @@ test("sell_stack aggregates duplicate entries from one requested-equipment snaps
     assert.ok(equipmentById(responseData, UNRELATED_EQUIPMENT))
 })
 
+test("sell_equipment deduplicates entries from one requested-equipment snapshot", async () => {
+    const { playerId, viewerId } = await createPlayer("sell-equipment-dedup")
+    addEquipment(playerId, EQUIPMENT_A, { stack: 2 })
+    addEquipment(playerId, EQUIPMENT_B, { stack: 1 })
+    addEquipment(playerId, UNRELATED_EQUIPMENT, { stack: 0 })
+
+    const { result: response, statements } = await captureSql(() => app.inject({
+        method: "POST",
+        url: "/equipment/sell_equipment",
+        payload: {
+            viewer_id: viewerId,
+            equipment_list: [
+                { equipment_id: EQUIPMENT_A },
+                { equipment_id: EQUIPMENT_A },
+                { equipment_id: EQUIPMENT_B },
+            ],
+        },
+    }))
+
+    const responseData = decodeSuccess(response)
+    assertSingleBatchReadAndFullResponse(statements, 2)
+    assert.equal(equipmentById(responseData, EQUIPMENT_A), undefined)
+    assert.equal(equipmentById(responseData, EQUIPMENT_B), undefined)
+    assert.ok(equipmentById(responseData, UNRELATED_EQUIPMENT))
+    assert.equal(responseData.data.item_list[CRAFT_POINT_ITEM_ID], 7)
+})
+
 test("single equipment upgrade uses lookup rarity for sub-million equipment", async () => {
     const { playerId, viewerId } = await createPlayer("submillion-upgrade")
     addEquipment(playerId, SUBMILLION_EQUIPMENT, { stack: 1 })
@@ -456,7 +483,38 @@ test("sell_stack rejects a missing requested equipment without applying earlier 
     assert.equal(getPlayerItemSync(playerId, CRAFT_POINT_ITEM_ID), null)
 })
 
+test("sell_equipment rejects a missing requested equipment without applying earlier deletions", async () => {
+    const { playerId, viewerId } = await createPlayer("sell-equipment-missing")
+    addEquipment(playerId, EQUIPMENT_A, { stack: 2 })
+
+    const { result: response, statements } = await captureSql(() => app.inject({
+        method: "POST",
+        url: "/equipment/sell_equipment",
+        payload: {
+            viewer_id: viewerId,
+            equipment_list: [
+                { equipment_id: EQUIPMENT_A },
+                { equipment_id: MISSING_EQUIPMENT },
+            ],
+        },
+    }))
+
+    assert.equal(response.statusCode, 400, response.body)
+    assertSingleRejectedBatchRead(statements, 2)
+    assert.equal(getPlayerEquipmentSync(playerId, EQUIPMENT_A).stack, 2)
+    assert.equal(getPlayerItemSync(playerId, CRAFT_POINT_ITEM_ID), null)
+})
+
 for (const scenario of [
+    {
+        name: "sell_equipment",
+        payload: {
+            equipment_list: [
+                { equipment_id: EQUIPMENT_A },
+                { equipment_id: EQUIPMENT_B },
+            ],
+        },
+    },
     {
         name: "sell_stack",
         payload: {
@@ -526,17 +584,21 @@ test("sell_stack rejects duplicate-count overflow before reading inventory", asy
     assert.deepEqual(equipmentSelects(statements), [])
 })
 
-for (const invalidEquipmentId of [0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+for (const invalidEquipmentId of [0, -1, 1.5, "1111001", Number.MAX_SAFE_INTEGER + 1]) {
     for (const scenario of [
         { name: "bulk_upgrade", payload: { equipment_ids: [invalidEquipmentId] } },
+        {
+            name: "sell_equipment",
+            payload: { equipment_list: [{ equipment_id: invalidEquipmentId }] },
+        },
         {
             name: "sell_stack",
             payload: { equipment_list: [{ equipment_id: invalidEquipmentId, number: 1 }] },
         },
         { name: "bulk_sell_stack", payload: { equipment_ids: [invalidEquipmentId] } },
     ]) {
-        test(`${scenario.name} rejects equipment ID ${invalidEquipmentId} before reading inventory`, async () => {
-            const { viewerId } = await createPlayer(`${scenario.name}-invalid-id-${invalidEquipmentId}`)
+        test(`${scenario.name} rejects equipment ID ${JSON.stringify(invalidEquipmentId)} before reading inventory`, async () => {
+            const { viewerId } = await createPlayer(`${scenario.name}-invalid-id-${String(invalidEquipmentId)}`)
 
             const { result: response, statements } = await captureSql(() => app.inject({
                 method: "POST",
@@ -548,6 +610,38 @@ for (const invalidEquipmentId of [0, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
             assert.deepEqual(equipmentSelects(statements), [])
         })
     }
+}
+
+for (const malformedCase of [
+    { label: "array body", payload: [] },
+    { label: "viewer_id=0", payload: { viewer_id: 0, equipment_list: [{ equipment_id: EQUIPMENT_A }] } },
+    { label: "viewer_id=-1", payload: { viewer_id: -1, equipment_list: [{ equipment_id: EQUIPMENT_A }] } },
+    { label: "viewer_id=1.5", payload: { viewer_id: 1.5, equipment_list: [{ equipment_id: EQUIPMENT_A }] } },
+    { label: "string viewer_id", payload: viewerId => ({ viewer_id: String(viewerId), equipment_list: [{ equipment_id: EQUIPMENT_A }] }) },
+    { label: "null viewer_id", payload: { viewer_id: null, equipment_list: [{ equipment_id: EQUIPMENT_A }] } },
+    { label: "object equipment_list", payload: viewerId => ({ viewer_id: viewerId, equipment_list: {} }) },
+    { label: "number equipment_list", payload: viewerId => ({ viewer_id: viewerId, equipment_list: 123 }) },
+    { label: "null list entry", payload: viewerId => ({ viewer_id: viewerId, equipment_list: [null] }) },
+    { label: "missing equipment_id entry", payload: viewerId => ({ viewer_id: viewerId, equipment_list: [{}] }) },
+    { label: "array list entry", payload: viewerId => ({ viewer_id: viewerId, equipment_list: [[EQUIPMENT_A]] }) },
+]) {
+    test(`sell_equipment rejects malformed ${malformedCase.label} before reading inventory`, async () => {
+        const { playerId, viewerId } = await createPlayer(`sell-equipment-malformed-${malformedCase.label}`)
+        addEquipment(playerId, EQUIPMENT_A, { stack: 1 })
+        const payload = typeof malformedCase.payload === "function"
+            ? malformedCase.payload(viewerId)
+            : malformedCase.payload
+
+        const { result: response, statements } = await captureSql(() => app.inject({
+            method: "POST",
+            url: "/equipment/sell_equipment",
+            payload,
+        }))
+
+        assert.equal(response.statusCode, 400, response.body)
+        assert.deepEqual(equipmentSelects(statements), [])
+        assert.equal(getPlayerEquipmentSync(playerId, EQUIPMENT_A).stack, 1)
+    })
 }
 
 for (const scenario of [
