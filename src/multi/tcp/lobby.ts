@@ -295,7 +295,14 @@ function projectRoomMatesFromKernel(roomNumber: string, forClient: SessionClient
             seatNpcIds.add(identity)
             const comId = Number(identity.slice("npc:".length + roomNumber.length + 1))
             const assignment = room.npc_roster.find(candidate => candidate.com_id === comId)
-            if (assignment) projected.push(buildNpcLobbyMate(forClient, roomNumber, assignment))
+            if (assignment) {
+                const mate = buildNpcLobbyMate(forClient, roomNumber, assignment)
+                // 2c.2:重建不重置 NPC 的准备状态——沿用既有投影条目的 state
+                // (重建前 NPC 已 ready 则保持 ready;真机:B 重入致 NPC 取消准备)
+                const prior = forClient.mates.find(candidate => candidate.connectionId === mate.connectionId)
+                if (prior?.state !== undefined) mate.state = prior.state
+                projected.push(mate)
+            }
             continue
         }
         const viewerId = Number(identity.slice("viewer:".length))

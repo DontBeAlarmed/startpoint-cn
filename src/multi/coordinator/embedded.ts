@@ -521,11 +521,15 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 ? battleParticipants
                 : room.member_participants
             room.battle_participants = serving.map(member => ({ ...member }))
-            room.member_participants = room.member_participants.filter(
-                member => member.viewerId === room.host_viewer_id,
-            )
+            // 2c.2:成员名单过滤只在 4→1(updateRoomState 的 R-6)执行——
+            // 战斗结束到房主返回的窗口内 B/C 保持成员身份,他们的 prepare
+            // 命中"成员等待"横幅(等待房主),而非 4507 未满足参加条件
+            //(真机 2026-11-01:三弹框同点的根源)
         }
         reconcileHostReturn(roomNumber)
+        // 2c.2:finish 路径的 4→1 同样触发 NPC 续战回房(与闩锁/resolveRoom
+        // 两处一致;此前漏接=真机"A 先回房内 1 人、B 回时 NPC 才加入"的根因)
+        returnNpcRosterAfterHostReturn(roomNumber)
         return true
     }
 

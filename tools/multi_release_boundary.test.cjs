@@ -53,7 +53,9 @@ test("finalize releases seats and clears the battle runtime but stays Battle", a
     assert.equal(sessionManager.getActiveBattleSessionId(room.room_number), null)
     assert.equal(sessionManager.battleParticipants.has(room.room_number), false)
     assert.equal(sessionManager.battleExpectedCount.has(room.room_number), false)
-    assert.deepEqual(room.member_participants, [HOST], "seats release to the host")
+    // 2c.2:成员过滤移到 4→1(R-6)——释放时成员保持(等待房主窗口,
+    // 真机 2026-11-01:提前过滤曾致 B/C 收到 4507 未满足参加条件)
+    assert.deepEqual(room.member_participants, [HOST, GUEST], "members persist through the release window")
     assert.deepEqual(room.battle_participants, [HOST, GUEST], "serving projection keeps the battle participants")
 
     // state 4 的服务矩阵仍认返回客机为成员；座位释放不改变成员判定。
@@ -79,7 +81,7 @@ test("a guest abort finalizes without 4→1", async t => {
     assert.equal(aborted.ok, true)
     assert.equal(room.raising_state, 4)
     assert.equal(sessionManager.getActiveBattleSessionId(room.room_number), null)
-    assert.deepEqual(room.member_participants, [HOST])
+    assert.deepEqual(room.member_participants, [HOST, GUEST], "2c.2:成员过滤移至 4→1")
 })
 
 test("node-session cleanup keeps Battle", t => {
@@ -90,6 +92,7 @@ test("node-session cleanup keeps Battle", t => {
 
     assert.equal(room.raising_state, 4)
     assert.equal(sessionManager.getActiveBattleSessionId(room.room_number), null)
+    // guest 成员条目由节点会话失效清理移除(独立路径,非释放过滤)
     assert.deepEqual(room.member_participants, [HOST])
 })
 
