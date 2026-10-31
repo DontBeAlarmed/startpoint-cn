@@ -1208,6 +1208,17 @@ export class SessionManager {
         return this.battleFacts.getActiveBattleSessionId(roomNumber)
     }
 
+    /**
+     * 2b:内核已 finalize 的战局事实释放(R-01 同源守卫:active 会话不匹配
+     * 则忽略)。coordinator 路径由 releaseIfFullyFinalized 调用;测试/运维
+     * 直驱内核事件时经此补齐 releaseBattle 前置(facts 空才能 4→1)。
+     */
+    releaseFinishedBattleFacts(roomNumber: string, battleSessionId: string): void {
+        if (this.battleFacts.getActiveBattleSessionId(roomNumber) !== battleSessionId) return
+        this.battleFacts.releaseRoom(roomNumber)
+        this.clearBattleExpectedCount(roomNumber)
+    }
+
     getBattleFactCounts() {
         return this.battleFacts.getCounts()
     }

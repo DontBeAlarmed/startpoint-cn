@@ -39,6 +39,8 @@ export interface MultiMate {
 export interface RoomNpcAssignment {
     com_id: 1 | 2
     name: string
+    /** 2c.1:招募发布分配的投影 viewerId(9xx 段);缺省=合成 900000000+com_id */
+    viewer_id?: number
 }
 
 export interface MultiRoomParticipant {

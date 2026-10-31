@@ -282,15 +282,63 @@ function checkAllReadyAndStart(roomNumber: string): void {
     sessionManager.broadcastToRoom(roomNumber, [1, [10, 2]])
 }
 
+/**
+ * 2c.1:成员投影的唯一排序权威——按内核 seats 序逐身份投影(real→连接
+ * 客户端的 yourself;npc→buildNpcLobbyMate),pending joiner(票先占座、
+ * 尚未入座)按 joiner 序追尾。真机回归的排序问题([房主|B|NPC] 应为
+ * [房主|NPC|B])即由本函数统一:任何重建/合并路径不得再自行排序。
+ */
+function projectRoomMatesFromKernel(roomNumber: string, forClient: SessionClient): any[] {
+    const room = getRoom(roomNumber)
+    if (!room) return forClient.mates
+    const state = lifecycleRegistry.get(roomNumber)
+    if (!state) return forClient.mates
+    const projected: any[] = []
+    const projectedViewers = new Set<number>()
+    const seatNpcIds = new Set<string>()
+    for (const identity of state.seats) {
+        if (identity.startsWith("npc:")) {
+            seatNpcIds.add(identity)
+            const comId = Number(identity.slice("npc:".length + roomNumber.length + 1))
+            const assignment = room.npc_roster.find(candidate => candidate.com_id === comId)
+            if (assignment) projected.push(buildNpcLobbyMate(forClient, roomNumber, assignment))
+            continue
+        }
+        const viewerId = Number(identity.slice("viewer:".length))
+        const member = sessionManager
+            .getClientsInRoom(roomNumber)
+            .find(candidate => candidate.viewerId === viewerId)
+        const yourself = member?.yourself
+        if (yourself) {
+            projected.push(yourself)
+            projectedViewers.add(viewerId)
+        }
+    }
+    for (const identity of Object.keys(state.joiners)) {
+        if (identity.startsWith("npc:") || seatNpcIds.has(identity)) continue
+        if (state.seats.includes(identity)) continue
+        const viewerId = Number(identity.slice("viewer:".length))
+        if (projectedViewers.has(viewerId)) continue
+        const member = sessionManager
+            .getClientsInRoom(roomNumber)
+            .find(candidate => candidate.viewerId === viewerId)
+        if (member?.yourself) {
+            projected.push(member.yourself)
+            projectedViewers.add(viewerId)
+        }
+    }
+    return projected
+}
+
 function buildNpcLobbyMate(
     client: SessionClient,
     roomNumber: string,
-    assignment: { com_id: number, name: string },
+    assignment: { com_id: number, name: string, viewer_id?: number },
     recruitedViewerId?: number,
 ): any {
     const hostMate = client.yourself ?? client.mates[0]
     const comId = assignment.com_id
-    const viewerId = recruitedViewerId ?? (900000000 + comId)
+    const viewerId = recruitedViewerId ?? assignment.viewer_id ?? (900000000 + comId)
     const party = client.npcPartySnapshots[comId - 1]
         ?? client.npcPartySnapshots[0]
         ?? hostMate?.party
@@ -385,9 +433,7 @@ export async function handleEnterComs(
         // 零空位(满员)或无未入座候选(纯重建):不发招募、不排定时器,
         // 投影 = 内核参与者(真人含 pending)+ 已入座 NPC
         commitRecruitmentRequest(room, requestId)
-        commitRoomMates(client, room, [...initialRealParticipants, ...seatedNow.map(
-            assignment => buildNpcLobbyMate(client, client.roomNumber, assignment),
-        )])
+        commitRoomMates(client, room, projectRoomMatesFromKernel(client.roomNumber, client))
         const committedRevision = commitRecruitmentRequest(room, requestId)
         if (committedRevision === null) return
         // 重建后照排两个旧 restore 任务:0ms 全客户端名单广播 + 500ms NPC
@@ -487,6 +533,9 @@ export async function handleEnterComs(
             destroy()
             continue
         }
+        assignment.viewer_id = recruitResult.recruitedMates
+            .find(recruited => recruited.com_id === assignment.com_id)?.viewer_id
+            ?? (900000000 + assignment.com_id)
         seatedAssignments.push(assignment)
     }
 
@@ -499,7 +548,7 @@ export async function handleEnterComs(
 
     const committedRevision = commitRecruitmentRequest(room, requestId)
     if (committedRevision === null) return
-    commitRoomMates(client, room, [...currentRealMates, ...npcMates])
+    commitRoomMates(client, room, projectRoomMatesFromKernel(client.roomNumber, client))
 
     console.log(`[LOBBY] EnterComs: room=${client.roomNumber} real=${currentRealMates.length} npc=${npcMates.length} total=${client.mates.length}`)
 
@@ -682,16 +731,10 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         }
     } else {
         if (hostClient && client.yourself) {
-            const existingMateIndex = hostClient.mates.findIndex(
-                mate => !mate.comId && mate.viewerId === client.viewerId,
-            )
-            const mergedMates = [...hostClient.mates]
-            if (existingMateIndex >= 0) mergedMates[existingMateIndex] = client.yourself
-            else mergedMates.push(client.yourself)
-            hostClient.mates = limitLobbyMates(
-                mergedMates,
-                room?.host_viewer_id ?? hostClient.viewerId,
-            )
+            // 2c.1:投影排序权=内核 seats 序(内核 enter 已派发,本客机在
+            // seats 尾)——guest-merge push 排序废止,顺序问题就此收口
+            const projected = projectRoomMatesFromKernel(client.roomNumber, hostClient)
+            hostClient.mates = projected
             client.mates = [...hostClient.mates]
         } else {
             client.mates = [client.yourself!]

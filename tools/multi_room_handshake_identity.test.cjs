@@ -427,15 +427,15 @@ test("guest reconnect Enter makes the new connection authoritative for battle", 
     const firstGuest = await handshake(room, 228, { connectionId: "guest-old-cid" })
     handleLobbyMessage(hostSocket, [0, [0, { party: snapshot(118).party }]])
     handleLobbyMessage(firstGuest, [0, [0, { party: snapshot(228).party }]])
+    // 2c.1:NPC 以正式参与者入座(内核 seats + roster 投影簿记),
+    // 手工 mates 条目不再是权威
+    const npcIdentity = `npc:${room.room_number}:1`
+    lifecycleRegistry.dispatch(room.room_number, generation => ({ type: "admit", generation, identity: npcIdentity }))
+    lifecycleRegistry.dispatch(room.room_number, generation => ({ type: "handshake", generation, identity: npcIdentity }))
+    lifecycleRegistry.dispatch(room.room_number, generation => ({ type: "enter", generation, identity: npcIdentity, nowMs: 1_500 }))
+    room.npc_roster = [{ com_id: 1, name: "稳定甲", viewer_id: 990000001 }]
     const hostClient = sessionManager.getUniqueRoomClientByViewerId(118, room.room_number)
     assert.ok(hostClient)
-    hostClient.mates.push({
-        viewerId: 990000001,
-        connectionId: "npc-stable-cid",
-        comId: 1,
-        party: {},
-        state: [1],
-    })
 
     const reconnectedGuest = await handshake(room, 228, { connectionId: "guest-new-cid" })
     handleLobbyMessage(reconnectedGuest, [0, [0, { party: snapshot(228).party }]])
@@ -454,7 +454,7 @@ test("guest reconnect Enter makes the new connection authoritative for battle", 
     assert.deepEqual(hostClient.mates.map(mate => mate.connectionId), [
         "host-authority-cid",
         "guest-new-cid",
-        "npc-stable-cid",
+        `${room.room_number}-npc-1`,
     ])
 
     handleLobbyMessage(hostSocket, [0, [6]])

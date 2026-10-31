@@ -8,6 +8,7 @@ require("./test-workflow/bootstrap.cjs").bootstrap()
 
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { lifecycleRegistry } = require("../src/multi/lifecycle")
+const { reconcileHostReturn } = require("../src/multi/room/manager")
 const {
     addRoomMember,
     createRoom,
@@ -141,6 +142,11 @@ function createLobbyRoom(
     )
     const host = createLobbyClient(room, hostViewerId, hostConnectionId, hostNodeSessionId)
     sessionManager.claimRoomHostParticipant(room.room_number, host.client.participant)
+    // 2c.1:生产序对齐——房主连接后必然 enter(内核 ready),[6]/restore 均以
+    // ready 为前提
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "enter", generation, identity: `viewer:${hostViewerId}`, nowMs: 1_000,
+    }))
     const guests = guestViewerIds.map(viewerId => createLobbyClient(room, viewerId, `guest-${viewerId}`))
     t.after(() => {
         for (const entry of [...guests].reverse()) sessionManager.removeClientBySocket(entry.socket)
@@ -1643,10 +1649,20 @@ test("lobby mutations are gated while the room battle is occupied", async t => {
     await flushPromises()
     assert.equal(room.is_npc_mode, false)
 
-    // After the official release (room returns to Ready before the battle
-    // runtime is cleared), host re-Enter legally returns the room to
-    // preparation for the rematch.
-    updateRoomState(room.room_number, 1)
+    // Official release → 内核真路 4→1(全员 finish + hostReturn)→ 房主重入
+    // 重赛(updateRoomStateFromKernel 派生 1)
+    const battleState = lifecycleRegistry.get(room.room_number)
+    for (const identity of battleState.battleParticipants) {
+        lifecycleRegistry.dispatch(room.room_number, generation => ({
+            type: "finish", generation, identity, nowMs: 2_500,
+            battleDeadlineMs: 900_000, battleSessionId: battleState.battleSessionId,
+        }))
+    }
+    sessionManager.releaseFinishedBattleFacts(room.room_number, battleState.battleSessionId)
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "hostReturn", generation, identity: "viewer:4701", nowMs: 2_600,
+    }))
+    reconcileHostReturn(room.room_number)
     sessionManager.clearBattleExpectedCount(room.room_number)
     handleMessage(host.socket, [0, [0, { party: { marker: "rematch" } }]])
     assert.equal(room.raising_state, 1)
@@ -1768,10 +1784,22 @@ test("restore path does not grow the roster for absent members (device 2a regres
     await flushPromises()
     assert.equal(host.client.mates.length, 3)
 
-    // 开战 → 客机 socket 关闭(生产:BattleStart 后大厅 socket 关闭)→ 4→1
+    // 开战 → 客机 socket 关闭(生产:BattleStart 后大厅 socket 关闭)
+    // → 内核真路 4→1(全员 finish + hostReturn)
     handleMessage(host.socket, [0, [6]])
     handleSocketDisconnect(guest.socket)
-    updateRoomState(room.room_number, 1)
+    const battleState = lifecycleRegistry.get(room.room_number)
+    for (const identity of battleState.battleParticipants) {
+        lifecycleRegistry.dispatch(room.room_number, generation => ({
+            type: "finish", generation, identity, nowMs: 2_500,
+            battleDeadlineMs: 900_000, battleSessionId: battleState.battleSessionId,
+        }))
+    }
+    sessionManager.releaseFinishedBattleFacts(room.room_number, battleState.battleSessionId)
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "hostReturn", generation, identity: "viewer:540", nowMs: 2_600,
+    }))
+    reconcileHostReturn(room.room_number)
     assert.equal(isRoomMember(room, guest.client.participant), false)
 
     // 房主重入 → restore:只回填存活 roster(1 NPC),不得按"连接真人=1"
@@ -1784,8 +1812,8 @@ test("restore path does not grow the roster for absent members (device 2a regres
         host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
         [
             { viewerId: 540, comId: 0 },
-            // restore 无招募发布:NPC viewerId 落合成段(仅 serializer 层)
-            { viewerId: 900000001, comId: 1 },
+            // restore 优先 roster 上首轮招募分配的 viewer_id(序列化层簿记)
+            { viewerId: 970000001, comId: 1 },
         ],
     )
     // 真人回房仍有座位:内核 free=3-2=1,admit 接纳
