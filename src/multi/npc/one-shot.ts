@@ -52,11 +52,8 @@ export function clearRoomNpcRoster(roomNumber: string, battleSessionId?: string)
         clearedBattleSessions.set(roomNumber, latchKey)
 
         room.npc_count = 0
-        lifecycleRegistry.dispatch(roomNumber, generation => ({
-            type: "setNpcCount",
-            generation,
-            npcCount: 0,
-        }))
+        // 2a1 step 1：内核 setNpcCount 事件已删；roster/mates 清理照旧，
+        // 内核容量恒 3（NPC 座位经虚拟 admit/enter 管理，step 2 接线）。
         advanceRecruitmentGeneration(room)
 
         const hostClient = sessionManager.getRoomHostClient(roomNumber)

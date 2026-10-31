@@ -22,8 +22,8 @@ const T0 = 1_000_000
 const BATTLE_DEADLINE = 1_000
 const CLOSE_DEADLINE = 500
 
-function make(npcCount = 0) {
-    return createLifecycle({ roomNumber: "100001", generation: GEN, host: HOST, npcCount })
+function make() {
+    return createLifecycle({ roomNumber: "100001", generation: GEN, host: HOST })
 }
 
 function ok(state, event) {
@@ -211,18 +211,19 @@ test("stale generation is rejected without effects", () => {
     }, "STALE_GENERATION")
 })
 
-test("npcCount reduces the real capacity", () => {
-    const state = make(2)
-    assert.equal(capacityOf(state), 1)
-    assert.equal(isJoinable(state), false)
-    bad(state, { type: "admit", generation: GEN, identity: GUEST }, "ROOM_FULL")
-})
-
-test("setNpcCount updates the real capacity", () => {
+test("NPC identities occupy seats under the constant total capacity (2a1)", () => {
     let state = make()
     assert.equal(capacityOf(state), 3)
-    state = ok(state, { type: "setNpcCount", generation: GEN, npcCount: 2 }).state
-    assert.equal(capacityOf(state), 1)
+    // 两名 NPC 以 npc:<room>:<rosterId> 身份走与真人相同的 admit/enter 入座
+    for (const npcIdentity of ["npc:100001:r1", "npc:100001:r2"]) {
+        state = ok(state, { type: "admit", generation: GEN, identity: npcIdentity }).state
+        state = ok(state, { type: "handshake", generation: GEN, identity: npcIdentity }).state
+        state = ok(state, { type: "enter", generation: GEN, identity: npcIdentity, nowMs: T0 }).state
+    }
+    assert.equal(state.seats.length, 3)
+    assert.equal(capacityOf(state), 3)
+    assert.equal(isJoinable(state), false)
+    // 1 真+2 NPC 即满员：第三个真人被拒（D8 语义）
     bad(state, { type: "admit", generation: GEN, identity: GUEST }, "ROOM_FULL")
 })
 

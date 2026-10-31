@@ -11,7 +11,7 @@ export interface RoomLifecycleState {
     readonly generation: number
     readonly phase: RoomPhase
     readonly host: Identity
-    /** 当前占座（含房主）；容量 = 3 - npcCount，只算真人 */
+    /** 当前占座（含房主）；身份 = real:<viewerId> 或 npc:<room>:<rosterId>（2a1 起 NPC 占座） */
     readonly seats: readonly Identity[]
     readonly ready: readonly Identity[]
     /** 入房流水线：admitted → handshaked → entered（closing 期间保留在途者） */
@@ -23,7 +23,6 @@ export interface RoomLifecycleState {
     readonly battleFinalized: boolean
     /** 房主已经请求返回；等最后一个 Finish 到齐后再 4→1 */
     readonly hostReturnPending: boolean
-    readonly npcCount: number
     readonly hostOnline: boolean
     readonly hostEntryTimeMs: number | null
     readonly finishedAtMs: number | null
@@ -68,7 +67,6 @@ export type RoomEvent =
         readonly closeDeadlineMs: number
     }
     | { readonly type: "socketLost"; readonly generation: number; readonly identity: Identity }
-    | { readonly type: "setNpcCount"; readonly generation: number; readonly npcCount: number }
     | { readonly type: "closeConfirmed"; readonly generation: number; readonly identity: Identity }
     | {
         readonly type: "gcSweep"
@@ -101,11 +99,9 @@ export interface CreateLifecycleInput {
     readonly roomNumber: string
     readonly generation: number
     readonly host: Identity
-    readonly npcCount?: number
 }
 
 export function createLifecycle(input: CreateLifecycleInput): RoomLifecycleState {
-    const npcCount = Math.max(0, Math.trunc(input.npcCount ?? 0))
     return {
         roomNumber: input.roomNumber,
         generation: input.generation,
@@ -119,7 +115,6 @@ export function createLifecycle(input: CreateLifecycleInput): RoomLifecycleState
         battleSessionId: null,
         battleFinalized: false,
         hostReturnPending: false,
-        npcCount,
         hostOnline: true,
         hostEntryTimeMs: null,
         finishedAtMs: null,
@@ -128,8 +123,13 @@ export function createLifecycle(input: CreateLifecycleInput): RoomLifecycleState
     }
 }
 
-export function capacityOf(state: RoomLifecycleState): number {
-    return Math.max(1, MAX_REAL_SEATS - state.npcCount)
+/**
+ * 容量恒等于总参与者数（2a1：NPC 是占座参与者，real:<id>/npc:<room>:<rid>
+ * 身份无差别占座）。旧 `3 - npcCount` / `3 - 真人数` 公式随 setNpcCount
+ * 事件一并删除——1 真+2 NPC 即满员（D8 拍板语义）。
+ */
+export function capacityOf(_state: RoomLifecycleState): number {
+    return MAX_REAL_SEATS
 }
 
 export function projectRaisingState(state: RoomLifecycleState): 1 | 2 | 4 | 9 {
@@ -604,16 +604,6 @@ export function decide(state: RoomLifecycleState, event: RoomEvent): RoomLifecyc
                 }
             }
             return { state, effects: [] }
-        }
-
-        case "setNpcCount": {
-            if (state.phase !== "recruiting" && state.phase !== "ready") {
-                return reject(state, "INVALID_PHASE")
-            }
-            return {
-                state: { ...state, npcCount: Math.max(0, Math.trunc(event.npcCount)) },
-                effects: [],
-            }
         }
 
         case "closeConfirmed": {

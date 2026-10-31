@@ -629,9 +629,11 @@ test("NPC slots remain replaceable by a real room member", async t => {
 test("kernel-full NPC room handshake denies gracefully without member write", async t => {
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const room = createRoom(130, 1_130, 1, 1, 530, 0, 130)
-    lifecycleRegistry.dispatch(room.room_number, generation => ({
-        type: "setNpcCount", generation, npcCount: 2,
-    }))
+    for (const npcIdentity of ["npc:130:r1", "npc:130:r2"]) {
+        lifecycleRegistry.dispatch(room.room_number, g => ({ type: "admit", generation: g, identity: npcIdentity }))
+        lifecycleRegistry.dispatch(room.room_number, g => ({ type: "handshake", generation: g, identity: npcIdentity }))
+        lifecycleRegistry.dispatch(room.room_number, g => ({ type: "enter", generation: g, identity: npcIdentity, nowMs: 1_500 }))
+    }
     t.after(() => disbandRoom(room.room_number))
     // 票在发票点就被内核拒绝（不存在）→ 握手走 admission_unavailable 优雅拒绝
     const socket = await handshake(room, 203, {}, { registry })
@@ -641,7 +643,7 @@ test("kernel-full NPC room handshake denies gracefully without member write", as
     assert.equal(sessionManager.getClientByParticipant(room.room_number, { nodeSessionId: "embedded", viewerId: 203 }), undefined)
 })
 
-test("late enter into a filled NPC room is dismissed instead of served", async t => {
+test("late enter after kernel closing is dismissed instead of served", async t => {
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const room = createRoom(131, 1_131, 1, 1, 531, 0, 131)
     let socket
@@ -649,11 +651,20 @@ test("late enter into a filled NPC room is dismissed instead of served", async t
         if (socket) sessionManager.removeClientBySocket(socket)
         disbandRoom(room.room_number)
     })
-    // npc=0 时发票+握手成功（内核 joiner=handshaked），随后 NPC 补满 → 迟到 Enter 被拒
+    // 2a1 下"迟到 Enter 撞满员"不可构造：pending joiner 计入占用（票先占座，
+    // D8 语义），第三名 admit 必被拒。等价竞态=握手成功后、Enter 到达前内核
+    // 进入 closing → Enter 被拒走同一条回滚+dismiss 分支。
     socket = await handshake(room, 204, {}, { registry })
     lifecycleRegistry.dispatch(room.room_number, generation => ({
-        type: "setNpcCount", generation, npcCount: 2,
+        type: "disband", generation, identity: null, nowMs: 1_600, closeDeadlineMs: 300_000,
     }))
+    // closing 相位的 enter 不被拒（内核发 sendEnterReply+sendDismiss 效果，
+    // 外壳不消费）；推进到 closed 后 enter 才被 ROOM_CLOSED 拒绝
+    for (const identity of ["viewer:131", "viewer:204"]) {
+        lifecycleRegistry.dispatch(room.room_number, generation => ({
+            type: "closeConfirmed", generation, identity,
+        }))
+    }
     handleLobbyMessage(socket, [0, [0, { party: snapshot(204).party }]])
     // dismiss-only：dismiss 是该 socket 的最后一条房间命令，成员账回滚
     assert.deepEqual(socket.messages.at(-1), [1, [6, "multibattle_room_dismissed"]])

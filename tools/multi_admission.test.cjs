@@ -265,11 +265,14 @@ test("node-session and room teardown clear all pending admissions", () => {
 test("kernel-rejected admission (NPC-full room) fails issue and leaves no ticket", () => {
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const { lifecycleRegistry } = require("../src/multi/lifecycle")
-    // NPC 房：1 真人 + 2 NPC = 内核容量 1，第二个真人不得入（D8 语义）
+    // NPC 房：两名 NPC 以 npc: 身份走与真人相同的 admit/enter 占座，
+    // 1 真+2 NPC = 总容量 3 满，第二个真人不得入（D8 语义，2a1）
     lifecycleRegistry.create("777001", "viewer:1")
-    lifecycleRegistry.dispatch("777001", generation => ({
-        type: "setNpcCount", generation, npcCount: 2,
-    }))
+    for (const npcIdentity of ["npc:777001:r1", "npc:777001:r2"]) {
+        lifecycleRegistry.dispatch("777001", g => ({ type: "admit", generation: g, identity: npcIdentity }))
+        lifecycleRegistry.dispatch("777001", g => ({ type: "handshake", generation: g, identity: npcIdentity }))
+        lifecycleRegistry.dispatch("777001", g => ({ type: "enter", generation: g, identity: npcIdentity, nowMs: 1_500 }))
+    }
     const full = registry.issue({
         roomNumber: "777001",
         participant: { nodeSessionId: "node-a", viewerId: 202 },

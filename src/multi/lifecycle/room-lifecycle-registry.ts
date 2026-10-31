@@ -47,12 +47,11 @@ export class RoomLifecycleRegistry {
     private rejections = 0
     private rejectionReasons = new Map<string, number>()
 
-    create(roomNumber: string, host: string, npcCount = 0): RoomLifecycleState {
+    create(roomNumber: string, host: string): RoomLifecycleState {
         const state = createLifecycle({
             roomNumber,
             generation: this.nextGeneration++,
             host,
-            npcCount,
         })
         this.rooms.set(roomNumber, state)
         return state

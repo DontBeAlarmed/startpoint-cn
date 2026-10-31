@@ -309,13 +309,10 @@ export async function handleEnterComs(
 
     // Assign the room roster synchronously so concurrent EnterComs calls share one binding.
     // 配额在每次招募激活时重算（3 − 当前真人）：上一轮成员变动（离开/加入）后的
-    // 缺口在重新开启招募/注入的这一次提交中补齐（用户定案语义，非离开瞬间补位）
+    // 缺口在重新开启招募/注入的这一次提交中补齐（用户定案语义，非离开瞬间补位）。
+    // 2a1 step 1：内核 setNpcCount 事件已删（容量恒 3，NPC 以占座参与者身份
+    // 经虚拟 admit/enter 入座——step 2 接线）；npc_count 只剩投影兼容字段。
     room.npc_count = Math.max(0, 3 - initialRealMates.length)
-    lifecycleRegistry.dispatch(client.roomNumber, generation => ({
-        type: "setNpcCount",
-        generation,
-        npcCount: room.npc_count,
-    }))
     ensureNpcRoster(room, room.npc_count)
 
     const initialActiveCount = getAvailableNpcSlotCount(room, initialRealMates)
