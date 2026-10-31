@@ -4,7 +4,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-// 2026-11-01:16 个锁旧 NPC 机制(restore 分支/rematch 定时器/reconcile/
+// 2026-11-01:17 个锁旧 NPC 机制(restore 分支/rematch 定时器/reconcile/
 // 重连自动补位)的测试已按语义迁移裁定退役;其不变量的新覆盖=探针(节奏/
 // 保持)、guest-reconnect 权威、NPC 座位、T-794/T-987 世代守卫、T-544
 // 定时器纪律、fill/rebuild ready 任务。退役清单见 git 历史本提交。
@@ -92,7 +92,7 @@ function startCapturedLobbyLifecycle() {
     const timers = []
     startLobbyLifecycle({
         createTimer(callback, delayMs) {
-            const timer = { callback, delayMs, unref() {} }
+            const timer = { callback, delayMs, unrefCalls: 0, unref() { this.unrefCalls += 1 } }
             timers.push(timer)
             return timer
         },
@@ -489,7 +489,7 @@ test("an async lobby timer callback cannot mutate state after its generation sto
     const timers = []
     startLobbyLifecycle({
         createTimer(callback) {
-            const timer = { callback, unref() {} }
+            const timer = { callback, unrefCalls: 0, unref() { this.unrefCalls += 1 } }
             timers.push(timer)
             return timer
         },
@@ -532,6 +532,8 @@ test("an async lobby timer callback cannot mutate state after its generation sto
         handleMessage(socket, [0, [10, []]])
         await new Promise(resolve => setImmediate(resolve))
         assert.equal(timers.length, 2)
+        // 退役测试 #1 的 unref 不变量在此补位(定时器必须 unref)
+        assert.deepEqual(timers.map(timer => timer.unrefCalls), [1, 1])
         const matesAfterCommit = client.mates.length
         assert.equal(matesAfterCommit, 3)
 

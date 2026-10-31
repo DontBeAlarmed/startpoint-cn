@@ -5,8 +5,8 @@
 // clearRoomNpcRoster 清空,见 one-shot 路径)。
 // 房主重入不触发本逻辑(补位唯一入口=房主手动铃铛招募;此处是 NPC 自己的
 // 续战,不是补位)。
-// 抢输处理:admit 被拒(真人先到)→ NPC 保持 roster 条目不销毁——条目是
-// 本房间 NPC 名册(身份/昵称),座位竞争输了下次续战再试;enter 被拒
+// 抢输处理:admit 被拒(真人先到)→ NPC 保持 roster 条目不销毁——重试节奏
+// 跟随房主状态轮询(本函数挂轮询热路径),每次轮询都会再试;enter 被拒
 // (理论不可达,admit 已锁定名额)→ 防御性销毁。
 
 import { getRoom } from "../room/manager"
@@ -19,6 +19,10 @@ import type { RoomNpcAssignment } from "../../lib/types"
 export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
     const room = getRoom(roomNumber)
     if (!room) return
+    // 相位守卫在设置读取之前:本函数挂在状态轮询热路径(每次房主状态读
+    // 都会跑),非 ready 相位直接返回,免付同步 SQLite SELECT
+    const state = lifecycleRegistry.get(roomNumber)
+    if (!state || state.phase !== "ready") return
     // fail-open:设置域不可读(无 DB 的轻量进程)时按默认 ON 处理
     let rematchEnabled = true
     try {
@@ -27,8 +31,6 @@ export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
         rematchEnabled = true
     }
     if (!rematchEnabled) return
-    const state = lifecycleRegistry.get(roomNumber)
-    if (!state || state.phase !== "ready") return
     let seatedCount = 0
     for (const assignment of [...room.npc_roster] as RoomNpcAssignment[]) {
         const identity = npcIdentityOf(roomNumber, assignment.com_id)
@@ -46,11 +48,16 @@ export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
         if (!enter || enter.rejected !== undefined) {
             const index = room.npc_roster.indexOf(assignment)
             if (index >= 0) room.npc_roster.splice(index, 1)
+            room.npc_count = room.npc_roster.length
             continue
         }
         assignment.viewer_id = assignment.viewer_id ?? (900000000 + assignment.com_id)
         assignment.ready = true
         seatedCount += 1
+        // 账面合一:回房入座同步派发内核 ready(与翻转点同形)
+        lifecycleRegistry.dispatch(roomNumber, generation => ({
+            type: "ready", generation, identity: npcIdentityOf(roomNumber, assignment.com_id), ready: true,
+        }))
     }
     if (seatedCount === 0) return
     console.log(`[MULTI] npc rematch return: room=${roomNumber} seated=${seatedCount}`

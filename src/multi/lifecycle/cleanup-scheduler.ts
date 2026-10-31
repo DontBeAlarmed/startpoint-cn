@@ -152,6 +152,11 @@ export function getCleanupSchedulerStatus(): {
     })
 }
 
+/** 测试钩子:直接驱动发牌循环(不经真实 interval)。 */
+export function runSchedulerDrivenTasksForTest(nowMs: number): void {
+    runSchedulerDrivenTasks(nowMs)
+}
+
 /** 测试隔离。 */
 export function resetCleanupSchedulerForTest(): void {
     stopCleanupScheduler()

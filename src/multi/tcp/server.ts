@@ -196,6 +196,9 @@ function startNodeSessionChecks(context: ServerContext): void {
     registerCleanupTask({ name: "nodeSessionChecks", intervalMs: context.nodeSessionCheckIntervalMs, externallyDriven: true })
     registerCleanupTask({ name: "hubIdempotencyCache", intervalMs: 0, excludedReason: "client-mode hub-side cache, not a node cleanup path" })
     registerCleanupTask({ name: "shareRecruitTtl", intervalMs: 0, excludedReason: "attention store rows are recency-queried, no timer" })
+    registerCleanupTask({ name: "hubNodeSessionSweep", intervalMs: 0, excludedReason: "hub-side sweep, not a node cleanup path" })
+    registerCleanupTask({ name: "credentialReloader", intervalMs: 0, excludedReason: "hub-side credential refresh timer" })
+    registerCleanupTask({ name: "settlementFactsPrune", intervalMs: 0, excludedReason: "runs inside the roomCleanup tick path" })
     context.nodeSessionTimer = setInterval(() => {
         if (activeContext !== context || phase !== "listening") return
         recordCleanupRun("nodeSessionChecks", Date.now())

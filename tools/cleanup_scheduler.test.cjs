@@ -61,3 +61,23 @@ test("registrations validate name, interval and callback", () => {
     assert.throws(() => registerCleanupTask({ name: "bad-interval", intervalMs: 0, task: () => {} }), TypeError)
     assert.throws(() => registerCleanupTask({ name: "no-callback", intervalMs: 1_000 }), TypeError)
 })
+
+test("scheduler-driven licensing math and error capture (core loop)", () => {
+    resetCleanupSchedulerForTest()
+    let runs = 0
+    let boom = 0
+    registerCleanupTask({ name: "lic-a", intervalMs: 60_000, task: () => { runs += 1 } })
+    registerCleanupTask({ name: "lic-b", intervalMs: 120_000, task: () => { throw new Error("boom-b") } })
+    const { runSchedulerDrivenTasksForTest } = require("../src/multi/lifecycle/cleanup-scheduler")
+    runSchedulerDrivenTasksForTest(0)
+    assert.equal(runs, 1, "first tick fires both")
+    runSchedulerDrivenTasksForTest(59_999)
+    assert.equal(runs, 1, "before interval: not re-licensed")
+    runSchedulerDrivenTasksForTest(60_000)
+    assert.equal(runs, 2, "at interval: re-licensed")
+    const status = getCleanupSchedulerStatus()
+    const boomTask = status.tasks.find(task => task.name === "lic-b")
+    assert.equal(boomTask.lastError, "boom-b")
+    assert.ok(boomTask.lastErrorAtMs !== null)
+    resetCleanupSchedulerForTest()
+})

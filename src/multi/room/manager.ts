@@ -204,7 +204,7 @@ export function startRoomCleanup(options: RoomCleanupOptions = {}): void {
     // 测试注入不受影响)
     registerCleanupTask({
         name: "roomCleanup",
-        intervalMs: timing.incompleteExpiryMs,
+        intervalMs: options.intervalMs ?? DEFAULT_CLEAN_INTERVAL_MS,
         externallyDriven: true,
     });
 }

@@ -260,12 +260,8 @@ function checkAllReadyAndStart(roomNumber: string): void {
     const room = getRoom(roomNumber)
     if (!room) return
 
-    // Guard: wait for all expected real players to return on rematch
-    if (room.npc_count > 0) {
-        const realPlayers = countRealPlayers(hostClient.mates)
-        const expectedReal = 3 - room.npc_count
-        if (realPlayers < expectedReal) return
-    }
+    // 前置 mates.length>=3 已覆盖满员判定——总参与者口径下 NPC 占座计入
+    // 名单,"等真人"的旧期望门被支配(保留删除均不改变行为,注释钉死性质)
     if (hostClient.mates.length < 3) return
 
     const allReady = hostClient.mates.every(m => m.state?.[0] === 1)
@@ -288,7 +284,6 @@ function checkAllReadyAndStart(roomNumber: string): void {
  * 服务端状态(list state/roster.ready)不在此翻转,由各翻转点负责。
  */
 export function broadcastReadyFramesForSeatedNpcs(roomNumber: string, mates: any[]): void {
-    const { sessionManager } = require("../state/SessionManager") as typeof import("../state/SessionManager")
     for (const mate of mates) {
         if (!mate.comId) continue
         if (mate.state?.[0] !== 1) continue
@@ -429,8 +424,11 @@ export async function handleEnterComs(
     }
     const initialRealParticipants = initialRealMates.filter(isKernelParticipant)
     const freeAtGate = getAvailableNpcSlotCount(room, initialRealMates)
+    const rosterBeforeGate = room.npc_roster.slice()
     if (freeAtGate > 0) {
-        // 补位时按当时空位创建 roster 条目(数量在补位时刻决定)
+        // 补位时按当时空位创建 roster 条目(数量在补位时刻决定);
+        // 若 provider await 期间招募代作废,回滚本次新增(提交点纪律:
+        // 作废的招募不得留下副作用,否则条目会在下次续战实体化)
         ensureNpcRoster(room, seatedNow.length + freeAtGate)
         seatedNow.length = 0
         unseated.length = 0
@@ -449,10 +447,9 @@ export async function handleEnterComs(
     if (initialActiveCount <= 0 || unseated.length === 0) {
         // 零空位(满员)或无未入座候选(纯重建):不发招募、不排定时器,
         // 投影 = 内核参与者(真人含 pending)+ 已入座 NPC
-        commitRecruitmentRequest(room, requestId)
-        commitRoomMates(client, room, projectRoomMatesFromKernel(client.roomNumber, client))
         const committedRevision = commitRecruitmentRequest(room, requestId)
         if (committedRevision === null) return
+        commitRoomMates(client, room, projectRoomMatesFromKernel(client.roomNumber, client))
         // 重建后照排两个旧 restore 任务:0ms 全客户端名单广播 + 500ms NPC
         // ready(已入座 NPC 翻 ready → 房主 auto-ready 检查)
         scheduleLobbyTask(lifecycle => {
@@ -495,8 +492,17 @@ export async function handleEnterComs(
 
     const npcProvider = new NpcMateProvider()
     const recruitResult = await npcProvider.onRecruit(client.roomNumber, String(room?.host_viewer_id ?? 0))
-    if (!lifecycle.isActive() || getRoom(client.roomNumber) !== room) return
-    if (requestId < getRoomRecruitmentState(room).committedRequestId) return
+    if (!lifecycle.isActive() || getRoom(client.roomNumber) !== room) {
+        room.npc_roster = rosterBeforeGate
+        room.npc_count = rosterBeforeGate.length
+        return
+    }
+    if (requestId < getRoomRecruitmentState(room).committedRequestId) {
+        // 招募代作废:回滚 gate 期间新增的 roster 条目
+        room.npc_roster = rosterBeforeGate
+        room.npc_count = rosterBeforeGate.length
+        return
+    }
 
     // Real players may enter while the provider is pending. Rebuild from current room state.
     const currentRealMates = getConnectedRealMates(client, room).filter(isKernelParticipant)
@@ -526,6 +532,7 @@ export async function handleEnterComs(
         const destroy = (): void => {
             const index = room.npc_roster.indexOf(assignment)
             if (index >= 0) room.npc_roster.splice(index, 1)
+            room.npc_count = room.npc_roster.length
         }
         if (admitDecision === null || admitDecision.rejected !== undefined) {
             destroy()
@@ -612,6 +619,15 @@ export async function handleEnterComs(
                 if (assignment) assignment.ready = true
                 const listed = currentHostClient.mates.find(candidate => candidate.connectionId === npc.connectionId)
                 if (listed) listed.state = [1]
+                // 账面合一:翻转同步派发内核 ready(与真人 ready 派发同形)
+                if (client.participant) {
+                    lifecycleRegistry.dispatch(client.roomNumber, generation => ({
+                        type: "ready",
+                        generation,
+                        identity: npcIdentityOf(client.roomNumber, npc.comId),
+                        ready: true,
+                    }), client.lifecycleGeneration)
+                }
             }
             broadcastReadyFramesForSeatedNpcs(client.roomNumber, currentHostClient.mates)
             if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
@@ -742,18 +758,17 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
             sessionManager.broadcastMateListToRoom(client.roomNumber, client.mates, client)
         }
     } else {
-        if (hostClient && client.yourself) {
+        if (hostClient && client.yourself && room) {
             // 2c.1:投影排序权=内核 seats 序(内核 enter 已派发,本客机在
-            // seats 尾)——guest-merge push 排序废止,顺序问题就此收口
-            const projected = projectRoomMatesFromKernel(client.roomNumber, hostClient)
-            hostClient.mates = projected
+            // seats 尾)——提交走唯一写点
+            commitRoomMates(hostClient, room, projectRoomMatesFromKernel(client.roomNumber, hostClient))
             client.mates = [...hostClient.mates]
         } else {
             client.mates = [client.yourself!]
-        }
-        if (room) {
-            room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
-            syncShareRow(room.room_number)
+            if (room) {
+                room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+                syncShareRow(room.room_number)
+            }
         }
     }
 
