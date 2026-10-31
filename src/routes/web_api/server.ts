@@ -29,6 +29,7 @@ import {
     type AdminMultiStatus,
 } from "../../lib/admin-multi-status";
 import { unavailableMultiRuntimeStatus } from "../../multi/runtime/status";
+import { getCleanupSchedulerStatus } from "../../multi/lifecycle/cleanup-scheduler";
 import {
     applyPlayerSaveTemplateSync,
     clonePlayerSaveV2Sync,
@@ -118,6 +119,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         }
 
         reply.status(200).send({
+            multiplayerCleanup: getCleanupSchedulerStatus(),
             server: {
                 uptimeSeconds: Math.floor(process.uptime()),
                 nodeVersion: process.version,

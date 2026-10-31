@@ -16,6 +16,7 @@ import {
     type RoomCleanupOptions,
 } from "../room/manager"
 import { installDisbandLifecycleListener } from "../room/disband-listener"
+import { recordCleanupRun, registerCleanupTask } from "../lifecycle/cleanup-scheduler"
 import { startLobbyLifecycle, stopLobbyLifecycle } from "./lobby-lifecycle"
 import {
     configureNpcRecruitmentTiming,
@@ -191,8 +192,13 @@ function rejectInvalidNodeSession(context: ServerContext, socket: net.Socket): b
 
 function startNodeSessionChecks(context: ServerContext): void {
     if (!context.validateNodeSession || context.nodeSessionTimer !== null) return
+    // 2d:统一清理可观测——节点会话检查外驱注册 + 排除项登记
+    registerCleanupTask({ name: "nodeSessionChecks", intervalMs: context.nodeSessionCheckIntervalMs, externallyDriven: true })
+    registerCleanupTask({ name: "hubIdempotencyCache", intervalMs: 0, excludedReason: "client-mode hub-side cache, not a node cleanup path" })
+    registerCleanupTask({ name: "shareRecruitTtl", intervalMs: 0, excludedReason: "attention store rows are recency-queried, no timer" })
     context.nodeSessionTimer = setInterval(() => {
         if (activeContext !== context || phase !== "listening") return
+        recordCleanupRun("nodeSessionChecks", Date.now())
         for (const socket of [...acceptedSockets]) rejectInvalidNodeSession(context, socket)
     }, context.nodeSessionCheckIntervalMs)
     context.nodeSessionTimer.unref()

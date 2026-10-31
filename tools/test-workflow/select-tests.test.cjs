@@ -2436,6 +2436,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_lifecycle_faults.test.cjs",
         "tools/multi_lifecycle_core.test.cjs",
         "tools/multi_lifecycle_registry.test.cjs",
+        "tools/cleanup_scheduler.test.cjs",
         "tools/multi_lifecycle_drift.test.cjs",
         "tools/multi_lifecycle_effect_executor.test.cjs",
         "tools/multi_context_initialization.test.cjs",

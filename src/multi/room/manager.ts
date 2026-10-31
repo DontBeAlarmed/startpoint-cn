@@ -5,6 +5,7 @@ import { getRealNowMs } from "../../runtime/time/game-time";
 import { sessionManager } from "../state/SessionManager";
 import { identityOf, LIFECYCLE_BATTLE_DEADLINE_MS, LIFECYCLE_CLOSE_DEADLINE_MS, lifecycleRegistry } from "../lifecycle";
 import { sampleLifecycleDrift } from "../lifecycle/drift-monitor";
+import { recordCleanupRun, registerCleanupTask } from "../lifecycle/cleanup-scheduler";
 import type { ParticipantIdentity } from "../coordinator/contracts";
 
 const rooms = new Map<string, MultiRoom>();
@@ -74,6 +75,7 @@ function notifyRoomDisbanded(roomNumber: string, hostPlayerId: number, hostViewe
 
 function cleanExpiredRooms(timing: RoomCleanupTiming) {
     const now = getRealNowMs();
+    recordCleanupRun("roomCleanup", now);
     // 切片 0：漂移观测（行为不变）——每轮清理 tick 顺带采样五项不变量，
     // 计数/样本经 server/status 暴露；不派生状态、不触发清理。
     sampleLifecycleDrift(now, {
@@ -197,6 +199,13 @@ export function startRoomCleanup(options: RoomCleanupOptions = {}): void {
     }
     cleanupTimer = timer;
     clearCleanupInterval = clearIntervalHandle;
+    // 2d:统一清理可观测——房间清理以外驱任务身份注册(自有定时器保留,
+    // 测试注入不受影响)
+    registerCleanupTask({
+        name: "roomCleanup",
+        intervalMs: timing.incompleteExpiryMs,
+        externallyDriven: true,
+    });
 }
 
 export function stopRoomCleanup(): void {
