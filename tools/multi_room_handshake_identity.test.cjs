@@ -635,10 +635,11 @@ test("kernel-full NPC room handshake denies gracefully without member write", as
         lifecycleRegistry.dispatch(room.room_number, g => ({ type: "enter", generation: g, identity: npcIdentity, nowMs: 1_500 }))
     }
     t.after(() => disbandRoom(room.room_number))
-    // 票在发票点就被内核拒绝（不存在）→ 握手走 admission_unavailable 优雅拒绝
+    // 2a1.3 后占用门（真人+NPC 总参与者=3）先于票检查拒绝 → room_full 文案；
+    // 票层同样被内核拒绝（不存在），双重闭环
     const socket = await handshake(room, 203, {}, { registry })
     assert.equal(socket.ended, true)
-    assert.deepEqual(socket.messages.at(-1), [1, "multibattle_room_not_found"])
+    assert.deepEqual(socket.messages.at(-1), [1, "multibattle_room_filled"])
     assert.equal(isRoomViewerMember(room, 203), false)
     assert.equal(sessionManager.getClientByParticipant(room.room_number, { nodeSessionId: "embedded", viewerId: 203 }), undefined)
 })

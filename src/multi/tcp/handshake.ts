@@ -190,7 +190,11 @@ export async function handleHandshake(
                 )
             } catch {}
         }
-        const occupiedRealPlayerSlots = room?.member_participants.length ?? 0
+        // 2a1.3：满员口径=总参与者（真人成员 + 已入座 NPC），内核同口径——
+        // 1 真+2 NPC 即满（D8）。
+        const occupiedRealPlayerSlots = (room?.member_participants.length ?? 0)
+            + (lifecycleRegistry.get(normalizedRoomNumber)?.seats
+                .filter(identity => identity.startsWith("npc:")).length ?? 0)
         const existingMember = room ? isRoomViewerMember(room, normalizedViewerId) : false
         if (!room
             || (room.raising_state !== 1 && room.raising_state !== 2)

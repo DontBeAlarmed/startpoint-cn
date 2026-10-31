@@ -308,7 +308,13 @@ export function getRoom(roomNumber: string): MultiRoom | undefined {
 export function getRoomOccupiedMemberCount(roomNumber: string): number {
     const room = rooms.get(roomNumber)
     if (!room) return 0
-    return new Set(room.member_participants.map(member => member.viewerId)).size
+    // 2a1.3：统一占用 = 真人成员（去重）+ 已入座 NPC（内核 seats 里的 npc: 身份）。
+    // NPC 占总席位（D8），AdmissionRegistry 的容量预检与内核同口径。
+    const lifecycleState = lifecycleRegistry.get(roomNumber)
+    const npcSeatCount = lifecycleState === undefined
+        ? 0
+        : lifecycleState.seats.filter(identity => identity.startsWith("npc:")).length
+    return new Set(room.member_participants.map(member => member.viewerId)).size + npcSeatCount
 }
 
 export function listActiveRooms(): readonly MultiRoom[] {
