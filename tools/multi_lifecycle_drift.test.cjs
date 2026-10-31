@@ -246,6 +246,7 @@ test("admin status passes drift and rejections through and drops identity leaks"
             memberNotInKernelNpcRooms: { current: 0, total: 0, lastAtMs: null, samples: [] },
             viewerMultipleRoomClients: { current: 0, total: 0, lastAtMs: null, samples: [] },
             closingPastDeadline: { current: 0, total: 0, lastAtMs: null, samples: [] },
+            raisingStateMismatch: { current: 0, total: 0, lastAtMs: null, samples: [] },
         },
         rejections: { total: 4, byReason: { ADMISSION_REQUIRED: 3, ROOM_FULL: 1 } },
     }
@@ -293,4 +294,38 @@ test("admin status passes drift and rejections through and drops identity leaks"
     })
     assert.equal(legacy.lifecycle.drift, null)
     assert.equal(legacy.lifecycle.rejections, null)
+})
+
+test("INV-6 flags persisted raising_state diverging from the kernel phase (2b double-write)", () => {
+    fresh()
+    // ready 相位(房主首次 enter)+ raising_state=1 → 一致
+    lifecycleRegistry.create("654321", "viewer:1")
+    dispatch("654321", generation => ({ type: "enter", generation, identity: "viewer:1", nowMs: 1_000_900 }))
+    let drift = sampleAt(1_001_000, [baseRoom("654321", { raising_state: 1 })])
+    assert.equal(drift.raisingStateMismatch.current, 0)
+
+    // 战斗相位 + raising_state=4 → 一致
+    dispatch("654321", generation => ({ type: "admit", generation, identity: "viewer:2" }))
+    dispatch("654321", generation => ({ type: "enter", generation, identity: "viewer:1", nowMs: 1_100 }))
+    dispatch("654321", generation => ({ type: "startBattle", generation, identity: "viewer:1", battleSessionId: "b1" }))
+    drift = sampleAt(1_061_200, [baseRoom("654321", { raising_state: 4 })])
+    assert.equal(drift.raisingStateMismatch.current, 0)
+
+    // 内核 ready 但持久仍是 2(漏写 4→1 的收口信号)→ 分歧计数+样本
+    lifecycleRegistry.create("654322", "viewer:1")
+    dispatch("654322", generation => ({ type: "enter", generation, identity: "viewer:1", nowMs: 1_001_000 }))
+    drift = sampleAt(1_061_300, [baseRoom("654322", { raising_state: 2 })])
+    assert.equal(drift.raisingStateMismatch.current, 1)
+    assert.ok(drift.raisingStateMismatch.samples[0].detail.includes("kernelPhase=ready"))
+    assert.ok(drift.raisingStateMismatch.samples[0].detail.includes("derived=1"))
+
+    // closed 相位跳过(房间待删除)
+    dispatch("654321", generation => ({
+        type: "disband", generation, identity: "viewer:1", nowMs: 1_061_500, closeDeadlineMs: 300_000,
+    }))
+    for (const identity of ["viewer:1", "viewer:2"]) {
+        dispatch("654321", generation => ({ type: "closeConfirmed", generation, identity }))
+    }
+    drift = sampleAt(1_121_600, [baseRoom("654321", { raising_state: 4 })])
+    assert.equal(drift.raisingStateMismatch.current, 0)
 })

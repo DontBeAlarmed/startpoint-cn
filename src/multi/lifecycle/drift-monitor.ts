@@ -17,6 +17,9 @@
 //         NPC 房（npc_count>0）子集单独计数：2a 参与者模型前预期非零。
 //   INV-4 同一 viewerId 同时持有多个活跃大厅 client
 //   INV-5 closing 超过 close deadline 仍未 closed（sweep 间隔窗口内可见）
+//   INV-6 持久 raising_state ≠ 内核相位派生值（2b 双写比对:recruiting→2/
+//         ready→1/battle→4/closing→4,closed 跳过——房间待删除;采样时点的
+//         持续分歧=写入序未收口的信号,瞬态分歧自愈不计）
 
 import { LIFECYCLE_CLOSE_DEADLINE_MS, lifecycleRegistry } from "./room-lifecycle-registry"
 import { getRealNowMs } from "../../runtime/time/game-time"
@@ -44,6 +47,8 @@ export interface LifecycleDriftStatus {
     readonly memberNotInKernelNpcRooms: LifecycleDriftInvariantStats
     readonly viewerMultipleRoomClients: LifecycleDriftInvariantStats
     readonly closingPastDeadline: LifecycleDriftInvariantStats
+    /** 2b 双写比对:持久 raising_state ≠ 内核相位派生值(采样时点持续分歧) */
+    readonly raisingStateMismatch: LifecycleDriftInvariantStats
 }
 
 export interface LifecycleDriftSampleInput {
@@ -75,6 +80,7 @@ const DRIFT_INVARIANT_NAMES = [
     "memberNotInKernelNpcRooms",
     "viewerMultipleRoomClients",
     "closingPastDeadline",
+    "raisingStateMismatch",
 ] as const
 
 type DriftInvariantName = (typeof DRIFT_INVARIANT_NAMES)[number]
@@ -91,6 +97,7 @@ const trackers: Record<DriftInvariantName, InvariantTracker> = {
     memberNotInKernelNpcRooms: createTracker(),
     viewerMultipleRoomClients: createTracker(),
     closingPastDeadline: createTracker(),
+    raisingStateMismatch: createTracker(),
 }
 
 const sampleThrottle = new Map<string, number>()
@@ -227,6 +234,33 @@ export function sampleLifecycleDrift(nowMs: number, input: LifecycleDriftSampleI
         })
     }
     retireMissing("closingPastDeadline", inv5Present)
+
+    // INV-6(2b 双写比对):持久 raising_state vs 内核相位派生。
+    // 派生:recruiting→2、ready→1、battle→4、closing→4(外壳保持 4 直到
+    // disband)、closed→跳过(房间即将删除)。瞬态写入序分歧在下次写入自愈,
+    // 采样时点仍分歧=持久账差,计数+样本。
+    const inv6Present = new Set<string>()
+    for (const room of input.rooms) {
+        const state = lifecycleRegistry.get(room.room_number)
+        if (!state) continue
+        let derived: number
+        switch (state.phase) {
+            case "recruiting": derived = 2; break
+            case "ready": derived = 1; break
+            case "battle":
+            case "closing":
+                derived = 4; break
+            default:
+                continue // closed:房间待删除,不计
+        }
+        if (room.raising_state === derived) continue
+        inv6Present.add(room.room_number)
+        record("raisingStateMismatch", room.room_number, nowMs, {
+            roomNumber: room.room_number,
+            detail: `raisingState=${room.raising_state} kernelPhase=${state.phase} derived=${derived}`,
+        })
+    }
+    retireMissing("raisingStateMismatch", inv6Present)
 }
 
 export function getLifecycleDriftStatus(): LifecycleDriftStatus {
@@ -245,6 +279,7 @@ export function getLifecycleDriftStatus(): LifecycleDriftStatus {
         memberNotInKernelNpcRooms: snapshot(trackers.memberNotInKernelNpcRooms),
         viewerMultipleRoomClients: snapshot(trackers.viewerMultipleRoomClients),
         closingPastDeadline: snapshot(trackers.closingPastDeadline),
+        raisingStateMismatch: snapshot(trackers.raisingStateMismatch),
     })
 }
 

@@ -64,6 +64,7 @@ export interface AdminLifecycleDriftStatus {
     readonly memberNotInKernelNpcRooms: AdminLifecycleDriftInvariant
     readonly viewerMultipleRoomClients: AdminLifecycleDriftInvariant
     readonly closingPastDeadline: AdminLifecycleDriftInvariant
+    readonly raisingStateMismatch: AdminLifecycleDriftInvariant
 }
 
 export interface AdminMultiLifecycleRejections {
@@ -272,6 +273,7 @@ const LIFECYCLE_DRIFT_INVARIANT_KEYS = [
     "memberNotInKernelNpcRooms",
     "viewerMultipleRoomClients",
     "closingPastDeadline",
+    "raisingStateMismatch",
 ] as const
 const MAX_DRIFT_SAMPLES = 8
 const MAX_DRIFT_DETAIL_LENGTH = 120
