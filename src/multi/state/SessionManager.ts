@@ -5,7 +5,6 @@
 import * as net from "net"
 import { Result } from "../types"
 import { RoomState } from "../types"
-import { RoomStateMachine } from "./RoomStateMachine"
 import {
     participantKey,
     type BattleSessionId,
@@ -166,7 +165,6 @@ export class SessionManager {
     private battleSceneGeneration = new Map<string, number>()
     private finalizedBattleParticipantKeys = new Map<string, Set<string>>()
     private roomHostParticipants = new Map<string, ParticipantIdentity>()
-    private roomStates = new Map<string, RoomStateMachine>()
     private battleFacts = new BattleFactStore()
     private battleHeartbeatTimers = new Map<string, NodeJS.Timeout>()
     private battleLastActivityAt = new Map<string, number>()
@@ -1275,23 +1273,8 @@ export class SessionManager {
         this.finalizedBattleParticipantKeys.delete(roomNumber)
     }
 
-    getRoomState(roomNumber: string): RoomStateMachine {
-        let sm = this.roomStates.get(roomNumber)
-        if (!sm) {
-            sm = new RoomStateMachine()
-            this.roomStates.set(roomNumber, sm)
-        }
-        return sm
-    }
-
-    /** Seed a room's machine at its creation state; existing machines stay. */
-    initRoomState(roomNumber: string, initialState: RoomState): void {
-        if (this.roomStates.has(roomNumber)) return
-        this.roomStates.set(roomNumber, new RoomStateMachine(initialState))
-    }
-
     removeRoomState(roomNumber: string): void {
-        this.roomStates.delete(roomNumber)
+        // 2b.3(D5):RoomStateMachine 已删,本方法只清参与者锚与战斗期望计数
         this.roomHostParticipants.delete(roomNumber)
         this.clearBattleExpectedCount(roomNumber)
     }

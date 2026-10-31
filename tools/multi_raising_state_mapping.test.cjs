@@ -17,6 +17,7 @@ const {
     disbandRoom,
     updateRoomState,
 } = require("../src/multi/room/manager")
+const { createLifecycle, decide } = require("../src/multi/lifecycle")
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { RoomState } = require("../src/multi/types")
 
@@ -72,33 +73,54 @@ test("multi HTTP sources use the endpoint-specific mappings", () => {
     assert.match(roomSource, /restoreRoomUnavailableRaisingState\(/)
 })
 
-test("room owner persists only raising_state 1/2/4 through the state machine", t => {
+test("room owner persists only raising_state 1/2/4 (kernel-derived, D5 oracle)", t => {
     const room = createOwnerRoom(t)
     assert.equal(room.raising_state, 2)
-    const machine = sessionManager.getRoomState(room.room_number)
-    assert.equal(machine.getState(), RoomState.Filled)
 
     assert.equal(updateRoomState(room.room_number, 1), true)
     assert.equal(room.raising_state, 1)
-    assert.equal(machine.getState(), RoomState.Ready)
 
     assert.equal(updateRoomState(room.room_number, 4), true)
     assert.equal(room.raising_state, 4)
-    assert.equal(machine.getState(), RoomState.Battle)
 
     assert.equal(updateRoomState(room.room_number, 1), true)
     assert.equal(room.raising_state, 1)
-    assert.equal(machine.getState(), RoomState.Ready)
 
     assert.equal(updateRoomState(room.room_number, 1), true, "same-state rewrite stays legal")
 })
 
-test("unknown raising states fail closed without touching the room or machine", t => {
+test("D5 oracle: the kernel decides every transition the old edge table allowed", t => {
+    // 旧 RoomStateMachine 九条边(语义映射)在内核 decide() 的对等覆盖:
+    // [Waiting,Ready]=建房→host enter;[Ready,Filled]/[Filled,Ready]=同值重写;
+    // [Ready,Battle]/[Filled,Battle]=startBattle;[Battle,Ready]=hostReturn;
+    // [Ready,Filled→Disbanded]/[Battle,Disbanded]=disband→closing
+    let state = createLifecycle({ roomNumber: "901001", generation: 1, host: "viewer:901" })
+    const ok2 = (s, event) => {
+        const result = decide(s, event)
+        assert.equal(result.rejected, undefined, `unexpected: ${result.rejected}`)
+        return result.state
+    }
+    // Waiting→Ready(host enter)
+    state = ok2(state, { type: "enter", generation: 1, identity: "viewer:901", nowMs: 1_000 })
+    assert.equal(state.phase, "ready")
+    // Ready→Battle(startBattle)
+    state = ok2(state, { type: "startBattle", generation: 1, identity: "viewer:901", battleSessionId: "o1" })
+    assert.equal(state.phase, "battle")
+    // Battle→Ready(hostReturn,finalized 需先 finish)
+    state = ok2(state, { type: "finish", generation: 1, identity: "viewer:901", nowMs: 1_100, battleDeadlineMs: 900_000, battleSessionId: "o1" })
+    state = ok2(state, { type: "hostReturn", generation: 1, identity: "viewer:901", nowMs: 1_200 })
+    assert.equal(state.phase, "ready")
+    // Ready→Battle→Disbanded(disband→closing)
+    state = ok2(state, { type: "startBattle", generation: 1, identity: "viewer:901", battleSessionId: "o2" })
+    state = ok2(state, { type: "disband", generation: 1, identity: "viewer:901", nowMs: 1_300, closeDeadlineMs: 300_000 })
+    assert.equal(state.phase, "closing")
+    // Battle→Ready 的另一序:hostReturnPending 下最后 finish 直 4→1 已由 core 测试覆盖
+})
+
+test("unknown raising states fail closed without touching the room", t => {
     const room = createOwnerRoom(t)
     assert.equal(updateRoomState(room.room_number, 4), true)
-    const machine = sessionManager.getRoomState(room.room_number)
     const raisingBefore = room.raising_state
-    const machineBefore = machine.getState()
 
     for (const bad of [0, 3, 7, 9, 13, 99, 2.5, Number.NaN, "4", null, undefined]) {
         assert.equal(
@@ -107,7 +129,6 @@ test("unknown raising states fail closed without touching the room or machine", 
             `state=${String(bad)} must fail closed`,
         )
         assert.equal(room.raising_state, raisingBefore, `state=${String(bad)} must not touch the room`)
-        assert.equal(machine.getState(), machineBefore, `state=${String(bad)} must not touch the machine`)
     }
 })
 

@@ -1,6 +1,6 @@
 import { randomBytes, randomInt } from "crypto";
 import { describeError } from "../describe-error";
-import { MultiRoom, QuestCategory, RoomState } from "../types";
+import { MultiRoom, QuestCategory } from "../types";
 import { getRealNowMs } from "../../runtime/time/game-time";
 import { sessionManager } from "../state/SessionManager";
 import { identityOf, LIFECYCLE_BATTLE_DEADLINE_MS, LIFECYCLE_CLOSE_DEADLINE_MS, lifecycleRegistry } from "../lifecycle";
@@ -291,7 +291,6 @@ export function createRoom(
         npc_count: 0,
         npc_roster: [],
     };
-    sessionManager.initRoomState(roomNumber, RoomState.Filled)
     rooms.set(roomNumber, room);
     // B2a 影子：内核记录生命周期；B3 起成为权威。
     lifecycleRegistry.create(roomNumber, identityOf(hostParticipant))
@@ -381,23 +380,14 @@ export function removeRoomMember(roomNumber: string, participant: ParticipantIde
     return true;
 }
 
-// Wire raising_state numbers onto the RoomStateMachine lifecycle:
-// 2 (recruiting, room created with the host) → Filled, 1 (preparation after
-// host Enter) → Ready, 4 → Battle. StartBattle is legal from both Filled and
-// Ready; Battle → Ready stays legal for the post-battle rematch re-entry.
-// The room owner persists only these values; 3/7/9/13 are HTTP response
-// projections for the CN client parser and must never become room states.
+// 持久 raising_state 只含 1/2/4(2=recruiting/建房、1=房主 Enter 后、4=战斗/
+// 结算);3/7/9/13 是 CN 客户端解析器的 HTTP 投影,不得进房间态。转移合法性
+// 由内核 decide() 唯一权威(2b.3:D5 删 RoomStateMachine,边表留测试 oracle)。
 export type PersistentRaisingState = 1 | 2 | 4
 
 function isPersistentRaisingState(value: unknown): value is PersistentRaisingState {
     return value === 1 || value === 2 || value === 4
 }
-
-const RAISING_STATE_TO_ROOM_STATE: ReadonlyMap<PersistentRaisingState, RoomState> = new Map([
-    [2, RoomState.Filled],
-    [1, RoomState.Ready],
-    [4, RoomState.Battle],
-])
 
 export function updateRoomState(
     roomNumber: string,
@@ -409,16 +399,8 @@ export function updateRoomState(
         console.warn(`[MULTI] room state rejected: ${roomNumber} ${String(state)}`);
         return false;
     }
-    const machine = sessionManager.getRoomState(roomNumber)
-    const target = RAISING_STATE_TO_ROOM_STATE.get(state)
-    if (target === undefined) return false;
-    if (machine.getState() !== target) {
-        const transition = machine.tryTransition(target)
-        if (!transition.allowed) {
-            console.warn(`[MULTI] room state transition rejected: ${roomNumber} ${transition.reason}`);
-            return false;
-        }
-    }
+    // 2b.3(D5):RoomStateMachine 已删——转移合法性由内核 decide() 唯一权威,
+    // 外壳只做持久投影(内核先行,见 updateRoomStateFromKernel/INV-6)。
     const previousState = room.raising_state;
     console.log(`[MULTI] room state: ${roomNumber} → ${state}`);
     room.raising_state = state;

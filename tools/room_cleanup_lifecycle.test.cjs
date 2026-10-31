@@ -33,7 +33,6 @@ const {
     stopRoomCleanup,
     updateRoomState,
 } = require("../src/multi/room/manager")
-const { RoomState } = require("../src/multi/types")
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { lifecycleRegistry } = require("../src/multi/lifecycle")
 const { getServerTime } = require("../src/utils")
@@ -324,8 +323,6 @@ test("room number exhaustion fails without consuming or mutating room state", t 
     useRoomNumbers(234567)
     const existing = createRoom(104, 204, 1, 1, 304, 1, 404)
     const participant = { nodeSessionId: "collision-test", viewerId: existing.host_viewer_id }
-    const roomState = sessionManager.getRoomState(existing.room_number)
-    assert.equal(roomState.tryTransition(RoomState.Ready).allowed, true)
     sessionManager.setBattleParticipants(existing.room_number, [{
         connectionId: "collision-test-host",
         participant,
@@ -364,8 +361,6 @@ test("room number exhaustion fails without consuming or mutating room state", t 
     assert.equal(roomNumberGenerationCalls, 10)
     assert.equal(getRoom(existing.room_number), existing)
     assert.deepEqual(existing, existingSnapshot)
-    assert.equal(sessionManager.getRoomState(existing.room_number), roomState)
-    assert.equal(roomState.getState(), RoomState.Ready)
     assert.equal(sessionManager.getActiveBattleSessionId(existing.room_number), battleSessionId)
     cleanup()
     assert.equal(broadcasts.length, 1)
