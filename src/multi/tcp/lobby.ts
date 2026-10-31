@@ -380,6 +380,43 @@ export async function handleEnterComs(
         commitRoomMates(client, room, [...initialRealParticipants, ...seatedNow.map(
             assignment => buildNpcLobbyMate(client, client.roomNumber, assignment),
         )])
+        const committedRevision = commitRecruitmentRequest(room, requestId)
+        if (committedRevision === null) return
+        // 重建后照排两个旧 restore 任务:0ms 全客户端名单广播 + 500ms NPC
+        // ready(已入座 NPC 翻 ready → 房主 auto-ready 检查)
+        scheduleLobbyTask(lifecycle => {
+            try {
+                if (!lifecycle.isActive()) return
+                if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
+                const currentHostClient = findHostClient(client.roomNumber)
+                if (!currentHostClient) return
+                for (const enteredClient of sessionManager.getClientsInRoom(client.roomNumber)) {
+                    if (!enteredClient.enterData) continue
+                    const projectedMates = sessionManager.projectMateListForClient(
+                        enteredClient,
+                        currentHostClient.mates,
+                    )
+                    enteredClient.mates = projectedMates
+                    sessionManager.sendJson(enteredClient.socket, [1, [1, projectedMates]])
+                }
+            } catch { console.error("[LOBBY] EnterComs rebuild send-mates failed") }
+        }, 0)
+        if (seatedNow.length > 0) {
+            scheduleLobbyTask(lifecycle => {
+                try {
+                    if (!lifecycle.isActive()) return
+                    if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
+                    const currentHostClient = findHostClient(client.roomNumber)
+                    if (!currentHostClient) return
+                    for (const npc of currentHostClient.mates) {
+                        if (!npc.comId) continue
+                        npc.state = [1]
+                        sessionManager.broadcastToRoom(client.roomNumber, [1, [2, npc.connectionId, [1]]])
+                    }
+                    if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
+                } catch { console.error("[LOBBY] EnterComs rebuild npc-ready failed") }
+            }, npcRecruitmentTiming.readyDelayMs)
+        }
         if (unseated.length === 0) {
             console.log(`[LOBBY] EnterComs: rebuild-only (seated=${seatedNow.length})`)
         } else {
@@ -621,14 +658,16 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
                 // 2a2 续战/恢复路径（切出未开战或 4→1 后 roster 仍存活）：
                 // 立即虚拟回房已入座 NPC 并即时广播（joinDelay 0,不重演招募
                 // 剧场）。已入座者跳过,空位先到先得,抢输 NPC 销毁。
+                // 注意:restore 的 rebuild 是同步提交——本分支不得再覆盖投影。
                 void handleEnterComs(client, getLobbyLifecycleGuard(), { joinBroadcastDelayMs: 0 })
                     .catch(() => console.error("[LOBBY] EnterComs reconnect restore failed"))
+            } else {
+                // 无存活招募代（rematch OFF 清空/从未招募）:不自动重演招募——
+                // 招募只由房主主动发起（D8 触发矩阵:host reconnect 不新增）。
+                // 但房主本人的 mates 投影仍需重建（原 reconcile 的 commit 部分;
+                // 2a2 教训:删函数时把投影提交一起删了→beginBattle realMembers=0）。
+                commitRoomMates(client, room, getConnectedRealMates(client, room))
             }
-            // 无存活招募代（rematch OFF 清空/从未招募）:不自动重演招募——
-            // 招募只由房主主动发起（D8 触发矩阵:host reconnect 不新增）。
-            // 但房主本人的 mates 投影仍需重建（原 reconcile 的 commit 部分,
-            // 2a2 教训:删函数时把投影提交一起删了→beginBattle realMembers=0）。
-            commitRoomMates(client, room, getConnectedRealMates(client, room))
         }
         if (client.mates.length > 1) {
             sessionManager.broadcastMateListToRoom(client.roomNumber, client.mates, client)
