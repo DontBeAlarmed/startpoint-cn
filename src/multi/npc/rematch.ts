@@ -65,9 +65,8 @@ export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
     const { sessionManager } = require("../state/SessionManager") as typeof import("../state/SessionManager")
     const hostClient = sessionManager.getRoomHostClient(roomNumber)
     if (!hostClient) return
-    const projected = lobby.projectRoomMatesFromKernel(roomNumber, hostClient)
-    hostClient.mates = projected
-    room.mates = projected.map(mate => ({ viewer_id: mate.viewerId ?? null, com_id: mate.comId ?? 0 }))
-    lobby.broadcastReadyFramesForSeatedNpcs(roomNumber, projected)
+    // 投影提交走唯一写点(与填充/重建同一条 commitRoomMates 路径)
+    lobby.commitRoomMates(hostClient, room, lobby.projectRoomMatesFromKernel(roomNumber, hostClient))
+    lobby.broadcastReadyFramesForSeatedNpcs(roomNumber, hostClient.mates)
     lobby.checkHostAutoReady(roomNumber)
 }
