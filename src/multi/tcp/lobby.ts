@@ -588,18 +588,9 @@ export async function handleEnterComs(
             if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
             const currentHostClient = findHostClient(client.roomNumber)
             if (!currentHostClient) return
-            const recruitedNpcKeys = new Set(npcMates.map(npc =>
-                `${npc.comId}:${npc.viewerId}:${npc.connectionId}`
-            ))
-            const currentNpcMates = currentHostClient.mates.filter(npc =>
-                recruitedNpcKeys.has(`${npc.comId}:${npc.viewerId}:${npc.connectionId}`)
-            )
-            for (const npc of currentNpcMates) {
-                npc.state = [1]
-                const assignment = room.npc_roster.find(candidate => candidate.com_id === npc.comId)
-                if (assignment) assignment.ready = true
-                sessionManager.broadcastToRoom(client.roomNumber, [1, [2, npc.connectionId, [1]]])
-            }
+            // ①只有准备状态:NPC 入座即 ready([1] 随投影)——任务仅保留
+            // auto-ready 检查(500ms 时点=进场剧场到自动开战的固定间隔,
+            // 让 NPC 玩家看起来更像真人玩家,维护者裁定保留)
             if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
         } catch { console.error("[LOBBY] EnterComs npc-ready failed") }
     }, joinDelayMs + npcRecruitmentTiming.readyDelayMs)
