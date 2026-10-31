@@ -44,7 +44,8 @@ function activePlanRewards(missionId, stage) {
     return getActiveMissionPlanRewardStages(getActiveMissionPlan(), missionId)
         .find(definition => definition.stage === stage)?.rewards ?? []
 }
-const { addMissionProgressDelta } = require("../src/lib/mission/progress")
+const { addMissionProgressDelta, MAX_CLIENT_PROGRESS_DELTA } = require("../src/lib/mission/progress")
+const { collectClientProgressDeltas } = require("../src/lib/mission/client-progress")
 require("../src/data").initializeDatabase()
 db = require("../src/data/db").getDb()
 
@@ -92,10 +93,46 @@ assert.equal(
     false
 )
 
+assert.equal(MAX_CLIENT_PROGRESS_DELTA, 100)
 assert.equal(addMissionProgressDelta(4, 3), 7)
+assert.equal(addMissionProgressDelta(4, 100), 104)
+assert.equal(addMissionProgressDelta(4, 101), null)
+assert.equal(addMissionProgressDelta(0, Number.MAX_SAFE_INTEGER), null)
+assert.equal(addMissionProgressDelta(Number.MAX_SAFE_INTEGER - 10, 20), null)
 assert.equal(addMissionProgressDelta(4, 0), null)
 assert.equal(addMissionProgressDelta(4, -1), null)
 assert.equal(addMissionProgressDelta(4, 1.5), null)
+
+assert.equal(typeof collectClientProgressDeltas, "function")
+assert.deepEqual(
+    [...collectClientProgressDeltas([
+        { mission_pattern: "character_detail_play_dot_sp_motion_count", progress_value: 50 },
+    ])],
+    [["character_detail_play_dot_sp_motion_count", 50]],
+)
+assert.deepEqual(
+    [...collectClientProgressDeltas([
+        { mission_pattern: "home_tap_town_character_count", progress_value: 2 },
+        { mission_pattern: "home_tap_town_character_count", progress_value: 3 },
+    ])],
+    [["home_tap_town_character_count", 5]],
+)
+assert.deepEqual(
+    [...collectClientProgressDeltas([
+        { mission_pattern: "character_detail_play_dot_sp_motion_count", progress_value: 60 },
+        { mission_pattern: "character_detail_play_dot_sp_motion_count", progress_value: 60 },
+    ])],
+    [["character_detail_play_dot_sp_motion_count", 100]],
+)
+assert.deepEqual(
+    [...collectClientProgressDeltas([
+        { mission_pattern: "home_change_voice_count", progress_value: 101 },
+        { mission_pattern: "unknown_pattern", progress_value: 1 },
+        { mission_pattern: "__proto__", progress_value: 1 },
+        { mission_pattern: "constructor", progress_value: 1 },
+    ])],
+    [],
+)
 
 assert.deepEqual(catalogRewards(1, 1, 1), [{ kind: 0, amount: 5 }])
 assert.deepEqual(catalogRewards(2, 1, 1), [{ kind: 0, amount: 5 }])

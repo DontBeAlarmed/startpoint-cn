@@ -248,6 +248,78 @@ async function main() {
             "溢出增量必须 fail closed，不能让进度倒退或失去安全整数精度",
         )
 
+        const capAccount = insertAccountSync({
+            appId: "wf_cn",
+            idpAlias: "",
+            idpCode: "test",
+            idpId: `mission-progress-route-cap-${randomUUID()}`,
+            status: "normal",
+        })
+        const capPlayerId = insertDefaultPlayerSync(capAccount.id).id
+        const capViewerId = viewerId + 2
+        db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+            .run(String(capViewerId), capAccount.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+
+        const scopesBeforeOverCap = observedAutomaticScopes.length
+        for (const overCapDelta of [Number.MAX_SAFE_INTEGER, 101, 10000]) {
+            const response = await postPayload(fastify, {
+                viewer_id: capViewerId,
+                api_count: 1,
+                mission_param_list: [{
+                    mission_pattern: "character_detail_play_dot_sp_motion_count",
+                    progress_value: overCapDelta,
+                }],
+            })
+            assert.equal(response.statusCode, 200, response.body)
+        }
+        assert.deepEqual(
+            getPlayerCategoryMissionsSync(capPlayerId, 5),
+            {},
+            "超出单次上限的增量即使从零开始也必须 fail closed，不得写库",
+        )
+        assert.equal(observedAutomaticScopes.length, scopesBeforeOverCap)
+
+        const normalSceneFlushResponse = await postPayload(fastify, {
+            viewer_id: capViewerId,
+            api_count: 1,
+            mission_param_list: [{
+                mission_pattern: "character_detail_play_dot_sp_motion_count",
+                progress_value: 50,
+            }],
+        })
+        assert.equal(normalSceneFlushResponse.statusCode, 200, normalSceneFlushResponse.body)
+        assert.equal(
+            getPlayerCategoryMissionsSync(capPlayerId, 5)[48000].progress,
+            50,
+            "单次驻留累计 50 次像素特殊动作的正常切场景上报不得被截断",
+        )
+
+        const mergedResponse = await postPayload(fastify, {
+            viewer_id: capViewerId,
+            api_count: 1,
+            mission_param_list: [
+                { mission_pattern: "home_tap_town_character_count", progress_value: 2 },
+                { mission_pattern: "home_tap_town_character_count", progress_value: 3 },
+                ...Array.from({ length: 150 }, () => ({
+                    mission_pattern: "character_detail_play_dot_sp_motion_count",
+                    progress_value: 1,
+                })),
+                { mission_pattern: "home_change_voice_count", progress_value: 60 },
+                { mission_pattern: "home_change_voice_count", progress_value: 60 },
+            ],
+        })
+        assert.equal(mergedResponse.statusCode, 200, mergedResponse.body)
+        assert.deepEqual(
+            Object.fromEntries(Object.entries(getPlayerCategoryMissionsSync(capPlayerId, 5))
+                .map(([missionId, mission]) => [missionId, mission.progress])),
+            { 48000: 150, 49000: 5, 50000: 100 },
+            "同请求重复 pattern 必须先按 pattern 归并并受单次请求上限约束",
+        )
+        assert.deepEqual(observedAutomaticScopes.at(-1), [{
+            category: 5,
+            missionIds: [49000, 48000, 50000],
+        }])
+
         const orphanAccount = insertAccountSync({
             appId: "wf_cn",
             idpAlias: "",
