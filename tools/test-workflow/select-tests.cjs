@@ -124,11 +124,11 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
-        pattern: /^(?:src\/lib\/growth-fund\.ts|src\/routes\/api\/growthFund\.ts|tools\/growth_fund\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/growth-fund\.ts|src\/routes\/api\/growthFund\.ts)$/,
         groups: ["integration:reward-grant"],
     },
     {
-        pattern: /^(?:src\/routes\/api\/specialExchange\.ts|tools\/special_exchange\.test\.cjs)$/,
+        pattern: /^src\/routes\/api\/specialExchange\.ts$/,
         groups: ["integration:reward-grant"],
     },
     {
