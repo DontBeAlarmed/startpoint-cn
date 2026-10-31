@@ -280,6 +280,41 @@ function checkAllReadyAndStart(roomNumber: string): void {
     sessionManager.broadcastToRoom(roomNumber, [1, [10, 2]])
 }
 
+function buildNpcLobbyMate(
+    client: SessionClient,
+    roomNumber: string,
+    assignment: { com_id: number, name: string },
+    recruitedViewerId?: number,
+): any {
+    const hostMate = client.yourself ?? client.mates[0]
+    const comId = assignment.com_id
+    const viewerId = recruitedViewerId ?? (900000000 + comId)
+    const party = client.npcPartySnapshots[comId - 1]
+        ?? client.npcPartySnapshots[0]
+        ?? hostMate?.party
+    return {
+        viewerId,
+        comId,
+        name: assignment.name,
+        rank: hostMate?.rank,
+        degreeId: hostMate?.degreeId,
+        playerRoleKind: 99,
+        party,
+        connectionId: `${roomNumber}-npc-${comId}`,
+        autoplayMode: false,
+        autoskillMode: 1,
+        autoSpeedLevel: 1,
+        autoStart: false,
+        skillAbilityBehaviorMode: 1,
+        dashBehaviorMode: 1,
+        allowHealFromOtherPlayers: true,
+        state: [0],
+        entryTime: getRealNowMs(),
+        isNewbie: false,
+        isHost: false,
+    }
+}
+
 export async function handleEnterComs(
     client: SessionClient,
     lifecycle: LobbyLifecycleGuard = getLobbyLifecycleGuard(),
@@ -313,11 +348,43 @@ export async function handleEnterComs(
     room.npc_count = Math.max(0, 3 - initialRealMates.length)
     ensureNpcRoster(room, room.npc_count)
 
+    // 2a2:早退闸门只在"零空位且无已入座 NPC"时跳过——free=0 但 seats 里
+    // 有 NPC(restore/重入)仍需重建 mates 投影,否则第二次 EnterComs 会把
+    // 已入座 NPC 从名单里清掉。
+    // 2a2:名单重建与招募解耦——先按内核算出已入座/未入座 roster;投影恒含
+    // 已入座,新 admit 只补 free 名额;无未入座候选时纯重建(不发招募)。
+    // 真人投影过滤到内核参与者(seats ∪ joiners):票先占座——已接纳(含
+    // pending)真人在名单,未被接纳的等待者不进投影(D8)。
+    const kernelBeforeGate = lifecycleRegistry.get(client.roomNumber)
+    const seatedNow: typeof room.npc_roster = []
+    const unseated: typeof room.npc_roster = []
+    for (const assignment of room.npc_roster) {
+        const npcIdentity = npcIdentityOf(client.roomNumber, assignment.com_id)
+        if (kernelBeforeGate !== undefined && kernelBeforeGate.seats.includes(npcIdentity)) {
+            seatedNow.push(assignment)
+        } else {
+            unseated.push(assignment)
+        }
+    }
+    const isKernelParticipant = (mate: { viewerId: number }): boolean => {
+        if (kernelBeforeGate === undefined) return true
+        const identity = `viewer:${mate.viewerId}`
+        return kernelBeforeGate.seats.includes(identity) || kernelBeforeGate.joiners[identity] !== undefined
+    }
+    const initialRealParticipants = initialRealMates.filter(isKernelParticipant)
     const initialActiveCount = getAvailableNpcSlotCount(room, initialRealMates)
-    if (initialActiveCount <= 0) {
+    if (initialActiveCount <= 0 || unseated.length === 0) {
+        // 零空位(满员)或无未入座候选(纯重建):不发招募、不排定时器,
+        // 投影 = 内核参与者(真人含 pending)+ 已入座 NPC
         commitRecruitmentRequest(room, requestId)
-        commitRoomMates(client, room, initialRealMates)
-        console.log(`[LOBBY] EnterComs: room full (${initialRealMates.length} players), skip NPCs`)
+        commitRoomMates(client, room, [...initialRealParticipants, ...seatedNow.map(
+            assignment => buildNpcLobbyMate(client, client.roomNumber, assignment),
+        )])
+        if (unseated.length === 0) {
+            console.log(`[LOBBY] EnterComs: rebuild-only (seated=${seatedNow.length})`)
+        } else {
+            console.log(`[LOBBY] EnterComs: room full (${initialRealParticipants.length} players), skip NPCs`)
+        }
         return
     }
 
@@ -327,23 +394,12 @@ export async function handleEnterComs(
     if (requestId < getRoomRecruitmentState(room).committedRequestId) return
 
     // Real players may enter while the provider is pending. Rebuild from current room state.
-    const currentRealMates = getConnectedRealMates(client, room)
-    // 2a1.2/2a2:名单重建必须包含"已入座"的 roster 条目(restore/重入时
-    // free=0 但 NPC 已在座——只按空位取会清掉 mates 里的 NPC);新 admits
-    // 只补 free 名额,已在座者直接保留。
-    const kernelStateNow = lifecycleRegistry.get(client.roomNumber)
-    const seatedNow: typeof room.npc_roster = []
-    const unseated: typeof room.npc_roster = []
-    for (const assignment of room.npc_roster) {
-        const npcIdentity = npcIdentityOf(client.roomNumber, assignment.com_id)
-        if (kernelStateNow !== undefined && kernelStateNow.seats.includes(npcIdentity)) {
-            seatedNow.push(assignment)
-        } else {
-            unseated.push(assignment)
-        }
-    }
+    const currentRealMates = getConnectedRealMates(client, room).filter(isKernelParticipant)
     const freeSlots = getAvailableNpcSlotCount(room, currentRealMates)
-    const assignments = [...seatedNow, ...unseated.slice(0, freeSlots)]
+    // 补位从 roster 尾部取(旧 getActiveNpcRoster slice(-count) 语义:com_id
+    // 大者先填,与"真人替换 com_id 1"的替换次序一致)
+    const tailStart = Math.max(0, unseated.length - freeSlots)
+    const assignments = [...seatedNow, ...unseated.slice(tailStart)]
 
     // 2a1.2：NPC 以占座参与者身份走与真人相同的 admit→handshake→enter 流水线
     // （提交点同步三连派发，无 I/O）。admit 被拒=真人先到/满员 → 抢输销毁：
@@ -391,36 +447,9 @@ export async function handleEnterComs(
 
     const npcMates: any[] = []
     const recruitedByComId = new Map(recruitResult.recruitedMates.map(mate => [mate.com_id, mate]))
-    for (let i = 0; i < seatedAssignments.length; i++) {
-        const assignment = seatedAssignments[i]
+    for (const assignment of seatedAssignments) {
         const recruited = recruitedByComId.get(assignment.com_id)
-        const comId = assignment.com_id
-        const viewerId = recruited?.viewer_id ?? (900000000 + comId)
-        const party = client.npcPartySnapshots[assignment.com_id - 1]
-            ?? client.npcPartySnapshots[0]
-            ?? hostMate.party
-
-        npcMates.push({
-            viewerId: viewerId,
-            comId: comId,
-            name: assignment.name,
-            rank: hostMate.rank,
-            degreeId: hostMate.degreeId,
-            playerRoleKind: 99,
-            party,
-            connectionId: `${client.roomNumber}-npc-${comId}`,
-            autoplayMode: false,
-            autoskillMode: 1,
-            autoSpeedLevel: 1,
-            autoStart: false,
-            skillAbilityBehaviorMode: 1,
-            dashBehaviorMode: 1,
-            allowHealFromOtherPlayers: true,
-            state: [0],
-            entryTime: getRealNowMs(),
-            isNewbie: false,
-            isHost: false,
-        })
+        npcMates.push(buildNpcLobbyMate(client, client.roomNumber, assignment, recruited?.viewer_id))
     }
 
     const committedRevision = commitRecruitmentRequest(room, requestId)
