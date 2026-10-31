@@ -17,6 +17,7 @@ import { applyNpcPostFill } from "../npc/release"
 import { closeRecruitmentForRoom, updateOpenRecruitmentSnapshotForRoom } from "../../data/domains/attention"
 import { isEffectSwitched } from "../lifecycle/effect-executor"
 import { npcIdentityOf } from "../npc/identity"
+import { recordEntryStage } from "../lifecycle/entry-pipeline"
 import { incrementFollowBonusForBattle } from "../../lib/follow-bonus"
 import { safeEvolutionImgLevel } from "../safe-display-fields"
 import { getRealNowMs } from "../../runtime/time/game-time"
@@ -651,12 +652,15 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         // dismiss 让客户端走拆除重进流程——外壳成员账不得越过内核账
         // （2026-10-31 真机 699560："guest entered"写在内核连拒之后）。
         if (enterDecision?.rejected) {
+            recordEntryStage("enterRejected")
+            recordEntryStage("rollbackMembersRemoved")
             removeRoomMember(client.roomNumber, client.participant!)
             sessionManager.dismissSingleClient(client)
             console.log(`[LOBBY] enter rejected by lifecycle: room=${client.roomNumber}`
                 + ` reason=${enterDecision.rejected}`)
             return
         }
+        recordEntryStage("enterAccepted")
         // HostReturn 清空 ready 后，房主重进时按客户端当前 ready 重新同步。
         lifecycleRegistry.dispatch(client.roomNumber, generation => ({
             type: "ready",

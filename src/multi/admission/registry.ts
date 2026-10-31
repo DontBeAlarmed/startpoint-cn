@@ -2,6 +2,7 @@ import type { CoordinatorErrorCode, ParticipantIdentity } from "../coordinator/c
 import type { PlayerSnapshot } from "../snapshot/player-snapshot"
 import { getRoom, getRoomOccupiedMemberCount, isRoomViewerMember } from "../room/manager"
 import { identityOf, lifecycleRegistry } from "../lifecycle"
+import { recordEntryStage } from "../lifecycle/entry-pipeline"
 import { getRealNowMs } from "../../runtime/time/game-time"
 
 const MAX_REAL_ROOM_MEMBERS = 3
@@ -108,9 +109,11 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
                 const refreshReject = this.recordAdmissionIntent(roomNumber, refreshed.participant)
                 if (refreshReject !== null
                     && !this.isOccupiedMember(roomNumber, input.participant.viewerId)) {
+                    recordEntryStage("issueRejected")
                     this.admissions.delete(admissionKey)
                     return { ok: false, error: refreshReject }
                 }
+                recordEntryStage("issued")
                 this.admissions.set(admissionKey, refreshed)
                 return { ok: true, value: refreshed }
             }
@@ -150,9 +153,11 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         // 释放属 B3a 预期，内核拒绝被有意忽略（与 2026-10-30 占座豁免一致）。
         if (kernelReject !== null
             && !this.isOccupiedMember(roomNumber, input.participant.viewerId)) {
+            recordEntryStage("issueRejected")
             this.admissions.delete(admissionKey)
             return { ok: false, error: kernelReject }
         }
+        recordEntryStage("issued")
         return { ok: true, value: admission }
     }
 
@@ -192,6 +197,7 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
             return null
         }
         this.admissions.delete(admissionKey)
+        recordEntryStage("consumed")
         return admission
     }
 

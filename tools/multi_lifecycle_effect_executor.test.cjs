@@ -272,3 +272,28 @@ test("effect switches: closeRecruitment executes only when switched, with applie
         setLifecycleEffectApplier(null)
     }
 })
+
+test("entry pipeline counters track issue/consume/handshake/enter stages", () => {
+    const { recordEntryStage, getEntryPipelineStatus, resetEntryPipelineForTest } =
+        require("../src/multi/lifecycle/entry-pipeline")
+    resetEntryPipelineForTest()
+    recordEntryStage("issued")
+    recordEntryStage("consumed")
+    recordEntryStage("handshakeAccepted")
+    recordEntryStage("enterAccepted")
+    recordEntryStage("issueRejected")
+    recordEntryStage("handshakeRejected")
+    recordEntryStage("enterRejected")
+    recordEntryStage("rollbackMembersRemoved")
+    const status = getEntryPipelineStatus()
+    assert.equal(status.issued, 1)
+    assert.equal(status.consumed, 1)
+    assert.equal(status.handshakeAccepted, 1)
+    assert.equal(status.enterAccepted, 1)
+    assert.equal(status.issueRejected, 1)
+    assert.equal(status.handshakeRejected, 1)
+    assert.equal(status.enterRejected, 1)
+    assert.equal(status.rollbackMembersRemoved, 1)
+    resetEntryPipelineForTest()
+    assert.equal(getEntryPipelineStatus().issued, 0)
+})

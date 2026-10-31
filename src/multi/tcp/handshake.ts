@@ -15,6 +15,7 @@ import {
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
 import { identityOf, lifecycleRegistry } from "../lifecycle"
+import { recordEntryStage } from "../lifecycle/entry-pipeline"
 import type { SessionClient } from "../state/SessionManager"
 import {
     embeddedAdmissionRegistry,
@@ -302,6 +303,7 @@ export async function handleHandshake(
         // 内核拒绝=该 viewer 已不能进（迟到票/容量/相位在签发后变化）：
         // 回滚本段全部外壳写入再优雅拒绝——外壳成员账不得越过内核账。
         if (handshakeDecision?.rejected) {
+            recordEntryStage("handshakeRejected")
             removeRoomMember(normalizedRoomNumber, admission.participant)
             sessionManager.removeClient(client)
             releaseAdmission()
@@ -311,6 +313,7 @@ export async function handleHandshake(
             ))
             return
         }
+        recordEntryStage("handshakeAccepted")
         sessionManager.sendJson(socket, [0, normalizedConnectionId, normalizedRoomNumber])
         return
     }
