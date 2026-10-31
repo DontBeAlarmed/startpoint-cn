@@ -41,7 +41,8 @@ const clearedBattleSessions = new Map<string, string>()
  */
 export function clearRoomNpcRoster(roomNumber: string, battleSessionId?: string): void {
     try {
-        if (!getServerGameplaySettingsSync().multiNpcOneShotLifecycle) return
+        // 2a1.4：正向语义读取——续战开启则不清空（= 旧 !multiNpcOneShotLifecycle）
+        if (getServerGameplaySettingsSync().npcRematchEnabled) return
         const room = getRoom(roomNumber)
         if (!room || (room.npc_count <= 0 && !room.is_npc_mode)) return
 

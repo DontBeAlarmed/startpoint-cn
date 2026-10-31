@@ -10,6 +10,8 @@ export interface ServerGameplaySettings {
     readonly multiNpcReleaseSeconds: number
     readonly multiNpcCloseRecruitmentAfterFill: boolean
     readonly multiNpcOneShotLifecycle: boolean
+    /** 只读派生：NPC 续战开关（= !multiNpcOneShotLifecycle，默认 ON） */
+    readonly npcRematchEnabled: boolean
     readonly updatedAt: string
 }
 
@@ -53,6 +55,10 @@ function mapSettings(row: RawServerGameplaySettings | undefined): ServerGameplay
         multiNpcReleaseSeconds: row.multi_npc_release_seconds,
         multiNpcCloseRecruitmentAfterFill: row.multi_npc_close_recruitment_after_fill === 1,
         multiNpcOneShotLifecycle: row.multi_npc_one_shot_lifecycle === 1,
+        // 2a1.4：NPC 续战开关 = one-shot 字段的反向派生（D8：默认续战 ON）。
+        // 只读派生——可写入口仍只有 multiNpcOneShotLifecycle，避免后台同时
+        // 出现两个相反开关（评估文档 §3.6）。
+        npcRematchEnabled: row.multi_npc_one_shot_lifecycle !== 1,
         updatedAt: row.updated_at,
     }
 }
