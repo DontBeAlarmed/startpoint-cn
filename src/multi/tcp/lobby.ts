@@ -282,6 +282,20 @@ function checkAllReadyAndStart(roomNumber: string): void {
  * 尚未入座)按 joiner 序追尾。真机回归的排序问题([房主|B|NPC] 应为
  * [房主|NPC|B])即由本函数统一:任何重建/合并路径不得再自行排序。
  */
+/**
+ * 2c.2:给名单中全部"已就绪 NPC"补发 [2] ready 帧——客户端成员对象的
+ * 准备态由 [2] 帧驱动,任何名单重建都会把准备显示打回,须按帧再确认。
+ * 服务端状态(list state/roster.ready)不在此翻转,由各翻转点负责。
+ */
+export function broadcastReadyFramesForSeatedNpcs(roomNumber: string, mates: any[]): void {
+    const { sessionManager } = require("../state/SessionManager") as typeof import("../state/SessionManager")
+    for (const mate of mates) {
+        if (!mate.comId) continue
+        if (mate.state?.[0] !== 1) continue
+        sessionManager.broadcastToRoom(roomNumber, [1, [2, mate.connectionId, [1]]])
+    }
+}
+
 export function projectRoomMatesFromKernel(roomNumber: string, forClient: SessionClient): any[] {
     const room = getRoom(roomNumber)
     if (!room) return forClient.mates
@@ -465,11 +479,8 @@ export async function handleEnterComs(
                     if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
                     const currentHostClient = findHostClient(client.roomNumber)
                     if (!currentHostClient) return
-                    for (const npc of currentHostClient.mates) {
-                        if (!npc.comId) continue
-                        npc.state = [1]
-                        sessionManager.broadcastToRoom(client.roomNumber, [1, [2, npc.connectionId, [1]]])
-                    }
+                    // rebuild 后同样以 helper 再确认全部就绪 NPC 的 [2] 帧
+                    broadcastReadyFramesForSeatedNpcs(client.roomNumber, currentHostClient.mates)
                     if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
                 } catch { console.error("[LOBBY] EnterComs rebuild npc-ready failed") }
             }, npcRecruitmentTiming.readyDelayMs)
@@ -592,18 +603,17 @@ export async function handleEnterComs(
             // (assignment.ready 置位→投影 [1])+ [2] ready 帧(客户端成员
             // 对象的准备态由 [2] 帧驱动)+auto-ready 检查(500ms 时点=
             // 进场剧场到自动开战的固定间隔,让 NPC 玩家看起来更像真人玩家)
-            const recruitedNpcKeys = new Set(npcMates.map(npc =>
-                `${npc.comId}:${npc.viewerId}:${npc.connectionId}`
-            ))
-            const currentNpcMates = currentHostClient.mates.filter(npc =>
-                recruitedNpcKeys.has(`${npc.comId}:${npc.viewerId}:${npc.connectionId}`)
-            )
-            for (const npc of currentNpcMates) {
-                npc.state = [1]
+            // 翻转仅限本次新招募;[2] 帧发给全部就绪 NPC(含旧的——名单
+            // 重建会打回客户端准备显示,统一由 helper 再确认)。
+            // 注意:名单条目是投影重建的新对象(与 npcMates 不同引用),
+            // 必须按 connectionId 定位名单条目翻转。
+            for (const npc of npcMates) {
                 const assignment = room.npc_roster.find(candidate => candidate.com_id === npc.comId)
                 if (assignment) assignment.ready = true
-                sessionManager.broadcastToRoom(client.roomNumber, [1, [2, npc.connectionId, [1]]])
+                const listed = currentHostClient.mates.find(candidate => candidate.connectionId === npc.connectionId)
+                if (listed) listed.state = [1]
             }
+            broadcastReadyFramesForSeatedNpcs(client.roomNumber, currentHostClient.mates)
             if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
         } catch { console.error("[LOBBY] EnterComs npc-ready failed") }
     }, joinDelayMs + npcRecruitmentTiming.readyDelayMs)

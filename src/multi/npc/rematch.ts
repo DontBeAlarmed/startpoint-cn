@@ -53,7 +53,13 @@ export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
         seatedCount += 1
     }
     if (seatedCount === 0) return
-    // NPC 续战回房即就绪(与玩家开续战自动准备一致):翻转投影 + auto-ready。
+    console.log(`[MULTI] npc rematch return: room=${roomNumber} seated=${seatedCount}`
+        + ` roster=${room.npc_roster.length}`)
+    // 投影重建 + ready 帧 + auto-ready:仅在房主 client 存在时执行——
+    // 内核入座已完成,缺席时由房主随后的 TCP enter 的无条件投影重建兜底
+    //(2026-11-01 真机教训:此守卫曾放在入座之前,开战瞬间房主大厅 socket
+    // 已关 → 4→1 时点 hostClient=undefined → 整个回房被误杀,直到房主
+    // 下一次状态轮询才触发——表现为"NPC 等另一名玩家返回才出现")。
     // lobby 内部函数经惰性 require 引入(本模块被 embedded 持有,避免加载环)。
     const lobby = require("../tcp/lobby") as typeof import("../tcp/lobby")
     const { sessionManager } = require("../state/SessionManager") as typeof import("../state/SessionManager")
@@ -62,9 +68,6 @@ export function returnNpcRosterAfterHostReturn(roomNumber: string): void {
     const projected = lobby.projectRoomMatesFromKernel(roomNumber, hostClient)
     hostClient.mates = projected
     room.mates = projected.map(mate => ({ viewer_id: mate.viewerId ?? null, com_id: mate.comId ?? 0 }))
-    for (const mate of projected) {
-        if (!mate.comId) continue
-        sessionManager.broadcastToRoom(roomNumber, [1, [2, mate.connectionId, [1]]])
-    }
+    lobby.broadcastReadyFramesForSeatedNpcs(roomNumber, projected)
     lobby.checkHostAutoReady(roomNumber)
 }
