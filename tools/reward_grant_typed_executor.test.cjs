@@ -199,13 +199,28 @@ test("real repeated Character and Equipment entries preserve per-entry outcomes"
         createRewardGrantExecutionPlan([
             { type: RewardType.CHARACTER, id: characterId },
             { type: RewardType.CHARACTER, id: characterId },
+            { type: RewardType.CHARACTER, id: characterId },
         ]),
     )
     assert.equal(firstResult.entries[0].outcome.isNew, true)
     assert.equal(firstResult.entries[0].outcome.compensationItem, null)
     assert.equal(firstResult.entries[1].outcome.isNew, false)
     assert.ok(firstResult.entries[1].outcome.compensationItem)
+    assert.equal(firstResult.entries[2].outcome.isNew, false)
+    assert.ok(firstResult.entries[2].outcome.compensationItem)
+    assert.equal(firstResult.assets.characters.length, 1)
     assert.equal(firstResult.assets.characters[0].joined, true)
+    const mergedNewCharacterAfter = firstResult.assets.characters[0].after
+    assert.equal(mergedNewCharacterAfter.character_id, characterId)
+    assert.equal(mergedNewCharacterAfter.viewer_id, 0)
+    assert.equal(mergedNewCharacterAfter.entry_count, 1)
+    assert.equal(mergedNewCharacterAfter.exp, 0)
+    assert.equal(mergedNewCharacterAfter.exp_total, 0)
+    assert.equal(mergedNewCharacterAfter.mana_board_index, 1)
+    assert.ok(Array.isArray(mergedNewCharacterAfter.bond_token_list))
+    assert.ok(mergedNewCharacterAfter.bond_token_list.length >= 1)
+    assert.equal(mergedNewCharacterAfter.stack, 2)
+    assert.equal(getPlayerCharacterSync(firstPlayerId, characterId).stack, 2)
 
     const equipmentPlayerId = createPlayer("typed-repeated-equipment")
     const equipmentResult = executeRewardGrantExecutionPlanSync(

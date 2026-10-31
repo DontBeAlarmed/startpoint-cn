@@ -165,6 +165,30 @@ test("owned snapshots preserve __proto__ as inert data", () => {
     assert.deepEqual(snapshot.__proto__, { polluted: true })
     assert.equal(snapshot.polluted, undefined)
     assert.equal({}.polluted, undefined)
+
+    const repeatedPlan = createRewardGrantExecutionPlan([
+        { type: RewardType.CHARACTER, id: 203 },
+        { type: RewardType.CHARACTER, id: 203 },
+    ])
+    const repeatedResult = createRewardGrantExecutionResult(
+        44,
+        repeatedPlan,
+        [
+            characterOutcome(203, { after }),
+            characterOutcome(203, {
+                isNew: false,
+                after: JSON.parse('{"character_id":203,"stack":1,"__proto__":{"polluted":true}}'),
+                compensationItem: item(14002, 1, 0),
+            }),
+        ],
+        emptyPlayer(44),
+    )
+    const mergedSnapshot = repeatedResult.assets.characters[0].after
+    assert.equal(Object.getPrototypeOf(mergedSnapshot), Object.prototype)
+    assert.equal(Object.hasOwn(mergedSnapshot, "__proto__"), true)
+    assert.deepEqual(mergedSnapshot.__proto__, { polluted: true })
+    assert.equal(mergedSnapshot.polluted, undefined)
+    assert.equal({}.polluted, undefined)
 })
 
 test("Character and Equipment require plain object top-level after-state", () => {

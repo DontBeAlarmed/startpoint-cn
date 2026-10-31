@@ -6,6 +6,12 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 
 const {
+    STACK_CHARACTER_GROWTH_FIELDS,
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+} = require("../src/lib/character-growth/response-projector")
+const { projectCharacterPatch } = require("../src/lib/common-response/entities")
+const {
     RewardGrantContractValidationError,
     createRewardGrantExecutionPlan,
     createRewardGrantExecutionResult,
@@ -162,6 +168,130 @@ test("typed result preserves entry outcomes and aggregates final assets in first
     assertDeepFrozen(result)
     assert.throws(() => { result.entries[0].index = 9 }, TypeError)
     assert.throws(() => { result.assets.characters[0].after.bond_token_list[0].status = 2 }, TypeError)
+})
+
+test("duplicate Character outcomes in one plan preserve initial new-character fields under stack-only updates", () => {
+    const plan = createRewardGrantExecutionPlan([
+        { type: RewardType.CHARACTER, id: 201 },
+        { type: RewardType.CHARACTER, id: 201 },
+        { type: RewardType.CHARACTER, id: 201 },
+    ])
+    const joinTime = new Date("2026-01-01T00:00:00.000Z")
+    const baseCharacter = {
+        entryCount: 1,
+        evolutionLevel: 0,
+        overLimitStep: 0,
+        protection: false,
+        joinTime,
+        updateTime: joinTime,
+        exp: 0,
+        stack: 0,
+        manaBoardIndex: 1,
+        bondTokenList: [{ manaBoardIndex: 1, status: 0 }],
+    }
+    const initialAfter = projectCharacterGrowthEntry({
+        characterId: 201,
+        character: baseCharacter,
+        state: characterGrowthProjectionStateFromPlayerCharacter(201, baseCharacter),
+        viewerId: 0,
+        fields: [
+            "entry_count",
+            "exp",
+            "exp_total",
+            "bond_token_list",
+            "mana_board_index",
+            "create_time",
+            "update_time",
+            "join_time",
+        ],
+    })
+    const firstDuplicateCharacter = {
+        ...baseCharacter,
+        stack: 1,
+        updateTime: new Date("2026-01-01T00:00:01.000Z"),
+    }
+    const firstStackPatchAfter = projectCharacterGrowthEntry({
+        characterId: 201,
+        character: firstDuplicateCharacter,
+        state: characterGrowthProjectionStateFromPlayerCharacter(201, firstDuplicateCharacter),
+        fields: STACK_CHARACTER_GROWTH_FIELDS,
+    })
+    const secondDuplicateCharacter = {
+        ...baseCharacter,
+        stack: 2,
+        updateTime: new Date("2026-01-01T00:00:02.000Z"),
+    }
+    const secondStackPatchAfter = projectCharacterGrowthEntry({
+        characterId: 201,
+        character: secondDuplicateCharacter,
+        state: characterGrowthProjectionStateFromPlayerCharacter(201, secondDuplicateCharacter),
+        fields: STACK_CHARACTER_GROWTH_FIELDS,
+    })
+    const result = createRewardGrantExecutionResult(7, plan, [
+        {
+            kind: "character",
+            characterId: 201,
+            isNew: true,
+            after: initialAfter,
+            compensationItem: null,
+        },
+        {
+            kind: "character",
+            characterId: 201,
+            isNew: false,
+            after: firstStackPatchAfter,
+            compensationItem: item(102, 1, 1, 0, 0),
+        },
+        {
+            kind: "character",
+            characterId: 201,
+            isNew: false,
+            after: secondStackPatchAfter,
+            compensationItem: item(102, 1, 1, 0, 1),
+        },
+    ], {
+        playerId: 7,
+        freeMana: 0,
+        freeVmoney: 0,
+        expPool: 0,
+    })
+
+    assert.equal("stack" in result.entries[0].outcome.after, false)
+    assert.equal("entry_count" in result.entries[1].outcome.after, false)
+    assert.equal("entry_count" in result.entries[2].outcome.after, false)
+    assert.deepEqual(result.assets.characters, [{
+        characterId: 201,
+        joined: true,
+        after: {
+            ...initialAfter,
+            ...firstStackPatchAfter,
+            ...secondStackPatchAfter,
+        },
+    }])
+    const projectedPatch = projectCharacterPatch(result.assets.characters[0].after)
+    assert.equal(projectedPatch.character_id, 201)
+    assert.equal(projectedPatch.entry_count, 1)
+    assert.equal(projectedPatch.exp, 0)
+    assert.equal(projectedPatch.exp_total, 0)
+    assert.equal(projectedPatch.mana_board_index, 1)
+    assert.deepEqual(projectedPatch.bond_token_list, [{ mana_board_index: 1, status: 0 }])
+    assert.equal(projectedPatch.stack, 2)
+    assertDeepFrozen(result)
+    assert.deepEqual(snapshotRewardGrantExecutionResultForPlan(7, plan, result), result)
+    assert.throws(
+        () => snapshotRewardGrantExecutionResultForPlan(7, plan, {
+            ...result,
+            assets: {
+                ...result.assets,
+                characters: [{
+                    characterId: 201,
+                    joined: true,
+                    after: secondStackPatchAfter,
+                }],
+            },
+        }),
+        RewardGrantContractValidationError,
+    )
 })
 
 test("collects direct and Character compensation dispositions in execution order", () => {

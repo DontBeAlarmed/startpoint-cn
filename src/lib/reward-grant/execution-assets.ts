@@ -7,8 +7,28 @@ import {
     type RewardGrantFinalCurrency,
     type RewardGrantFinalEquipment,
     type RewardGrantItemOutcome,
+    type RewardGrantObjectSnapshot,
+    type RewardGrantSnapshot,
 } from "./execution-contract"
 import { addRewardGrantAmount } from "./execution-outcome"
+
+function mergeObjectSnapshots(
+    previous: RewardGrantObjectSnapshot,
+    next: RewardGrantObjectSnapshot,
+): RewardGrantObjectSnapshot {
+    const merged: Record<string, RewardGrantSnapshot> = {}
+    for (const snapshot of [previous, next]) {
+        for (const key of Object.keys(snapshot)) {
+            Object.defineProperty(merged, key, {
+                configurable: true,
+                enumerable: true,
+                writable: true,
+                value: Object.getOwnPropertyDescriptor(snapshot, key)!.value,
+            })
+        }
+    }
+    return Object.freeze(merged)
+}
 
 export function aggregateRewardGrantAssets(
     entries: readonly RewardGrantExecutionEntryResult[],
@@ -116,7 +136,9 @@ export function aggregateRewardGrantAssets(
             const final = Object.freeze({
                 characterId: outcome.characterId,
                 joined: existingIndex === undefined ? outcome.isNew : characters[existingIndex].joined,
-                after: outcome.after,
+                after: existingIndex === undefined
+                    ? outcome.after
+                    : mergeObjectSnapshots(characters[existingIndex].after, outcome.after),
             })
             if (existingIndex === undefined) {
                 characterIndices.set(outcome.characterId, characters.length)
