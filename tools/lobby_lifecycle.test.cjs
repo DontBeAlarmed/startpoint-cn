@@ -1049,3 +1049,33 @@ test("probe: B leave preserves the seated NPC ready state server-side", async t 
     assert.ok(npcAfter, "B 离开后 NPC 仍在名单")
     assert.equal(npcAfter.state?.[0], 1, "B 离开后 NPC 准备态保持")
 })
+
+test("auto-start countdown refires after a cancel and is cleared on disband", async t => {
+    const { host, guests } = createLobbyRoom(t, 506, [606, 607])
+    const guestsAll = guests
+    for (const c of [host, ...guestsAll]) {
+        handleMessage(c.socket, [0, [0, { party: {} }]])
+    }
+    const countdownFrames = () => [host, ...guestsAll].reduce((count, c) => (
+        count + c.socket.writes.filter(message => (
+            message?.[1]?.[0] === 10 && message[1][1] === 2
+        )).length
+    ), 0)
+    const guestReadies = (guest, ready) => handleMessage(guest.socket, [0, [3, [ready ? 1 : 0]]])
+
+    // 全员就绪 → 倒计时 [10,2]
+    handleMessage(host.socket, [0, [3, [1]]])
+    for (const g of guestsAll) guestReadies(g, true)
+    const afterFirst = countdownFrames()
+    assert.ok(afterFirst >= 1, "first all-ready fires the countdown")
+
+    // 取消一人 → 倒计时失效;重新就绪 → 倒计时必须重发(修复前被集合守卫压死)
+    guestReadies(guestsAll[0], false)
+    const afterCancel = countdownFrames()
+    guestReadies(guestsAll[0], true)
+    assert.ok(countdownFrames() > afterCancel, "countdown refires after cancel + re-ready")
+
+    // 解散 → 集合清理(disband-listener);解散后旧 socket 全断,验证收尾不抛
+    handleMessage(host.socket, [0, [1]])
+    assert.equal(getRoom(host.client.roomNumber), undefined)
+})

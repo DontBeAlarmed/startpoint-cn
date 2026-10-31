@@ -6,6 +6,7 @@ import { sessionManager } from "../state/SessionManager"
 import { identityOf, lifecycleRegistry } from "../lifecycle"
 import { isEffectSwitched } from "../lifecycle/effect-executor"
 import { applyEffects } from "../lifecycle/apply-effects"
+import { clearAutoStartingRoom } from "../tcp/lobby"
 import { setLifecycleEffectApplier } from "../lifecycle/room-lifecycle-registry"
 import { setRoomDisbandListener } from "./manager"
 
@@ -39,6 +40,8 @@ export function installDisbandLifecycleListener(): void {
         } catch (error) {
             console.error(`[MULTI] room share disband cleanup failed: room=${roomNumber}: ${describeError(error)}`)
         }
+        // 倒计时集合清理:解散后房号复用不得被旧条目压死新房间的倒计时
+        clearAutoStartingRoom(roomNumber)
         // W1a：closeRecruitmentForRoom 为异步形状——同步 listener 内
         // fire-and-forget（拒绝就地捕获，不得成为 unhandled rejection）。
         // 切片 1 第③步：开关启用后由执行器消费内核 disband 的

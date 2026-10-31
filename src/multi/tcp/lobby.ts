@@ -254,18 +254,23 @@ function formatLogTag(value: unknown): string {
 }
 
 function checkAllReadyAndStart(roomNumber: string): void {
-    if (autoStartingRooms.has(roomNumber)) return
     const hostClient = findHostClient(roomNumber)
     if (!hostClient) return
     const room = getRoom(roomNumber)
     if (!room) return
 
-    // 前置 mates.length>=3 已覆盖满员判定——总参与者口径下 NPC 占座计入
-    // 名单,"等真人"的旧期望门被支配(保留删除均不改变行为,注释钉死性质)
-    if (hostClient.mates.length < 3) return
+    // 倒计时失效语义:未满员或有人取消准备 → 清集合,让下次全员就绪能
+    // 重新广播倒计时(此前集合只在 StartBattle 删除——取消/离开/房号复用
+    // 后倒计时不重发,真机 2026-11-01 报告)。失效判断必须在集合守卫之前:
+    // 守卫命中即 return,失效删除放在守卫之后永远走不到。
+    const allReady = hostClient.mates.length >= 3
+        && hostClient.mates.every(m => m.state?.[0] === 1)
+    if (!allReady) {
+        autoStartingRooms.delete(roomNumber)
+        return
+    }
 
-    const allReady = hostClient.mates.every(m => m.state?.[0] === 1)
-    if (!allReady) return
+    if (autoStartingRooms.has(roomNumber)) return
 
     autoStartingRooms.add(roomNumber)
     console.log(`[LOBBY] all ready — StartRemainingTime float: room=${roomNumber}`)
@@ -1049,6 +1054,11 @@ function beginBattle(client: SessionClient): boolean {
     }
     client.enterData = null
     return true
+}
+
+/** 解散时清倒计时集合(房号复用后旧条目会压死新房间的倒计时)。 */
+export function clearAutoStartingRoom(roomNumber: string): void {
+    autoStartingRooms.delete(roomNumber)
 }
 
 function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
