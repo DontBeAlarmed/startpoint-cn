@@ -15,9 +15,8 @@ import {
 import { projectCharacterPatch } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
-import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
+import { collectClientProgressDeltas, resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { addMissionProgressDelta } from "../../lib/mission/progress";
 
 interface GetMissionProgressBody {
     api_count: number,
@@ -259,20 +258,15 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // Update mission progress counters in DB (fire-and-forget from client)
-        const missionParams = Array.isArray(body.mission_param_list)
-            ? body.mission_param_list
-            : []
+        const clientDeltas = collectClientProgressDeltas(body.mission_param_list)
         const evaluationTime = new Date(getServerTime() * 1000)
         const awakeCandidateCharacterIds: number[] = []
         const automaticMissionIdsByCategory = new Map<number, Set<number>>()
 
         const automaticSettlement = getDb().transaction(() => {
-            for (const param of missionParams) {
-                if (param === null || typeof param !== "object" || Array.isArray(param)) continue
-                const delta = addMissionProgressDelta(0, param.progress_value)
-                if (typeof param.mission_pattern !== "string" || delta === null) continue
+            for (const [missionPattern, delta] of clientDeltas) {
                 const matches = resolveClientProgressTargets(
-                    param.mission_pattern,
+                    missionPattern,
                     evaluationTime,
                 )
                 for (const match of matches) {

@@ -1,4 +1,7 @@
 import { MISSION_CATEGORIES, MissionMasterDefinition, getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
+import { addMissionProgressDelta, MAX_CLIENT_PROGRESS_DELTA } from "./progress"
+
+export { MAX_CLIENT_PROGRESS_DELTA } from "./progress"
 const DEGREE_CLIENT_PROGRESS_PATTERN_BY_SELECTOR: Readonly<Record<string, string>> = Object.freeze({
     "40": "character_detail_zoom_illust_for_1min_count",
     "41": "character_detail_play_dot_sp_motion_count",
@@ -10,6 +13,24 @@ const CLIENT_REPORTED_PATTERNS = new Set([
     ...Object.values(DEGREE_CLIENT_PROGRESS_PATTERN_BY_SELECTOR),
     "twitter_check",
 ])
+
+/** Bound and deduplicate client UI counters per request; server-computed mission facts are separate. */
+export function collectClientProgressDeltas(params: unknown): Map<string, number> {
+    const deltas = new Map<string, number>()
+    if (!Array.isArray(params)) return deltas
+    for (const param of params) {
+        if (param === null || typeof param !== "object" || Array.isArray(param)) continue
+        const { mission_pattern: pattern, progress_value: rawDelta } = param as {
+            mission_pattern?: unknown
+            progress_value?: unknown
+        }
+        if (typeof pattern !== "string" || !CLIENT_REPORTED_PATTERNS.has(pattern)) continue
+        const delta = addMissionProgressDelta(0, rawDelta as number)
+        if (delta === null) continue
+        deltas.set(pattern, Math.min(MAX_CLIENT_PROGRESS_DELTA, (deltas.get(pattern) ?? 0) + delta))
+    }
+    return deltas
+}
 
 export function getDegreeClientProgressPattern(
     definition: MissionMasterDefinition,
