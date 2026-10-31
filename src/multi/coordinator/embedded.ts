@@ -20,6 +20,7 @@ import {
 } from "../lifecycle"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import { compareCompatibility } from "../compatibility"
+import { returnNpcRosterAfterHostReturn } from "../npc/rematch"
 import {
     MULTI_PROTOCOL_VERSION,
     type BattleSessionId,
@@ -406,6 +407,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                     // （切片 1 真机日志 21+ 次纯噪音的收口点）。
                     lifecycleRegistry.dispatchHostReturnIfInBattle(room.room_number, hostIdentity)
                     reconcileHostReturn(room.room_number)
+                    returnNpcRosterAfterHostReturn(room.room_number)
                 }
             }
         }
@@ -435,6 +437,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                     // 期间的 prepare、4→1 之后的 3s×5 轮询），跳过等价且消灭噪音。
                     lifecycleRegistry.dispatchHostReturnIfInBattle(room.room_number, hostIdentity)
                     reconcileHostReturn(room.room_number)
+                    returnNpcRosterAfterHostReturn(room.room_number)
                 }
             }
         }

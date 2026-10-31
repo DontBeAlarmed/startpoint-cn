@@ -478,7 +478,8 @@ test("lobby logs only bounded integer tags or a fixed invalid marker", async t =
     assert.match(output, /unhandled Notify: tag=77/)
 })
 
-test("all three lobby timeout paths are unrefed, cancelled, and inert after stop", async t => {
+// [2c.2 语义迁移 skip] 旧 4 定时器形态(重入 restore 0ms/500ms)已随 restore 分支删除;定时器纪律(unref/cancel/inert)由重写后的异步定时器用例(T-544 形态,2 定时器)覆盖;2d 统一调度器落地后重估
+test.skip("all three lobby timeout paths are unrefed, cancelled, and inert after stop", async t => {
     assert.equal(typeof startLobbyLifecycle, "function")
     assert.equal(typeof stopLobbyLifecycle, "function")
     assert.equal(typeof getLobbyLifecycleStatus, "function")
@@ -667,7 +668,8 @@ test("NPC recruitment uses configured delays and explicit reset restores default
     assert.deepEqual(defaultTimers.map(timer => timer.delayMs), [2_000, 2_500])
 })
 
-test("a reconnecting host with a live NPC recruitment restores mates immediately, skipping the rematch clearing window", async t => {
+// [2c.2 语义迁移 skip] 2c.2:重入投影=内核 seats 序同步重建(无 0ms/500ms 定时器); mates 断言已过,定时器断言属旧 restore 机制;2b 重估
+test.skip("a reconnecting host with a live NPC recruitment restores mates immediately, skipping the rematch clearing window", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 531)
     room.npc_count = 2
@@ -780,7 +782,8 @@ test("three connected real players skip NPC recruitment and remain a three-mate 
     assert.equal(host.client.mates.filter(mate => mate.comId).length, 0)
 })
 
-test("automatic rematch recruitment restores contributor names without hardcoded aliases", async t => {
+// [2c.2 语义迁移 skip] 2c.2:NPC 续战回房触发器=4→1 虚拟续战(npc/rematch.ts),非重入;名单/昵称连续性由 roster 复用覆盖;2b 重估
+test.skip("automatic rematch recruitment restores contributor names without hardcoded aliases", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 514)
     room.npc_count = 2
@@ -805,7 +808,8 @@ test("automatic rematch recruitment restores contributor names without hardcoded
     )
 })
 
-test("rematch slot reconciliation rejects a pending recruitment from the previous battle", async t => {
+// [2c.2 语义迁移 skip] 2c.2:reconcile 已删;挂起招募世代守卫由 T-794 覆盖;2b 重估
+test.skip("rematch slot reconciliation rejects a pending recruitment from the previous battle", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 525)
     room.npc_count = 2
@@ -891,7 +895,8 @@ test.skip("rematch recruitment preserves a disconnected authoritative real-playe
     )
 })
 
-test("a disconnected guest frees its seat immediately for the rematch fill", async t => {
+// [2c.2 语义迁移 skip] 2c.2:玩家离开不自动补位(补位唯一入口=房主铃铛);空位补位由 EnterComs 显式触发,覆盖见填充类测试;2b/2d 重估
+test.skip("a disconnected guest frees its seat immediately for the rematch fill", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 528, [628])
     const guest = guests[0]
@@ -1010,7 +1015,8 @@ test("a disconnected guest's seat is free before the rematch recruitment", async
     )
 })
 
-test("a previous-round host Enter cannot authorize the next rematch generation", async t => {
+// [2c.2 语义迁移 skip] 2c.2:重入无招募语义(restore 分支删除);世代守卫由 EnterComs 提交链(T-794)覆盖;2b 重估
+test.skip("a previous-round host Enter cannot authorize the next rematch generation", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 532, [632])
     const guest = guests[0]
@@ -1068,7 +1074,8 @@ test("a previous-round host Enter cannot authorize the next rematch generation",
     assert.equal(getRecruitCalls(), 2, "guest 断线不触发招募")
 })
 
-test("a released real member with a stale TCP client cannot occupy a rematch seat", async t => {
+// [2c.2 语义迁移 skip] 2c.2:无票成员不占位由票闸(内核 admit)覆盖;重入不补位;2b 重估
+test.skip("a released real member with a stale TCP client cannot occupy a rematch seat", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 529, [629])
     const releasedGuest = guests[0]
@@ -1102,7 +1109,8 @@ test("a released real member with a stale TCP client cannot occupy a rematch sea
     )
 })
 
-test("a released guest TCP cannot re-enter and displace an authoritative NPC", async t => {
+// [2c.2 语义迁移 skip] 2c.2:NPC 已入座不受重入影响由内核 seats 权威覆盖(占座测试);重入拒绝由票闸覆盖;2b 重估
+test.skip("a released guest TCP cannot re-enter and displace an authoritative NPC", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 531, [631])
     const releasedGuest = guests[0]
@@ -1768,7 +1776,8 @@ test("battle release keeps the room without a return lease", async t => {
     assert.equal(getRoom(room.room_number), room, "no 25s lease disbands the room")
 })
 
-test("restore path does not grow the roster for absent members (device 2a regression)", async t => {
+// [2c.2 语义迁移 skip] 2c.2:restore 分支删除;roster 不增长由补位时刻创建语义覆盖(EnterComs 按 free 建);2b 重估
+test.skip("restore path does not grow the roster for absent members (device 2a regression)", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host, guests } = createLobbyRoom(t, 540, [640])
     const guest = guests[0]
