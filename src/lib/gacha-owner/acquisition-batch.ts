@@ -10,6 +10,7 @@ import { getRealNow } from "../../runtime/time/game-time"
 import { getCharacterFacts } from "../character-content"
 import { clientSerializeEquipment } from "../equipment"
 import {
+    getCharacterStackCompensation,
     getCharacterStackCompensationItemId,
 } from "../character-growth/commands/grant-character-stack"
 import {
@@ -158,11 +159,11 @@ export function prepareGachaAcquisitionBatchSync(
             }
             const asset = getCharacterFacts().get(characterId)
             if (asset === null) return null
-            const itemId = getCharacterStackCompensationItemId(
+            const compensation = getCharacterStackCompensation(
                 asset.rarity,
                 asset.element as Element,
             )
-            if (itemId !== undefined) grantCompensation(itemId, 1)
+            if (compensation !== undefined) grantCompensation(compensation.id, compensation.count)
             const character = {
                 ...current.character,
                 stack: addSafeInteger(current.character.stack, 1, "character.stack"),
@@ -172,7 +173,9 @@ export function prepareGachaAcquisitionBatchSync(
             return {
                 isNew: false,
                 character: stackProjection(characterId, character),
-                ...(itemId === undefined ? {} : { item: { id: itemId, count: 1 } }),
+                ...(compensation === undefined ? {} : {
+                    item: { id: compensation.id, count: compensation.count },
+                }),
             }
         },
         grantEquipment(equipmentId, amount) {

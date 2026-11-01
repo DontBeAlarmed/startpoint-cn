@@ -235,3 +235,100 @@ test("receive_all response fixture preserves mixed ordering, dedupe, and final i
     assert.equal(historyCount(playerId), mails.length)
     assertNoInternalRewardFields(result)
 })
+
+test("mail receive and receive_all grant 3 Sublime Starstones per duplicate 5-star character and enforce 3-item capacity", async () => {
+    const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+    const { playerId, viewerId } = await createPlayer("five-star-duplicate-mail")
+    const fiveStarCharacterId = 111001
+    const fiveStarCompensationId = 14003
+    const threeStarCharacterId = 311001
+    const threeStarCompensationId = 14001
+
+    // First copy of an unowned 5-star character joins without duplicate compensation.
+    const firstJoinMailId = addMail(playerId, MailType.CHARACTER, fiveStarCharacterId, 1)
+    const firstJoinResponse = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: firstJoinMailId },
+    })
+    assert.equal(firstJoinResponse.statusCode, 200, firstJoinResponse.body)
+    const firstJoinResult = decode(firstJoinResponse)
+    assert.equal(firstJoinResult.character_list.length, 1)
+    assert.equal(firstJoinResult.character_list[0].character_id, fiveStarCharacterId)
+    assert.equal(firstJoinResult.item_list, undefined)
+    assert.equal(getPlayerItemSync(playerId, fiveStarCompensationId) ?? 0, 0)
+
+    // Duplicate 5-star via /receive grants 3 Sublime Starstones.
+    const singleDupMailId = addMail(playerId, MailType.CHARACTER, fiveStarCharacterId, 1)
+    const singleDupResponse = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: singleDupMailId },
+    })
+    assert.equal(singleDupResponse.statusCode, 200, singleDupResponse.body)
+    const singleDupResult = decode(singleDupResponse)
+    assert.equal(singleDupResult.character_list[0].stack, 1)
+    assert.deepEqual(singleDupResult.item_list, { [fiveStarCompensationId]: 3 })
+    assert.equal(getPlayerItemSync(playerId, fiveStarCompensationId), 3)
+
+    // Pre-join 3-star character, then claim 2x 5-star + 1x 3-star via /receive_all -> +6 and +1.
+    const joinThreeStarMailId = addMail(playerId, MailType.CHARACTER, threeStarCharacterId, 1)
+    await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: joinThreeStarMailId },
+    })
+    const batchFiveStarMailId = addMail(playerId, MailType.CHARACTER, fiveStarCharacterId, 2)
+    const batchThreeStarMailId = addMail(playerId, MailType.CHARACTER, threeStarCharacterId, 1)
+    const batchResponse = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: [batchFiveStarMailId, batchThreeStarMailId] },
+    })
+    assert.equal(batchResponse.statusCode, 200, batchResponse.body)
+    const batchResult = decode(batchResponse)
+    assert.deepEqual(batchResult.ex_boost_item_list, [])
+    assert.equal(batchResult.max_overed_mail_count, 0)
+    assert.deepEqual(batchResult.item_list, {
+        [fiveStarCompensationId]: 9,
+        [threeStarCompensationId]: 1,
+    })
+
+    // Capacity boundary: at 99998 (1 free slot), 1x duplicate 5-star needs 3 starstones so mail claim is blocked.
+    setInventoryFixtureItemExactSync(playerId, fiveStarCompensationId, 99998)
+    const blockedFiveStarMailId = addMail(playerId, MailType.CHARACTER, fiveStarCharacterId, 1)
+    const allowedFourStarMailId = addMail(playerId, MailType.CHARACTER, CHARACTER_ID, 1)
+
+    const blockedSingle = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: blockedFiveStarMailId },
+    })
+    assert.equal(blockedSingle.statusCode, 200, blockedSingle.body)
+    assert.equal(unpack(Buffer.from(blockedSingle.body, "base64")).data_headers.result_code, 2001)
+    assert.equal(getPlayerItemSync(playerId, fiveStarCompensationId), 99998)
+    assert.equal(getPlayerCharactersSync(playerId)[fiveStarCharacterId].stack, 3)
+
+    const partialBatch = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: [blockedFiveStarMailId, allowedFourStarMailId] },
+    })
+    assert.equal(partialBatch.statusCode, 200, partialBatch.body)
+    const partialBatchResult = decode(partialBatch)
+    assert.deepEqual(partialBatchResult.mail_ids, [allowedFourStarMailId])
+    assert.equal(partialBatchResult.max_overed_mail_count, 1)
+    assert.equal(getPlayerItemSync(playerId, fiveStarCompensationId), 99998)
+    assert.equal(getPlayerItemSync(playerId, 14002), 1)
+
+    // With 3 free slots (99996 + 3 = 99999), the previously blocked 5-star mail fits cleanly.
+    setInventoryFixtureItemExactSync(playerId, fiveStarCompensationId, 99996)
+    const unblockedSingle = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: blockedFiveStarMailId },
+    })
+    assert.equal(unblockedSingle.statusCode, 200, unblockedSingle.body)
+    assert.deepEqual(decode(unblockedSingle).item_list, { [fiveStarCompensationId]: 99999 })
+    assert.equal(getPlayerCharactersSync(playerId)[fiveStarCharacterId].stack, 4)
+})

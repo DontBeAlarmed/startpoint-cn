@@ -19,11 +19,32 @@ const duplicateItemByRarityAndElement: Readonly<Record<number, Readonly<Record<n
     5: { 0: 14003, 1: 14006, 2: 14009, 3: 14012, 4: 14018, 5: 14015 },
 })
 
+const duplicateCompensationCountByRarity: Readonly<Record<number, number>> = Object.freeze({
+    3: 1,
+    4: 1,
+    5: 3,
+})
+
+export interface CharacterStackCompensation {
+    readonly id: number
+    readonly count: number
+}
+
 export function getCharacterStackCompensationItemId(
     rarity: number,
     element: Element,
 ): number | undefined {
     return duplicateItemByRarityAndElement[rarity]?.[element]
+}
+
+export function getCharacterStackCompensation(
+    rarity: number,
+    element: Element,
+): CharacterStackCompensation | undefined {
+    const id = getCharacterStackCompensationItemId(rarity, element)
+    const count = duplicateCompensationCountByRarity[rarity]
+    if (id === undefined || count === undefined) return undefined
+    return { id, count }
 }
 
 export interface GrantCharacterStackCommand {
@@ -49,7 +70,7 @@ export function grantCharacterStackWithinTransactionSync(
     if (character === null) return null
     const asset = getCharacterFacts().get(command.characterId)
     if (asset === null) return null
-    const itemId = getCharacterStackCompensationItemId(asset.rarity, asset.element as Element)
+    const compensation = getCharacterStackCompensation(asset.rarity, asset.element as Element)
     const stack = addSafeInteger(character.stack, 1, "character.stack")
 
     const updateStack = (): GivePlayerCharacterResult => {
@@ -67,26 +88,32 @@ export function grantCharacterStackWithinTransactionSync(
                 state: characterGrowthProjectionStateFromPlayerCharacter(command.characterId, afterCharacter),
                 fields: STACK_CHARACTER_GROWTH_FIELDS,
             }),
-            ...(itemId === undefined ? {} : { item: { id: itemId, count: 1 } }),
+            ...(compensation === undefined ? {} : {
+                item: { id: compensation.id, count: compensation.count },
+            }),
         }
     }
 
-    if (itemId === undefined) return updateStack()
+    if (compensation === undefined) return updateStack()
     if (grantCompensation !== undefined) {
-        grantCompensation(command.playerId, itemId, 1)
+        grantCompensation(command.playerId, compensation.id, compensation.count)
         return updateStack()
     }
     return withInventoryBatchContextWithinTransactionSync({
         playerId: command.playerId,
-        preloadItemIds: [itemId],
+        preloadItemIds: [compensation.id],
     }, inventory => {
         const overflowPolicy = createRewardGrantItemOverflowPolicy(command.playerId)
-        const grant = inventory.grantWithCapacity(itemId, 1, overflowPolicy.maxCount(itemId))
+        const grant = inventory.grantWithCapacity(
+            compensation.id,
+            compensation.count,
+            overflowPolicy.maxCount(compensation.id),
+        )
         inventory.flush()
         const overflowSettlement = grant.overflowAmount > 0
             ? settleDirectItemOverflowsWithinTransactionSync({
                 playerId: command.playerId,
-                overflows: [{ itemId, amount: grant.overflowAmount }],
+                overflows: [{ itemId: compensation.id, amount: grant.overflowAmount }],
             })
             : null
         return {

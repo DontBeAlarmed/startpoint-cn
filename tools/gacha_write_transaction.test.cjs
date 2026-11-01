@@ -271,7 +271,7 @@ test("character pity exchange publishes duplicate compensation overflow absolute
     assert.equal(payload.item_list[compensationItemId], 99999)
     assert.deepEqual(payload.over_max, [{
         process_type: 1,
-        item: { item_id: compensationItemId, number: 1 },
+        item: { item_id: compensationItemId, number: 3 },
     }])
     assert.equal(payload.mail_arrived, true)
     assert.equal(getPlayerGachaInfoSync(playerId, ACTIVE_CHARACTER_GACHA_ID).gachaExchangePoint, 0)
@@ -279,7 +279,7 @@ test("character pity exchange publishes duplicate compensation overflow absolute
     const newMails = getPlayerMailsSync(playerId, 1, 100, true)
         .filter(mail => mail.type === MailType.ITEM && mail.type_id === compensationItemId)
     assert.equal(newMails.length, mailCountBefore + 1)
-    assert.equal(newMails[0].number, 1)
+    assert.equal(newMails[0].number, 3)
 })
 
 test("equipment pity exchange rolls reward and history back when points fail", async t => {
@@ -1882,10 +1882,59 @@ test("verification-free movie still projects duplicate Character compensation", 
     }
     assert.deepEqual(result.draw[0].ex_boost_item, {
         id: compensationItemId,
-        count: 1,
+        count: 3,
     })
-    assert.equal(result.items[compensationItemId], 1)
+    assert.equal(result.items[compensationItemId], 3)
     assert.deepEqual(markedSeeds, [])
+})
+
+test("batched 5-star gacha duplicate compensation grants 3 Sublime Starstones and splits partial capacity overflow", async () => {
+    const { playerId } = await createPlayer("gacha-five-star-batch-overflow")
+    const fiveStarCharacterId = 111001
+    const fiveStarItemId = 14003
+    const threeStarCharacterId = 311001
+    const threeStarItemId = 14001
+    assert.equal(givePlayerCharacterSync(playerId, fiveStarCharacterId).isNew, true)
+    assert.equal(givePlayerCharacterSync(playerId, threeStarCharacterId).isNew, true)
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    const maxCount = policy.maxCount(fiveStarItemId)
+    setInventoryFixtureItemExactSync(playerId, fiveStarItemId, maxCount - 4)
+
+    const result = database.transaction(() => rewardPlayerGachaDrawResultSync(
+        playerId,
+        { type: GachaType.CHARACTER },
+        [fiveStarCharacterId, fiveStarCharacterId, threeStarCharacterId],
+        undefined,
+        [
+            { characterId: fiveStarCharacterId, rarity: 5, movieId: "rarity_5_guarantee", seed: 10, requiresVerification: false },
+            { characterId: fiveStarCharacterId, rarity: 5, movieId: "rarity_5_guarantee", seed: 11, requiresVerification: false },
+            { characterId: threeStarCharacterId, rarity: 3, movieId: "normal", seed: 12, requiresVerification: false },
+        ],
+        {
+            ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+                playerId,
+                plan,
+                rewardGrantPlayerSnapshot(playerId),
+                { itemOverflow: policy },
+            ),
+        },
+    ))()
+
+    assert.deepEqual(result.draw[0].ex_boost_item, { id: fiveStarItemId, count: 3 })
+    assert.deepEqual(result.draw[1].ex_boost_item, { id: fiveStarItemId, count: 1 })
+    assert.deepEqual(result.draw[2].ex_boost_item, { id: threeStarItemId, count: 1 })
+    assert.equal(result.items[fiveStarItemId], maxCount)
+    assert.equal(result.items[threeStarItemId], 1)
+    assert.equal(getPlayerItemSync(playerId, fiveStarItemId), maxCount)
+    assert.equal(getPlayerItemSync(playerId, threeStarItemId), 1)
+    assert.deepEqual(result.itemOverflowDispositions, [{
+        kind: "mail",
+        itemId: fiveStarItemId,
+        overflowAmount: 2,
+    }])
+    const overflowMails = getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM && mail.type_id === fiveStarItemId)
+    assert.deepEqual(overflowMails.map(mail => mail.number), [2])
 })
 
 test("equipment owner plan preserves draw order metadata effects and last equipment state", async () => {
