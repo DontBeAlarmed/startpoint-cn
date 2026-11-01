@@ -11,6 +11,7 @@ import {
     updateRoomState,
     updateRoomStateFromKernel,
 } from "../room/manager"
+import type { RoomNpcAssignment } from "../../lib/types"
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import { applyNpcPostFill } from "../npc/release"
@@ -429,11 +430,15 @@ export async function handleEnterComs(
     }
     const initialRealParticipants = initialRealMates.filter(isKernelParticipant)
     const freeAtGate = getAvailableNpcSlotCount(room, initialRealMates)
-    const rosterBeforeGate = room.npc_roster.slice()
+    const rosterLengthBeforeGate = room.npc_roster.length
+    // 防御性回滚(当前 provider 无真实延迟,await 窗口不可插入——本分支
+    // 不可达;真实延迟 provider 接入时它是活性路径)。减法式回滚:只删
+    // 本 gate 新增且仍未入座的条目,整表快照恢复会抹掉 await 窗口内其他
+    // 执行者(rematch 抢输销毁/后发招募)的合法变更。
+    const gateAdded = (assignment: RoomNpcAssignment): boolean =>
+        room.npc_roster.indexOf(assignment) >= rosterLengthBeforeGate
     if (freeAtGate > 0) {
-        // 补位时按当时空位创建 roster 条目(数量在补位时刻决定);
-        // 若 provider await 期间招募代作废,回滚本次新增(提交点纪律:
-        // 作废的招募不得留下副作用,否则条目会在下次续战实体化)
+        // 补位时按当时空位创建 roster 条目(数量在补位时刻决定)
         ensureNpcRoster(room, seatedNow.length + freeAtGate)
         seatedNow.length = 0
         unseated.length = 0
@@ -495,17 +500,23 @@ export async function handleEnterComs(
         return
     }
 
+    function rollbackGateAddedRoster(
+        target: { npc_roster: RoomNpcAssignment[], npc_count: number },
+        isGateAdded: (assignment: RoomNpcAssignment) => boolean,
+    ): void {
+        target.npc_roster = target.npc_roster.filter(assignment => !isGateAdded(assignment))
+        target.npc_count = target.npc_roster.length
+    }
+
     const npcProvider = new NpcMateProvider()
     const recruitResult = await npcProvider.onRecruit(client.roomNumber, String(room?.host_viewer_id ?? 0))
     if (!lifecycle.isActive() || getRoom(client.roomNumber) !== room) {
-        room.npc_roster = rosterBeforeGate
-        room.npc_count = rosterBeforeGate.length
+        rollbackGateAddedRoster(room, gateAdded)
         return
     }
     if (requestId < getRoomRecruitmentState(room).committedRequestId) {
         // 招募代作废:回滚 gate 期间新增的 roster 条目
-        room.npc_roster = rosterBeforeGate
-        room.npc_count = rosterBeforeGate.length
+        rollbackGateAddedRoster(room, gateAdded)
         return
     }
 
@@ -818,6 +829,8 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
 
     if (reason === "network") {
         // 房主网络断开不重写 mates：房主席位保留，由 host-offline 投影与老化回收处理。
+        // 倒计时条目随房主离线失效(断线未解散窗口内旧条目会压死重就绪的重发)
+        if (isHost) autoStartingRooms.delete(client.roomNumber)
         if (!isHost) removeDisconnectedMate(client.roomNumber, client.connectionId)
         sessionManager.removeClient(client)
         if (!isHost && client.participant) {

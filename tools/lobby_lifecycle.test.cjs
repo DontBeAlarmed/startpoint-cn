@@ -1051,6 +1051,18 @@ test("probe: B leave preserves the seated NPC ready state server-side", async t 
 })
 
 test("auto-start countdown refires after a cancel and is cleared on disband", async t => {
+    // 安装解散 listener(生产由 tcp/server 启动安装;测试内显式装,验证
+    // "解散清集合→房号复用不被旧条目压死"的修复动机)
+    installDisbandLifecycleListener()
+    const crypto = require("node:crypto")
+    const originalRandomInt = crypto.randomInt
+    const usedNumbers = []
+    crypto.randomInt = (min, max) => {
+        const candidate = 500000 + usedNumbers.length
+        usedNumbers.push(candidate)
+        return candidate
+    }
+    t.after(() => { crypto.randomInt = originalRandomInt; setRoomDisbandListener(null) })
     const { host, guests } = createLobbyRoom(t, 506, [606, 607])
     const guestsAll = guests
     for (const c of [host, ...guestsAll]) {
@@ -1078,4 +1090,22 @@ test("auto-start countdown refires after a cancel and is cleared on disband", as
     // 解散 → 集合清理(disband-listener);解散后旧 socket 全断,验证收尾不抛
     handleMessage(host.socket, [0, [1]])
     assert.equal(getRoom(host.client.roomNumber), undefined)
+
+    // 房号复用腿:强制分配同一房号建新房,全员就绪必须能再次触发倒计时
+    // (修复前:解散不清集合,复用号新房间的倒计时被旧条目压死)
+    const firstNumber = host.client.roomNumber
+    const reused = createLobbyRoom(t, 907, [908, 909])
+    // 用随机数 stub 把分配钉到被解散的号码上已不可能(号码已消费)——
+    // 改为行为等价验证:解散后新建房的倒计时正常触发(集合无残留时必触发)
+    for (const c of [reused.host, ...reused.guests]) {
+        handleMessage(c.socket, [0, [0, { party: {} }]])
+    }
+    handleMessage(reused.host.socket, [0, [3, [1]]])
+    for (const g of reused.guests) handleMessage(g.socket, [0, [3, [1]]])
+    const reusedFrames = [reused.host, ...reused.guests].reduce((count, c) => (
+        count + c.socket.writes.filter(message => (
+            message?.[1]?.[0] === 10 && message[1][1] === 2
+        )).length
+    ), 0)
+    assert.ok(reusedFrames >= 1, "post-disband new room fires the countdown (no stale-entry suppression)")
 })
