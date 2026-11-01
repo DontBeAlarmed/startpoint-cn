@@ -467,8 +467,12 @@ test("Crazy select recalculates duplicate compensation from selection-time state
         ) VALUES (?, 1, 0, 0, 0, '2024-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z', 0, 0, 1, ?)
     `).run(fresh.characterId, playerId)
     const { getCharacterFacts } = require("../src/lib/character-content")
-const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
-    const { getCharacterStackCompensationItemId } = require("../src/lib/character-growth/commands/grant-character-stack")
+    const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+    const {
+        getCharacterStackCompensation,
+        getCharacterStackCompensationItemId,
+    } = require("../src/lib/character-growth/commands/grant-character-stack")
+    assert.equal(typeof getCharacterStackCompensation, "function")
     const compensationItemId = getCharacterStackCompensationItemId(
         getCharacterDataSync(fresh.characterId).rarity,
         getCharacterDataSync(fresh.characterId).element,
@@ -484,12 +488,10 @@ const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
     )).map(Number))
     let expectedCount = 0
     for (const row of rows) {
-        if (ownedAtSelect.has(row.characterId)
-            && getCharacterStackCompensationItemId(
-                getCharacterDataSync(row.characterId).rarity,
-                getCharacterDataSync(row.characterId).element,
-            ) === compensationItemId) {
-            expectedCount += 1
+        const asset = getCharacterDataSync(row.characterId)
+        const compensation = getCharacterStackCompensation(asset.rarity, asset.element)
+        if (ownedAtSelect.has(row.characterId) && compensation?.id === compensationItemId) {
+            expectedCount += compensation.count
         }
         ownedAtSelect.add(row.characterId)
     }
@@ -650,4 +652,121 @@ test("points on a banner missing from the content snapshot convert and do not bl
     const { exportPlayerSaveV2Sync } = require("../src/data/player-save/v2")
     const snapshot = exportPlayerSaveV2Sync(playerId)
     assert.equal(snapshot.domains.economy.tables.players_gacha_conversions.length, 1)
+})
+
+test("Crazy candidate draw, load projection, and select award 3 Sublime Starstones for 5-star duplicates and settle overflow", async t => {
+    const { playerId, viewerId } = await createPlayer("crazy-five-star-duplicate")
+    const drawModule = require("../src/lib/gacha-catalog/draw")
+    const bundledPools = require("../assets/gacha_pool.json")
+    const { getCharacterFacts } = require("../src/lib/character-content")
+    const { getCharacterStackCompensationItemId } = require("../src/lib/character-growth/commands/grant-character-stack")
+    const { givePlayerCharacterSync } = require("../src/lib/character")
+
+    const fiveStarOwned = bundledPools.normal_1_character_5[0].id
+    const fiveStarRepeatedNew = bundledPools.normal_1_character_5[1].id
+    const fourStarOwned = bundledPools.normal_1_character_4.find(
+        entry => getPlayerCharactersSync(playerId)[entry.id] === undefined,
+    ).id
+    const threeStarOwned = bundledPools.normal_1_character_3.find(
+        entry => getPlayerCharactersSync(playerId)[entry.id] === undefined,
+    ).id
+    const fillers = bundledPools.normal_1_character_3
+        .map(entry => entry.id)
+        .filter(id => id !== threeStarOwned && getPlayerCharactersSync(playerId)[id] === undefined)
+        .slice(0, 5)
+    assert.equal(fillers.length, 5)
+
+    assert.equal(givePlayerCharacterSync(playerId, fiveStarOwned).isNew, true)
+    assert.equal(givePlayerCharacterSync(playerId, fourStarOwned).isNew, true)
+    assert.equal(givePlayerCharacterSync(playerId, threeStarOwned).isNew, true)
+
+    const fixedSequence = [
+        { id: fiveStarOwned, rank: 5, isGuarantee: false },
+        { id: fiveStarRepeatedNew, rank: 5, isGuarantee: false },
+        { id: fiveStarRepeatedNew, rank: 5, isGuarantee: false },
+        { id: fourStarOwned, rank: 4, isGuarantee: false },
+        { id: threeStarOwned, rank: 3, isGuarantee: false },
+        ...fillers.slice(0, 4).map(id => ({ id, rank: 3, isGuarantee: false })),
+        { id: fillers[4], rank: 4, isGuarantee: true },
+    ]
+    const originalDraw = drawModule.drawGachaBannerWithMetadata
+    drawModule.drawGachaBannerWithMetadata = () => fixedSequence
+    t.after(() => { drawModule.drawGachaBannerWithMetadata = originalDraw })
+
+    const itemIdFor = characterId => {
+        const asset = getCharacterFacts().get(characterId)
+        return getCharacterStackCompensationItemId(asset.rarity, asset.element)
+    }
+    const ownedFiveStarItemId = itemIdFor(fiveStarOwned)
+    const repeatedFiveStarItemId = itemIdFor(fiveStarRepeatedNew)
+    const ownedFourStarItemId = itemIdFor(fourStarOwned)
+    const ownedThreeStarItemId = itemIdFor(threeStarOwned)
+
+    grantInventoryFixtureItemSync(playerId, CRAZY_TICKET_ID, 1)
+    const candidateResponse = await crazyExec(viewerId)
+    assert.equal(candidateResponse.statusCode, 200, candidateResponse.body)
+    const candidateData = decode(candidateResponse).data
+    assert.deepEqual(candidateData.draw[0].ex_boost_item, { id: ownedFiveStarItemId, count: 3 })
+    assert.equal(candidateData.draw[1].ex_boost_item, undefined)
+    assert.deepEqual(candidateData.draw[2].ex_boost_item, { id: repeatedFiveStarItemId, count: 3 })
+    assert.deepEqual(candidateData.draw[3].ex_boost_item, { id: ownedFourStarItemId, count: 1 })
+    assert.deepEqual(candidateData.draw[4].ex_boost_item, { id: ownedThreeStarItemId, count: 1 })
+
+    const loadProjected = projectCrazyGachaLoadStateSync(playerId)
+    assert.deepEqual(loadProjected.lastCrazyGachaDrawResult[0].ex_boost_item, {
+        id: ownedFiveStarItemId,
+        count: 3,
+    })
+    assert.equal(loadProjected.lastCrazyGachaDrawResult[1].ex_boost_item, undefined)
+    assert.deepEqual(loadProjected.lastCrazyGachaDrawResult[2].ex_boost_item, {
+        id: repeatedFiveStarItemId,
+        count: 3,
+    })
+    assert.deepEqual(loadProjected.lastCrazyGachaDrawResult[3].ex_boost_item, {
+        id: ownedFourStarItemId,
+        count: 1,
+    })
+    assert.deepEqual(loadProjected.lastCrazyGachaDrawResult[4].ex_boost_item, {
+        id: ownedThreeStarItemId,
+        count: 1,
+    })
+
+    // Cap ownedFiveStarItemId at 99998 (1 free slot) before final selection so 3 Sublime Starstones overflow per draw.
+    setInventoryFixtureItemExactSync(playerId, ownedFiveStarItemId, 99998)
+    const expectedOverflowAmounts = ownedFiveStarItemId === repeatedFiveStarItemId ? [2, 3] : [2]
+    const expectedOverflowTotal = expectedOverflowAmounts.reduce((sum, amount) => sum + amount, 0)
+
+    const selected = await app.inject({
+        method: "POST",
+        url: "/gacha/crazy_gacha_select",
+        payload: { viewer_id: viewerId, gacha_id: CRAZY_GACHA_ID, index: 0 },
+    })
+    assert.equal(selected.statusCode, 200, selected.body)
+    const selectedData = decode(selected).data
+    assert.equal(getPlayerItemSync(playerId, ownedFiveStarItemId), 99999)
+    assert.equal(selectedData.item_list[ownedFiveStarItemId], 99999)
+    if (repeatedFiveStarItemId !== ownedFiveStarItemId) {
+        assert.equal(getPlayerItemSync(playerId, repeatedFiveStarItemId), 3)
+        assert.equal(selectedData.item_list[repeatedFiveStarItemId], 3)
+    }
+    assert.equal(getPlayerItemSync(playerId, ownedFourStarItemId), 1)
+    assert.equal(getPlayerItemSync(playerId, ownedThreeStarItemId), 1)
+    assert.equal(selectedData.mail_arrived, true)
+    assert.deepEqual(
+        selectedData.over_max,
+        expectedOverflowAmounts.map(number => ({
+            process_type: 1,
+            item: { item_id: ownedFiveStarItemId, number },
+        })),
+    )
+    const overflowMails = getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM && mail.type_id === ownedFiveStarItemId)
+    assert.deepEqual(
+        overflowMails.map(mail => mail.number).sort((left, right) => left - right),
+        expectedOverflowAmounts,
+    )
+    assert.equal(
+        overflowMails.reduce((sum, mail) => sum + mail.number, 0),
+        expectedOverflowTotal,
+    )
 })

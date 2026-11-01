@@ -20,7 +20,7 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getCharacterAcquisitionStatesSync } from "../../data/domains/reward-acquisition"
 import { getCharacterFacts } from "../character-content"
 import { getCrazyGachaPolicySync } from "../config-content"
-import { getCharacterStackCompensationItemId } from "../character-growth/commands/grant-character-stack"
+import { getCharacterStackCompensation } from "../character-growth/commands/grant-character-stack"
 import {
     drawGachaBannerWithMetadata,
     GachaCampaignPeriodError,
@@ -177,7 +177,7 @@ export function executeCrazyGachaCandidateSync(
                     const duplicate = seen.has(characterId)
                     seen.add(characterId)
                     const asset = duplicate ? getCharacterFacts().get(characterId) : null
-                    const itemId = asset === null ? undefined : getCharacterStackCompensationItemId(
+                    const compensation = asset === null ? undefined : getCharacterStackCompensation(
                         asset.rarity,
                         asset.element as Element,
                     )
@@ -186,8 +186,8 @@ export function executeCrazyGachaCandidateSync(
                         movie_id: movie.movieId,
                         seed: movie.seed,
                         entry_count: 1,
-                        ...(itemId === undefined ? {} : {
-                            ex_boost_item: { id: itemId, count: 1 },
+                        ...(compensation === undefined ? {} : {
+                            ex_boost_item: { id: compensation.id, count: compensation.count },
                         }),
                     }
                 })
