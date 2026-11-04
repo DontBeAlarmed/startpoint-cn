@@ -175,6 +175,13 @@ export interface CrazyGachaSelectSuccess {
     readonly postCommitEffects: readonly GachaPostCommitEffect[]
     readonly missionSettlement: MissionSettlementResult | null
     readonly activeMissionList: readonly unknown[]
+    /** 定案后的抽卡信息（crazy_draw_count 归零）；缺省时响应不带 gacha_info_list。 */
+    readonly gachaInfo?: Readonly<{
+        readonly exchangePoint: number
+        readonly isDailyFirst: boolean
+        readonly isAccountFirst: boolean
+        readonly crazyDrawCount: number
+    }>
 }
 
 export type CrazyGachaCandidateResult = CrazyGachaCandidateSuccess
