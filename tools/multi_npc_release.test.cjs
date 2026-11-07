@@ -396,4 +396,82 @@ test("一场一换：清零后回房/reconcile 不复活 NPC，仅重开招募�
     assert.ok(npcCount(host.mates) > 0, "招募激活（EnterComs）才重算补齐")
 }, 15000)
 
+// ---- rematch 回房 settle(2026-11-08 真机 383529/720940)----
+// 4→1 rematch 回房后 NPC 已就绪、房主重入 → 房主重入路径必须跑 settle:
+// 翻转房主准备态+武装倒计时(官方语义:全员准备→房主准备→倒计时→手动/
+// 到点开)。修复前 re-entry 不跑 settle,房主条目 state 恒 0——客户端
+// canStartBattle 要求全员(含房主)state≠0,挑战恒灰直至解散。
+test("rematch 回房:房主重入 settle 翻转房主并武装倒计时", async () => {
+    const { startLobbyLifecycle: start } = require("../src/multi/tcp/lobby-lifecycle")
+    start()
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiRandomRecruitmentPublishEnabled: true,
+        multiNpcCloseRecruitmentAfterFill: true,
+    })
+    const { lifecycleRegistry } = require("../src/multi/lifecycle")
+    const { returnNpcRosterAfterHostReturn } = require("../src/multi/npc/rematch")
+    const hostViewer = HOST_VIEWER + 13
+    const { room, host } = setupHostRoom(test, hostViewer)
+    const live = getRoom(room.room_number)
+    live.npc_count = 0
+    live.is_npc_mode = true
+    live.mates = [{ viewer_id: hostViewer, com_id: 0 }]
+    const lifecycle = require("../src/multi/tcp/lobby-lifecycle").getLobbyLifecycleGuard()
+
+    // 房主首入 + 铃铛填充:2 NPC 入座并就绪(与真机第一轮同形)
+    handleLobbyMessage(host.socket, [0, [0, { party: {} }]])
+    handleEnterComs(host, lifecycle).catch(() => {})
+    await wait(600)
+    assert.ok(npcCount(host.mates) >= 2, "前置:NPC 已填充")
+
+    // 开战(StartBattle notify)→ 房主 socket 离场(与真机同:开战即 client left)
+    handleLobbyMessage(host.socket, [0, [6]])
+    assert.equal(getRoom(room.room_number)?.raising_state, 4)
+    handleSocketDisconnect(host.socket)
+    assert.equal(
+        sessionManager.getClientsInRoom(room.room_number).some(c => c.viewerId === hostViewer),
+        false, "前置:战斗中房主 socket 已离场",
+    )
+
+    // 全员 finish → hostReturn → 4→1
+    const battleState = lifecycleRegistry.get(room.room_number)
+    for (const identity of battleState.battleParticipants) {
+        lifecycleRegistry.dispatch(room.room_number, generation => ({
+            type: "finish", generation, identity, nowMs: 2_500,
+            battleDeadlineMs: 900_000, battleSessionId: battleState.battleSessionId,
+        }))
+    }
+    sessionManager.releaseFinishedBattleFacts(room.room_number, battleState.battleSessionId)
+    lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "hostReturn", generation, identity: `viewer:${hostViewer}`, nowMs: 2_600,
+    }))
+    roomManager.reconcileHostReturn(room.room_number)
+    sessionManager.clearBattleExpectedCount(room.room_number)
+    assert.equal(getRoom(room.room_number)?.raising_state, 1)
+
+    // rematch 回房:房主 socket 缺席 → 仅内核入座+roster ready(真机同形)
+    returnNpcRosterAfterHostReturn(room.room_number)
+
+    // 房主重入(新 socket + TCP enter)→ settle:翻转房主+武装倒计时
+    const socket2 = new FakeSocket()
+    const host2 = sessionManager.createClient(
+        socket2, hostViewer, room.room_number, `${room.room_number}-host-cid-2`,
+    )
+    host2.participant = { nodeSessionId: "embedded", viewerId: hostViewer }
+    host2.yourself = {
+        viewerId: hostViewer, connectionId: host2.connectionId,
+        party: { characters: [] }, state: [0],
+    }
+    host2.mates = [host2.yourself]
+    sessionManager.addClientToRoom(host2)
+    handleLobbyMessage(socket2, [0, [0, { party: {} }]])
+
+    const hostMate = host2.mates.find(m => m.viewerId === hostViewer)
+    assert.deepEqual(hostMate.state, [1], "settle 必须翻转房主准备态")
+    const countdownArmed = socket2.writes.some(f => Array.isArray(f)
+        && f[0] === 1 && Array.isArray(f[1]) && f[1][0] === 10 && f[1][1] === 2)
+    assert.ok(countdownArmed, "倒计时 [10,2] 必须武装")
+}, 15000)
+
 console.log("multi npc release: all assertions passed")

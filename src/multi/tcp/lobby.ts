@@ -803,6 +803,16 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         sessionManager.sendJson(client.socket, [1, [1, client.mates]])
     }
 
+    if (isHost) {
+        // 2026-11-08 真机 383529/720940:rematch 回房(4→1)后 NPC 已就绪而
+        // 房主条目 state=0——客户端 canStartBattle 要求全员(含房主自己)
+        // state≠0,挑战恒灰直至解散。房主重入即跑 settle(双向安全):全员
+        // 就绪→翻转房主+武装倒计时;未全就绪→cancelled 回翻+倒计时失效。
+        // 官方语义:全员准备→房主准备→倒计时→手动/到点开;rematch 回房无
+        // 铃铛流水线,节奏快是正常形态。
+        checkHostAutoReady(client.roomNumber)
+    }
+
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} entered: room=${client.roomNumber}`)
 }
 
