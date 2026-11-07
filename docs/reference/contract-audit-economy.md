@@ -141,7 +141,9 @@ server 侧对应实现：`server:src/lib/common-response/`（model.ts 片段类�
 - get_mission_progress：`src/routes/api/mission.ts:41-220` — mission_progress_list（mission_category/mission_id/progress_value Number()/stage，:155-172）+ mission_info/item_list/character_list/equipment_list/degree_list/mail_arrived + settlement 片段（:161-218）。
 
 **差集判定**：
-- **缺口（P2）#G1**：`active_mission/receive_incentive` 未实现。客户端契约要求 `data.active_mission_incentive`（ActiveMissionReceiveIncentiveRealRemote.as:43-58）。触发面：活动任务里带 real_reward（实物/外部链接奖励）的领取按钮。CN 1.4.54 主数据中是否存在该类任务未核对 — **待真机/待主数据核对**；若无此类任务则长期休眠。
+- **缺口（P2→P3 复核修正 2026-11-08）#G1**：`active_mission/receive_incentive` 未实现。客户端契约要求 `data.active_mission_incentive`（ActiveMissionReceiveIncentiveRealRemote.as:43-58）。
+  **真机复核修正（服务器日志+客户端架构双证）**：日志中 7 次任务领取全部走 `active_mission/receive`（200），零次 receive_incentive——成长任务(44)/内容指南(17)/回归任务(25)架构上就不走该端点。初版"17 项内容指南任务带 real incentive"系列匹配假阳性（列值 "1" 误作外键），特此更正。
+  **正确触发面**：real incentive 挂在 active_mission_event.real_reward_id（客户端 `RealIncentiveActiveMissionScene.as:187` 独立实奖任务板），CN 1.4.54 唯一实奖事件=**100万円Present企画**（event 3，10 任务：编成角色/通关主线第1章/参加「大家一起选」等；real_reward 4 行=现金奖，ingame_reward 27 行=★5破星结晶等安慰奖）。该企画为现金奖励活动，私服无兑现路径 → **端点当前不可达，降级 P3 条件缺口：仅当未来启用实奖任务板时必须先补本端点**。
 - get_mission_progress 契约匹配（progress_value server 端显式 `Number()` 转换，满足客户端 Float 校验）。
 - 冗余：active_mission/receive 与 get_mission_progress 的 `degree_list`（同 C3）。
 
@@ -170,7 +172,7 @@ server 侧对应实现：`server:src/lib/common-response/`（model.ts 片段类�
 ### P2（UI 显示缺陷 / 功能未实现）
 | # | 端点 | 内容 | 客户端证据 | 服务端证据 | 影响 |
 |---|---|---|---|---|---|
-| G1 | `active_mission/receive_incentive` | 服务端无路由，客户端必需 `data.active_mission_incentive`（ingame_reward_id[必]） | client ActiveMissionReceiveIncentiveRealRemote.as:43-58 | grep src/ 无 receive_incentive 路由 | 带 real 奖励的活动任务领取必弹通用错误框；CN 主数据是否含此类任务**待真机/待主数据核对** |
+| G1 | `active_mission/receive_incentive` | 服务端无路由，客户端必需 `data.active_mission_incentive`（ingame_reward_id[必]） | client ActiveMissionReceiveIncentiveRealRemote.as:43-58 | grep src/ 无 receive_incentive 路由 | **复核修正(P3)**：仅服务独立实奖任务板（100万円Present企画 event3/10 任务），常规任务全走 receive；私服无现金兑现路径，当前不可达——启用实奖板前必须先补 |
 
 ### P3（冗余 / 无害记录）
 | # | 端点 | 内容 | 说明 |
