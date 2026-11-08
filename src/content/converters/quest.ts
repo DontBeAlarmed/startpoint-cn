@@ -42,6 +42,7 @@ export const QUEST_AUXILIARY_SOURCES = Object.freeze({
     dailyChallengePoint: "master/quest/event/daily_challenge_point.orderedmap",
     expertSingleEvent: "master/quest/event/expert_single_event.orderedmap",
     soloTimeAttackEvent: "master/quest/event/solo_time_attack_event.orderedmap",
+    soloTimeAttackClearTimeReward: "master/quest/event/solo_time_attack_clear_time_reward.orderedmap",
     practiceQuest: "master/quest/practice/practice_quest.orderedmap",
     mainStageNode: "master/quest/main_stage_node.orderedmap",
     exStageNode: "master/quest/ex_stage_node.orderedmap",
@@ -49,6 +50,7 @@ export const QUEST_AUXILIARY_SOURCES = Object.freeze({
 
 export type QuestTableName = keyof typeof QUEST_TABLE_SOURCES
 export type QuestDerivedTableName =
+    | "solo_time_attack_clear_time_reward.json"
     | "daily_challenge_point_lookup.json"
     | "event_challenge_point_map.json"
     | "quest_entry_costs.json"
@@ -586,6 +588,9 @@ function standardQuest(
         output.eventId = parseInteger(tableName, row.path[0], "eventId")
         output.folderId = parseInteger(tableName, fields[2], "folderId")
         output.killCountWeight = parseInteger(tableName, fields[52], "killCountWeight")
+    } else if (tableName === "solo_time_attack_event_quest.json") {
+        output.eventId = parseInteger(tableName, row.path[0], "eventId")
+        output.soloTimeAttackQuestId = parseInteger(tableName, row.path[1], "soloTimeAttackQuestId")
     }
     return output
 }
@@ -1207,10 +1212,11 @@ export async function convertQuests(
     const questTrees = Object.fromEntries(convertedSources.map(
         ([tableName, tree]) => [tableName, tree],
     )) as Record<QuestTableName, CsvOrderedMapTree>
-    const [dailyChallengePoint, expertSingleEvent, soloTimeAttackEvent, practiceQuest, mainStageNode, exStageNode] = await Promise.all([
+    const [dailyChallengePoint, expertSingleEvent, soloTimeAttackEvent, soloTimeAttackClearTimeReward, practiceQuest, mainStageNode, exStageNode] = await Promise.all([
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.dailyChallengePoint),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.expertSingleEvent),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.soloTimeAttackEvent),
+        reader.readDynamic(QUEST_AUXILIARY_SOURCES.soloTimeAttackClearTimeReward),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.practiceQuest),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.mainStageNode),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.exStageNode),
@@ -1229,6 +1235,7 @@ export async function convertQuests(
     })
     return deepFreeze({
         ...questTables,
+        "solo_time_attack_clear_time_reward.json": convertOrderedMapJson(soloTimeAttackClearTimeReward, 1),
         "daily_challenge_point_lookup.json": dailyChallengePointLookup,
         "event_challenge_point_map.json": eventChallengePointMap,
         "quest_join_gates.json": buildQuestJoinGates(questTrees),

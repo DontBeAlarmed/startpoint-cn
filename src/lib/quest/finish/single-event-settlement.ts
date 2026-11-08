@@ -26,6 +26,7 @@ import {
     updatePlayerRushEventSync,
 } from "../../../data/domains/rushEvent"
 import { deletePlayerActiveQuestSync } from "../../../data/domains/quest_active"
+import { insertMailSync, MailType } from "../../../data/domains/mail"
 import { insertPlayerScoreAttackBattleHistorySync } from "../../../data/domains/score-attack-history"
 import { getDb } from "../../../data/db"
 import { createModeTransactionHost } from "../../../modes/loader"
@@ -52,6 +53,11 @@ import {
     handleScoreAttackEventFinish,
     type ScoreAttackBorderTier,
 } from "./score-attack-handler"
+import {
+    handleSoloTimeAttackEventFinish,
+    type SoloTimeAttackFinishResult,
+} from "./solo-time-attack-handler"
+import { resolveSoloTimeAttackTimelineTiers } from "../solo-time-attack-content"
 import type { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
@@ -195,6 +201,35 @@ export function settleSingleBuiltInEvent(
                 deleteActiveQuest: deletePlayerActiveQuestSync,
             })
         },
+        soloTimeAttack: current => handleSoloTimeAttackEventFinish({
+            playerId,
+            questId,
+            eventId: current.eventId,
+            soloQuestId: current.soloQuestId,
+            elapsedTimeMs: clearTime,
+            isAccomplished: questAccomplished,
+            clearRank: input.clearRank,
+            party,
+            tiers: resolveSoloTimeAttackTimelineTiers(current.eventId, current.soloQuestId),
+        }, {
+            transaction: operation => operation(),
+            getProgress: getPlayerSingleQuestProgressSync,
+            insertProgress: insertPlayerQuestProgressSync,
+            updateProgress: updatePlayerQuestProgressSync,
+            deleteActiveQuest: deletePlayerActiveQuestSync,
+            insertRewardMail: (pid, mail) => insertMailSync(pid, {
+                reason_id: mail.reasonId,
+                subject: null,
+                description: null,
+                type: MailType.FREE_VMONEY,
+                type_id: null,
+                number: mail.stoneCount,
+                receive_time: "0000-00-00 00:00:00",
+                create_time: mail.createdAt.toISOString().replace("T", " ").substring(0, 19),
+                reward_period_limited: 0,
+                reward_limit_time: null,
+            }),
+        }),
     })
     const rush = builtIn.kind === "rush"
         ? builtIn.value
@@ -202,6 +237,7 @@ export function settleSingleBuiltInEvent(
     const raidEventData = builtIn.kind === "raid" ? builtIn.value : null
     const carnival = builtIn.kind === "carnival" ? builtIn.value : null
     const scoreAttack = builtIn.kind === "scoreAttack" ? builtIn.value : null
+    const soloTimeAttack = builtIn.kind === "soloTimeAttack" ? builtIn.value : null
     if (operatorHookPhase === "afterBuiltIn") {
         modeRushExtension = dispatchModeRushFinish(rushFinishParams, settlementModeHost)
     }
@@ -217,5 +253,6 @@ export function settleSingleBuiltInEvent(
         carnivalRewardResult: carnival?.rewardResult,
         scoreAttackFinishResult: scoreAttack,
         scoreAttackRewardResult: scoreAttack?.rewardResult,
+        soloTimeAttackFinishResult: soloTimeAttack,
     }
 }

@@ -215,7 +215,8 @@ export function executeSingleSettlementWrites(
                 isQuestCleared: (category, requiredQuestId) => (
                     getPlayerSingleQuestProgressSync(playerId, category, requiredQuestId)?.finished === true
                 ),
-                rewardCampaignRates, boostPointUsed: useBoostPoint,
+                // #14(帮助 Event_treasure_hunt_quest L27):collect_item 通道不吃加成点数——恒 0
+                rewardCampaignRates, boostPointUsed: false,
                 serverDropMultiplier: gameplaySettings!.dropMultiplier,
             },
             { grantRewards: rewards => grantDirectRewards(playerId, rewards) },
@@ -245,6 +246,7 @@ export function executeSingleSettlementWrites(
         carnivalRewardResult,
         scoreAttackFinishResult,
         scoreAttackRewardResult,
+        soloTimeAttackFinishResult,
     } = settleSingleBuiltInEvent({
         descriptor: eventDescriptor,
         playerId,
@@ -310,7 +312,8 @@ export function executeSingleSettlementWrites(
         scoreRewardSelection, scoreRewardsResult, additionalRewardSettlement,
         rewardCharacterExpResult, rushEventData, rushEventRewardsResult,
         raidEventData, carnivalEventData, carnivalRewardResult, scoreAttackFinishResult,
-        scoreAttackRewardResult, itemList, characterList, clearReward, sPlusClearReward,
+        scoreAttackRewardResult, soloTimeAttackFinishResult, itemList, characterList,
+        clearReward, sPlusClearReward,
         missionSettlement, awakeMissionSettlement, activeMissionList, fixedManaReward,
         fixedPoolExpReward, fieldMana, newMana, beforeRankPoint, newRankPoint, newBoostPoint,
         newBossBoostPoint, finalPlayerProjection,

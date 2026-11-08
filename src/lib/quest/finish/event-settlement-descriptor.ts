@@ -35,6 +35,11 @@ export type EventSettlementDescriptor =
         eventId: number
         scoreAttackQuestId: number
     }>
+    | Readonly<EventSettlementDescriptorBase & {
+        kind: "soloTimeAttack"
+        eventId: number
+        soloQuestId: number
+    }>
 
 const NO_EVENT: EventSettlementDescriptor = Object.freeze({ kind: "none" })
 
@@ -96,6 +101,16 @@ export function createEventSettlementDescriptor(input: {
             kind: "scoreAttack" as const,
             eventId: input.quest.eventId,
             scoreAttackQuestId: input.quest.scoreAttackQuestId,
+        })
+    }
+    if (input.questCategory === QuestCategory.SOLO_TIME_ATTACK_EVENT) {
+        if (input.quest.eventId === undefined
+            || input.quest.soloTimeAttackQuestId === undefined) return NO_EVENT
+        return Object.freeze({
+            ...base,
+            kind: "soloTimeAttack" as const,
+            eventId: input.quest.eventId,
+            soloQuestId: input.quest.soloTimeAttackQuestId,
         })
     }
     return NO_EVENT

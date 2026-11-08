@@ -749,6 +749,10 @@ const definitionInputs: TableSourceInput[] = [
     >).map(periodicRewardDefinition),
     ...(Object.keys(QUEST_TABLE_SOURCES) as QuestTableName[]).map(questDefinition),
     questDerivedDefinition(
+        "solo_time_attack_clear_time_reward.json",
+        [QUEST_AUXILIARY_SOURCES.soloTimeAttackClearTimeReward],
+    ),
+    questDerivedDefinition(
         "daily_challenge_point_lookup.json",
         [QUEST_AUXILIARY_SOURCES.dailyChallengePoint],
     ),

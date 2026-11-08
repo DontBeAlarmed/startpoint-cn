@@ -5,19 +5,21 @@ type Descriptor<Kind extends EventSettlementDescriptor["kind"]> = Extract<
     { readonly kind: Kind }
 >
 
-export interface BuiltInEventSettlementHooks<Rush, Raid, Carnival, ScoreAttack> {
+export interface BuiltInEventSettlementHooks<Rush, Raid, Carnival, ScoreAttack, SoloTimeAttack> {
     readonly rush: (descriptor: Descriptor<"rush">) => Rush
     readonly raid: (descriptor: Descriptor<"raid">) => Raid
     readonly carnival: (descriptor: Descriptor<"carnival">) => Carnival
     readonly scoreAttack: (descriptor: Descriptor<"scoreAttack">) => ScoreAttack
+    readonly soloTimeAttack: (descriptor: Descriptor<"soloTimeAttack">) => SoloTimeAttack
 }
 
-export type BuiltInEventSettlementHookResult<Rush, Raid, Carnival, ScoreAttack> =
+export type BuiltInEventSettlementHookResult<Rush, Raid, Carnival, ScoreAttack, SoloTimeAttack> =
     | Readonly<{ kind: "none" }>
     | Readonly<{ kind: "rush"; value: Rush }>
     | Readonly<{ kind: "raid"; value: Raid }>
     | Readonly<{ kind: "carnival"; value: Carnival }>
     | Readonly<{ kind: "scoreAttack"; value: ScoreAttack }>
+    | Readonly<{ kind: "soloTimeAttack"; value: SoloTimeAttack }>
 
 const NO_BUILT_IN_EVENT = Object.freeze({ kind: "none" as const })
 
@@ -31,10 +33,10 @@ export function getOperatorRushHookPhase(
 }
 
 /** Dispatches at most one built-in Event hook from one closed descriptor. */
-export function dispatchBuiltInEventSettlement<Rush, Raid, Carnival, ScoreAttack>(
+export function dispatchBuiltInEventSettlement<Rush, Raid, Carnival, ScoreAttack, SoloTimeAttack>(
     descriptor: EventSettlementDescriptor,
-    hooks: BuiltInEventSettlementHooks<Rush, Raid, Carnival, ScoreAttack>,
-): BuiltInEventSettlementHookResult<Rush, Raid, Carnival, ScoreAttack> {
+    hooks: BuiltInEventSettlementHooks<Rush, Raid, Carnival, ScoreAttack, SoloTimeAttack>,
+): BuiltInEventSettlementHookResult<Rush, Raid, Carnival, ScoreAttack, SoloTimeAttack> {
     if (descriptor.kind === "rush") {
         return Object.freeze({ kind: "rush", value: hooks.rush(descriptor) })
     }
@@ -46,6 +48,9 @@ export function dispatchBuiltInEventSettlement<Rush, Raid, Carnival, ScoreAttack
     }
     if (descriptor.kind === "scoreAttack") {
         return Object.freeze({ kind: "scoreAttack", value: hooks.scoreAttack(descriptor) })
+    }
+    if (descriptor.kind === "soloTimeAttack") {
+        return Object.freeze({ kind: "soloTimeAttack", value: hooks.soloTimeAttack(descriptor) })
     }
     return NO_BUILT_IN_EVENT
 }

@@ -55,6 +55,10 @@ type ScoreAttackEventData = NonNullable<
     SingleFinishSuccess["scoreAttackFinishResult"]
 >["scoreAttackEvent"]
 
+type SoloTimeAttackEventData = NonNullable<
+    SingleFinishSuccess["soloTimeAttackFinishResult"]
+>["soloTimeAttackEvent"]
+
 export interface SingleFinishResponseData {
     user_info: SingleFinishResponseUserInfo
     add_exp_list: SingleFinishSuccess["rewardCharacterExpResult"]["add_exp_list"]
@@ -79,6 +83,7 @@ export interface SingleFinishResponseData {
     rush_event: SingleFinishSuccess["rushEventData"]
     carnival_event: SingleFinishSuccess["carnivalEventData"]
     score_attack_event: ScoreAttackEventData | null
+    solo_time_attack_event: SoloTimeAttackEventData | null
     user_daily_challenge_point_list: unknown[]
     presigned_quest_category: unknown[]
     active_mission_list: SingleFinishSuccess["activeMissionList"]
@@ -119,6 +124,7 @@ export function buildSingleFinishResponse({
         carnivalRewardResult,
         scoreAttackFinishResult,
         scoreAttackRewardResult,
+        soloTimeAttackFinishResult,
         itemList,
         characterList,
         clearReward,
@@ -134,6 +140,7 @@ export function buildSingleFinishResponse({
         questProgress,
     } = result
     const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
+    const soloTimeAttackEventData = soloTimeAttackFinishResult?.soloTimeAttackEvent ?? null
     const viewerId = body.viewer_id
     const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions ?? [])
 
@@ -207,6 +214,7 @@ export function buildSingleFinishResponse({
         "rush_event": rushEventData,
         "carnival_event": carnivalEventData,
         "score_attack_event": scoreAttackEventData,
+        "solo_time_attack_event": soloTimeAttackEventData,
         "user_daily_challenge_point_list": dailyChallengePointList ?? [],
         "presigned_quest_category": [],
         "active_mission_list": activeMissionList,
@@ -302,6 +310,7 @@ export function buildStaleSingleFinishResponse({
         "raid_event": null,
         "rush_event": null,
         "carnival_event": null,
+        "solo_time_attack_event": null,
         "score_attack_event": null,
         "user_daily_challenge_point_list": [],
         "presigned_quest_category": [],
