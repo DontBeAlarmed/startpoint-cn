@@ -123,10 +123,10 @@ export function registerShopPurchaseRoutes(
         if (playerId === null) return
         const gameTime = getGameTimeContext()
         const catalog = getShopCatalog()
-        const player = getPlayerSync(playerId)
-        if (player === null) return badRequest(reply, "Player not found.")
-        const playerRank = getPlayerRankLevel(player.rankPoint)
         try {
+            const player = getPlayerSync(playerId)
+            if (player === null) return badRequest(reply, "Player not found.")
+            const playerRank = getPlayerRankLevel(player.rankPoint)
             const result = executeShopPurchaseSync({
                 playerId,
                 shopType: body.shop_type,
