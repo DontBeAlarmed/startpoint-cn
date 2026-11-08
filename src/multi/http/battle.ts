@@ -269,15 +269,8 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             roomNumber: battle.value.roomNumber,
         });
         const gameplaySettings = getServerGameplaySettingsSync();
-        const rescueFragmentEligible = resolveLocalRescueFragmentEligibility({
-            allMultiRoomsEligible: gameplaySettings.multiRescueFragmentRewardsEnabled,
-            isRoomHost,
-            hostSelfRescueEnabled: gameplaySettings.multiRescueHostRewardsEnabled,
-        });
-        // 新手组队计数资格（cond92）：guest 参与新冒险者（房主）发起的战斗。
-        // 发起者本人不计数（官方口径）；总开关关闭时一律不计。
-        // 铃铛进房（quest/start 携 attention_key）以招募行的 is_newbie_host 冻结
-        // 资格（房主开铃时的状态），并记录 accepted 响应；无 key/无效 key 走实时判定。
+        // 铃铛响应解析先行:救援碎片严格模式(OFF)与新手计数(cond92)都以
+        // 「本次参战是否为铃铛响应」为资格输入。
         const bellRecruitment = await resolveBellRecruitmentForStart(
             typeof body.attention_key === "string" && body.attention_key.length > 0
                 ? body.attention_key
@@ -286,6 +279,16 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             room.value.host.viewerId,
             viewer_id,
         );
+        const rescueFragmentEligible = resolveLocalRescueFragmentEligibility({
+            allMultiRoomsEligible: gameplaySettings.multiRescueFragmentRewardsEnabled,
+            isRoomHost,
+            hostSelfRescueEnabled: gameplaySettings.multiRescueHostRewardsEnabled,
+            bellResponded: bellRecruitment !== null,
+        });
+        // 新手组队计数资格（cond92）：guest 参与新冒险者（房主）发起的战斗。
+        // 发起者本人不计数（官方口径）；总开关关闭时一律不计。
+        // 铃铛进房（quest/start 携 attention_key）以招募行的 is_newbie_host 冻结
+        // 资格（房主开铃时的状态），并记录 accepted 响应；无 key/无效 key 走实时判定。
         const newbieRescueEligible = bellRecruitment !== null
             ? gameplaySettings.multiRescueFragmentRewardsEnabled
                 && !isRoomHost

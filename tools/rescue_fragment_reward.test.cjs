@@ -170,42 +170,39 @@ test("settles normalized advent rewards with the same success gate", () => {
     assert.equal(granted.length, 1)
 })
 
-test("freezes the local rescue eligibility from host identity and switches", () => {
-    const hostCases = [
-        {
-            allMultiRoomsEligible: false,
-            hostSelfRescueEnabled: false,
-            expected: false,
-        },
-        {
-            allMultiRoomsEligible: false,
-            hostSelfRescueEnabled: true,
-            expected: false,
-        },
-        {
-            allMultiRoomsEligible: true,
-            hostSelfRescueEnabled: false,
-            expected: false,
-        },
-        {
-            allMultiRoomsEligible: true,
-            hostSelfRescueEnabled: true,
-            expected: true,
-        },
-    ]
-    for (const input of hostCases) {
+test("freezes the local rescue eligibility from bell response and switches", () => {
+    // 客机:OFF=严格官服(仅铃铛响应者,Battle_Boss L57);ON=特化放宽(所有客机)
+    for (const bellResponded of [false, true]) {
         assert.equal(resolveLocalRescueFragmentEligibility({
-            allMultiRoomsEligible: input.allMultiRoomsEligible,
-            isRoomHost: true,
-            hostSelfRescueEnabled: input.hostSelfRescueEnabled,
-        }), input.expected, JSON.stringify(input))
-    }
-
-    for (const allMultiRoomsEligible of [false, true]) {
-        assert.equal(resolveLocalRescueFragmentEligibility({
-            allMultiRoomsEligible,
+            allMultiRoomsEligible: false,
             isRoomHost: false,
             hostSelfRescueEnabled: true,
-        }), allMultiRoomsEligible)
+            bellResponded,
+        }), bellResponded, `OFF 严格模式 bellResponded=${bellResponded}`)
+        assert.equal(resolveLocalRescueFragmentEligibility({
+            allMultiRoomsEligible: true,
+            isRoomHost: false,
+            hostSelfRescueEnabled: true,
+            bellResponded,
+        }), true, `ON 特化放宽 bellResponded=${bellResponded}`)
+    }
+
+    // 房主:OFF=救援发起方不适用(即便响应了——结构上不可能,防御性);
+    // ON=hostSelfRescueEnabled 单独控制(单人部署的自救路径)
+    const hostCases = [
+        { hostSelfRescueEnabled: false, bellResponded: false, expected: false },
+        { hostSelfRescueEnabled: false, bellResponded: true, expected: false },
+        { hostSelfRescueEnabled: true, bellResponded: false, expected: false },
+        { hostSelfRescueEnabled: true, bellResponded: true, expected: true },
+    ]
+    for (const input of hostCases) {
+        for (const allMultiRoomsEligible of [false, true]) {
+            assert.equal(resolveLocalRescueFragmentEligibility({
+                allMultiRoomsEligible,
+                isRoomHost: true,
+                hostSelfRescueEnabled: input.hostSelfRescueEnabled,
+                bellResponded: input.bellResponded,
+            }), allMultiRoomsEligible && input.hostSelfRescueEnabled, JSON.stringify(input))
+        }
     }
 })
