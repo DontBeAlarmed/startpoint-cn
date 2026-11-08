@@ -264,7 +264,10 @@ function checkAllReadyAndStart(roomNumber: string): void {
     // 重新广播倒计时(此前集合只在 StartBattle 删除——取消/离开/房号复用
     // 后倒计时不重发,真机 2026-11-01 报告)。失效判断必须在集合守卫之前:
     // 守卫命中即 return,失效删除放在守卫之后永远走不到。
-    const allReady = hostClient.mates.length >= 3
+    // 2026-11-08 语义收敛:倒计时只与"全员就绪"挂钩,成员数无关(1 成员
+    // 就绪→房主准备→倒计时,用户裁定)——下界从 3 放宽到 2(canStartBattle
+    // 同款下界,单人无共斗)。
+    const allReady = hostClient.mates.length >= 2
         && hostClient.mates.every(m => m.state?.[0] === 1)
     if (!allReady) {
         autoStartingRooms.delete(roomNumber)
@@ -803,15 +806,12 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
         sessionManager.sendJson(client.socket, [1, [1, client.mates]])
     }
 
-    if (isHost) {
-        // 2026-11-08 真机 383529/720940:rematch 回房(4→1)后 NPC 已就绪而
-        // 房主条目 state=0——客户端 canStartBattle 要求全员(含房主自己)
-        // state≠0,挑战恒灰直至解散。房主重入即跑 settle(双向安全):全员
-        // 就绪→翻转房主+武装倒计时;未全就绪→cancelled 回翻+倒计时失效。
-        // 官方语义:全员准备→房主准备→倒计时→手动/到点开;rematch 回房无
-        // 铃铛流水线,节奏快是正常形态。
-        checkHostAutoReady(client.roomNumber)
-    }
+    // 2026-11-08 语义收敛:成员进入(房主重入/客机加入)后重算房主准备态与
+    // 倒计时——真机 383529/720940:rematch 回房后 NPC 已就绪而房主条目
+    // state=0,客户端 canStartBattle 要求全员(含房主)state≠0,挑战恒灰。
+    // 边界(官方语义):单人房就绪倒计时中新成员未就绪进入→房主回翻+倒计时
+    // 失效。settle 双向安全;rematch 回房无铃铛流水线,节奏快为正常形态。
+    checkHostAutoReady(client.roomNumber)
 
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} entered: room=${client.roomNumber}`)
 }
@@ -849,6 +849,12 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
             // disconnect 不新增,除非房主主动重开招募）。
             removeRoomMember(client.roomNumber, client.participant)
         }
+        if (!isHost && getRoom(client.roomNumber)) {
+            // 2026-11-08 语义收敛:成员离席(网络)同属 mates 变异点——离席者
+            // 曾就绪→房主回翻+倒计时失效;剩余全就绪→保持/重武装。与显式
+            // 离席同门,复用双向 settle。
+            checkHostAutoReady(client.roomNumber)
+        }
         console.log(`[LOBBY] client disconnected: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
         return
     }
@@ -877,6 +883,12 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
         sessionManager.broadcastMateListToRoom(client.roomNumber, hostClient.mates)
     }
     if (survivedRoom) syncShareRow(client.roomNumber)
+    if (survivedRoom && !isHost) {
+        // 2026-11-08 语义收敛:房主准备 ⇔ 其他成员全就绪(双向)。成员离席是
+        // mates 变异点——离席者未就绪→剩余全就绪则房主保持/重翻;离席者
+        // 曾就绪→回翻+倒计时失效。settle 双向安全,倒计时武装随尾部重算。
+        checkHostAutoReady(client.roomNumber)
+    }
     try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client left: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
 }
