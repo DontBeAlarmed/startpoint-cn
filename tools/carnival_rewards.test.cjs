@@ -332,4 +332,27 @@ assert.deepEqual(carnivalSaveState.getCarnivalSaveStateSync(db, 18), {
 })
 db.close()
 
+// ---- #19(双审 S-2):/load 的 carnival_event_record_list 投影 ----
+// 表/域/存档注册齐全,缺 load.ts 投影键;域函数=load 调用的同一条路径。
+// getPlayerCarnivalEventRecordListSync groups records by event for the load projection
+{
+    const playerId = 990001
+    runtimeDatabase.pragma("foreign_keys = OFF")
+    runtimeDatabase.prepare(`
+        INSERT INTO players_carnival_event_records
+            (player_id, event_id, folder_id, best_score, previous_score,
+             previous_character_ids, previous_unison_character_ids)
+        VALUES (?, 1, 1, 12345, 0, '[]', '[]'), (?, 1, 3, 45678, 0, '[]', '[]')
+    `).run(playerId, playerId)
+    const grouped = carnivalDomain.getPlayerCarnivalEventRecordListSync(playerId)
+    assert.deepEqual(grouped, {
+        1: { records: [
+            { folder_id: 1, best_score: 12345 },
+            { folder_id: 3, best_score: 45678 },
+        ] },
+    })
+    // 无记录玩家=空桶(load 投影直接携带,客户端 IntMap 空即 None 语义)
+    assert.deepEqual(carnivalDomain.getPlayerCarnivalEventRecordListSync(990002), {})
+}
+
 console.log("carnival reward tests passed")

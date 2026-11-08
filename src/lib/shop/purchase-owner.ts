@@ -48,6 +48,7 @@ export interface ExecuteShopPurchaseInput {
     readonly resetHour?: number
     readonly catalog?: ShopCatalog
     readonly rushOverride?: RushFinalOperationOverride | null
+    readonly playerRank?: number
 }
 
 function authorizeCampaignLineups(
@@ -92,6 +93,7 @@ export function executeShopPurchaseSync(
         purchasePeriodNowMs: input.purchasePeriodNowMs,
         resetHour: input.resetHour,
         rushOverride: input.rushOverride ?? null,
+        playerRank: input.playerRank,
     })
     const virtualNow = new Date(input.virtualNowMs)
 

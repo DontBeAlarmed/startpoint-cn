@@ -387,6 +387,9 @@ export async function convertShops(
         )
         item.groupId = parseInteger(fields[2], `equipment_enhancement_shop[${id}].groupId`)
         item.stage = parseInteger(fields[3], `equipment_enhancement_shop[${id}].stage`)
+        // 客户端 EquipmentEnhancementShopValues.parseAt24:等级解锁门
+        // (帮助「玩家等级达 90 解锁」),服务端 /shop/buy 同门校验
+        item.releaseRank = parseInteger(fields[24], `equipment_enhancement_shop[${id}].releaseRank`)
         if (productKind === 1) {
             item.equipmentId = parseInteger(
                 fields[29],

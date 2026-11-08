@@ -21,6 +21,26 @@ function buildRecord(raw: RawPlayerCarnivalEventRecord): PlayerCarnivalEventReco
     }
 }
 
+/** /load 的 carnival_event_record_list:按事件分组的 {records:[{folder_id,best_score}]}。 */
+export function getPlayerCarnivalEventRecordListSync(
+    playerId: number,
+): Record<number, { records: readonly { folder_id: number, best_score: number }[] }> {
+    const rows = getDb().prepare(`
+    SELECT event_id, folder_id, best_score
+    FROM players_carnival_event_records
+    WHERE player_id = ?
+    ORDER BY event_id, folder_id
+    `).all(playerId) as { event_id: number, folder_id: number, best_score: number }[]
+
+    const grouped: Record<number, { records: { folder_id: number, best_score: number }[] }> = {}
+    for (const row of rows) {
+        const bucket = grouped[row.event_id] ?? { records: [] }
+        bucket.records.push({ folder_id: row.folder_id, best_score: row.best_score })
+        grouped[row.event_id] = bucket
+    }
+    return grouped
+}
+
 export function getPlayerCarnivalEventRecordsSync(
     playerId: number,
     eventId: number

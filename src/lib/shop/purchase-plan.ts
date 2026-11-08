@@ -6,6 +6,7 @@ import {
     ShopItemUserCostType,
     ShopType,
 } from "../types"
+import { ShopOfferNotPurchasableError } from "./effective-offer"
 import { resolveEffectiveShopOffer } from "./effective-offer"
 import type { EffectiveShopOffer, ShopCatalog } from "./model"
 import type { RushFinalOperationOverride } from "../rush-final-operation-override"
@@ -48,6 +49,8 @@ export interface PrepareShopPurchaseInput {
     readonly purchasePeriodNowMs: number
     readonly resetHour?: number
     readonly rushOverride?: RushFinalOperationOverride | null
+    /** 玩家当前 RANK(getPlayerRankLevel);release_rank 门的判定输入。 */
+    readonly playerRank?: number
 }
 
 export interface PreparedShopPurchaseEntry extends ShopPurchaseCommandEntry {
@@ -173,6 +176,13 @@ export function prepareShopPurchase(input: PrepareShopPurchaseInput): PreparedSh
             offer.item.specifiedMonths,
             input.resetHour,
         )
+        // #11(帮助 Battle_Boss 旁证/装备强化帮助「玩家等级达 90 解锁」):
+        // release_rank 服务端同门——客户端 UI 拦截之外的最后一道(改机可达)。
+        if (offer.item.releaseRank !== undefined
+            && input.playerRank !== undefined
+            && input.playerRank < offer.item.releaseRank) {
+            throw new ShopOfferNotPurchasableError("Player rank is below the item release rank.")
+        }
         return {
             shopItemId,
             purchaseAmount,

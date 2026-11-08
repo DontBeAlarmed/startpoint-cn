@@ -1,3 +1,4 @@
+import { getPlayerCarnivalEventRecordListSync } from "../../data/domains/carnivalEvent"
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import path from "node:path";
 import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
@@ -430,6 +431,9 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             clientData.crazy_gacha_result_list = crazyGacha.crazyGachaResultList;
             clientData.last_crazy_gacha_draw_result = crazyGacha.lastCrazyGachaDrawResult;
             clientData.converted_gacha_list = projectPendingGachaConversionsSync(playerId);
+            // 双审 S-2:嘉年华最佳分记录回显——此前存档/域齐全但 /load 不投影,
+            // 重启即视觉清零
+            clientData.carnival_event_record_list = getPlayerCarnivalEventRecordListSync(playerId);
             clientData.favorite_party_group_list = getFavoritePartyGroupListSync(
                 playerId,
                 player.leaderCharacterId,

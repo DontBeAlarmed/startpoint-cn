@@ -20,6 +20,8 @@ import {
 import { projectShopPurchaseResponse } from "../../../lib/shop/response-projector"
 import { ShopType } from "../../../lib/types"
 import { getGameTimeContext } from "../../../runtime/time/game-time"
+import { getPlayerSync } from "../../../data/domains/player"
+import { getPlayerRankLevel } from "../../../lib/player-rank-content"
 import { generateDataHeaders } from "../../../utils"
 
 interface BuyBody {
@@ -121,6 +123,9 @@ export function registerShopPurchaseRoutes(
         if (playerId === null) return
         const gameTime = getGameTimeContext()
         const catalog = getShopCatalog()
+        const player = getPlayerSync(playerId)
+        if (player === null) return badRequest(reply, "Player not found.")
+        const playerRank = getPlayerRankLevel(player.rankPoint)
         try {
             const result = executeShopPurchaseSync({
                 playerId,
@@ -130,6 +135,7 @@ export function registerShopPurchaseRoutes(
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
                 catalog,
+                playerRank,
                 rushOverride: resolveRushFinalOperationOverrideForPurchase(
                     catalog,
                     body.shop_type,

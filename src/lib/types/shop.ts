@@ -61,6 +61,7 @@ export interface ShopItem {
     lineupId?: number
     passCardPoints?: number
     costScheduleId?: string
+    releaseRank?: number
     purchaseKind?: "purchase" | "specialExchangeLink"
     specialExchangeCampaignId?: number
 }
