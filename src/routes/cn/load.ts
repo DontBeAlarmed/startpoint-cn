@@ -330,7 +330,6 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             playerId,
             player,
             nowMs: now.getTime(),
-            maxStarCrumb: currencyPolicy.maxStarCrumb,
         });
         if (gachaPointConversion.status === "converted") {
             const refreshedPlayer = getPlayerSync(playerId);

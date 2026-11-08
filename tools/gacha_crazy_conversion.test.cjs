@@ -267,13 +267,12 @@ test("Crazy select rolls rewards and slot clearing back on a late history failur
     assert.equal(historyCount(playerId), 0)
 })
 
-test("expired points convert once, respect Star Crumb cap, mail overflow and ack once", async () => {
+test("expired points convert into star grain items once, overflow to item mail and ack once", async () => {
     const { playerId, viewerId } = await createPlayer("conversion")
-    // 上限绑定内容策略（生产 load 即传 currencyPolicy.maxStarCrumb；
-    // 10-06 assets/config.json 已将 max_star_crumb 调至 99999），
-    // 场景按「差 4 到上限」构造：兑换 10 点 → 收 4 溢 6
-    const maxStarCrumb = getCurrencyCapacityPolicySync().maxStarCrumb
-    updatePlayerSync({ id: playerId, starCrumb: maxStarCrumb - 4 })
+    // 官方语义(客户端 HomeScene converted_exchange_point_dialog):剩余兑换
+    // 点 1:1 转为星之粒道具 990008 入包;star_crumb(星之碎片)余额是另一
+    // 货币(付费石 75:1 累计),不受转换影响。
+    updatePlayerSync({ id: playerId, starCrumb: 777 })
     insertPlayerGachaInfoSync(playerId, {
         gachaId: EXPIRED_GACHA_ID,
         isDailyFirst: true,
@@ -284,61 +283,73 @@ test("expired points convert once, respect Star Crumb cap, mail overflow and ack
     const converted = settleExpiredGachaPointsOnLoadSync({
         playerId,
         nowMs: NOW_MS,
-        maxStarCrumb,
     })
     assert.equal(converted.status, "converted")
     assert.deepEqual(converted.entries.map(entry => ({
         requested: entry.requestedPoint,
-        accepted: entry.acceptedStarCrumb,
-        overflow: entry.overflowStarCrumb,
-    })), [{ requested: 10, accepted: 4, overflow: 6 }])
-    assert.equal(getPlayerSync(playerId).starCrumb, maxStarCrumb)
+        grainAfter: entry.starGrainAfter,
+        overflow: entry.overflowStarGrain,
+    })), [{ requested: 10, grainAfter: 10, overflow: 0 }])
+    assert.equal(converted.starGrainAfter, 10)
+    assert.equal(getPlayerSync(playerId).starCrumb, 777, "star_crumb 余额不受转换影响")
+    assert.equal(getPlayerItemSync(playerId, 990008), 10)
     assert.equal(getPlayerGachaInfoSync(playerId, EXPIRED_GACHA_ID).gachaExchangePoint, 0)
-    const overflow = getPlayerMailsSync(playerId, 1, 100, true)
-        .filter(mail => mail.type === MailType.STAR_CRUMB)
-    assert.equal(overflow.length, 1)
-    assert.equal(overflow[0].number, 6)
-    const blockedClaim = await app.inject({
-        method: "POST",
-        url: "/mail/receive",
-        payload: { viewer_id: viewerId, mail_id: overflow[0].id, api_count: 1 },
-    })
-    // 超容量领取走带内结果码 2001（客户端站内 ReceiveError）且邮件保留（花费后可再领）——
-    // 不消费邮件（否则溢出附件被静默丢失）；不再以 HTTP 400 踢登录（R-G03）
-    assert.equal(blockedClaim.statusCode, 200, blockedClaim.body)
-    assert.equal(unpack(Buffer.from(blockedClaim.body, "base64")).data_headers.result_code, 2001)
-    assert.equal(getPlayerSync(playerId).starCrumb, maxStarCrumb)
-    assert.equal(getPlayerMailsSync(playerId, 1, 100, true)
-        .some(mail => mail.id === overflow[0].id
-            && mail.receive_time === "0000-00-00 00:00:00"), true)
     assert.deepEqual(projectPendingGachaConversionsSync(playerId), [{
         gacha_id: EXPIRED_GACHA_ID,
         gacha_exchange_point: 10,
     }])
 
-    const repeatedSettlement = settleExpiredGachaPointsOnLoadSync({
+    // 溢出:粒灌到差 4 满,第二条过期池(banner 28,同在 NOW 前过期)再转
+    // 10 点 → +4 直发 + 6 走物品溢出邮件(conversions PK=player+gacha,
+    // 第二次转换须换 banner)
+    const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
+    const SECOND_EXPIRED_GACHA_ID = 28
+    const grainMax = createRewardGrantItemOverflowPolicy(playerId).maxCount(990008)
+    setInventoryFixtureItemExactSync(playerId, 990008, grainMax - 4)
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: SECOND_EXPIRED_GACHA_ID,
+        isDailyFirst: true,
+        isAccountFirst: true,
+        gachaExchangePoint: 10,
+    })
+    const overflowed = settleExpiredGachaPointsOnLoadSync({
         playerId,
         nowMs: NOW_MS,
-        maxStarCrumb,
     })
-    assert.equal(repeatedSettlement.status, "none")
-    assert.equal(getPlayerMailsSync(playerId, 1, 100, true)
-        .filter(mail => mail.type === MailType.STAR_CRUMB).length, 1)
+    assert.deepEqual(overflowed.entries.map(entry => ({
+        gachaId: entry.gachaId,
+        requested: entry.requestedPoint,
+        grainAfter: entry.starGrainAfter,
+        overflow: entry.overflowStarGrain,
+    })), [{
+        gachaId: SECOND_EXPIRED_GACHA_ID,
+        requested: 10,
+        grainAfter: grainMax,
+        overflow: 6,
+    }])
+    assert.equal(getPlayerItemSync(playerId, 990008), grainMax)
+    const overflowMails = getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM)
+    assert.equal(overflowMails.length, 1)
+    assert.equal(overflowMails[0].number, 6)
 
     const acknowledged = await app.inject({
         method: "POST",
         url: "/gacha/shown_converted",
-        payload: { viewer_id: viewerId, gacha_id: EXPIRED_GACHA_ID },
+        payload: { viewer_id: viewerId, gacha_id: SECOND_EXPIRED_GACHA_ID },
     })
     assert.equal(acknowledged.statusCode, 200, acknowledged.body)
-    assert.deepEqual(projectPendingGachaConversionsSync(playerId), [])
+    assert.deepEqual(projectPendingGachaConversionsSync(playerId), [{
+        gacha_id: EXPIRED_GACHA_ID,
+        gacha_exchange_point: 10,
+    }])
     const repeatedAck = await app.inject({
         method: "POST",
         url: "/gacha/shown_converted",
         payload: { viewer_id: viewerId, gacha_id: EXPIRED_GACHA_ID },
     })
     assert.equal(repeatedAck.statusCode, 200, repeatedAck.body)
-    assert.equal(getPlayerSync(playerId).starCrumb, maxStarCrumb)
+    assert.equal(getPlayerItemSync(playerId, 990008), grainMax)
 })
 
 test("held extension ticket delays conversion until the last legal path disappears", async () => {
@@ -412,7 +423,7 @@ test("load publishes committed conversion and does not repeat it after shown ack
     const second = await requestLoad()
     assert.equal(second.statusCode, 200, second.body)
     assert.deepEqual(decode(second).data.converted_gacha_list, [])
-    assert.equal(getPlayerSync(playerId).starCrumb, 5)
+    assert.equal(getPlayerItemSync(playerId, 990008), 3)
 })
 
 test("conversion notification accumulates before shown and reopens with only the new amount", async () => {
@@ -627,7 +638,6 @@ test("Crazy draw limit comes from config gacha_crazy_ten_max_count", async () =>
 test("points on a banner missing from the content snapshot convert and do not block save export", async () => {
     const { playerId } = await createPlayer("conversion-missing-banner")
     const unknownGachaId = 987654
-    const starCrumbBefore = getPlayerSync(playerId).starCrumb
     insertPlayerGachaInfoSync(playerId, {
         gachaId: unknownGachaId,
         isDailyFirst: true,
@@ -641,7 +651,7 @@ test("points on a banner missing from the content snapshot convert and do not bl
         maxStarCrumb: 9999,
     })
     assert.equal(converted.status, "converted")
-    assert.equal(getPlayerSync(playerId).starCrumb, starCrumbBefore + 5)
+    assert.equal(getPlayerItemSync(playerId, 990008), 5)
     assert.deepEqual(projectPendingGachaConversionsSync(playerId), [{
         gacha_id: unknownGachaId,
         gacha_exchange_point: 5,

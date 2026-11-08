@@ -11,6 +11,7 @@ const rewardExp = require("../src/lib/character-growth/commands/grant-character-
 const rewardStack = require("../src/lib/character-growth/commands/grant-character-stack")
 const injectExp = require("../src/lib/character-growth/commands/inject-exp")
 const stackToExp = require("../src/lib/character-growth/commands/stack-to-exp")
+const overLimit = require("../src/lib/character-growth/commands/over-limit")
 const { createCharacterGrowthC4Fixture } = require("./helpers/character-growth-c4-fixture.cjs")
 const expodRoutes = require("../src/routes/api/expod").default
 const characterRoutes = require("../src/routes/api/character").default
@@ -457,6 +458,71 @@ test("standalone and non-gacha RewardGrant 5-star duplicate character grants set
         const ownerMails = getPlayerMailsSync(ownerPlayerId, 1, 100, true)
             .filter(mail => mail.type === MailType.ITEM && mail.type_id === 14006)
         assert.deepEqual(ownerMails.map(mail => mail.number), [1])
+    } finally {
+        fixture.cleanup()
+    }
+})
+
+
+test("duplicate at stack cap 99 auto-converts to exp + star grain", () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    try {
+        const playerId = fixture.createPlayer()
+        fixture.addCharacter(playerId, 341003, { stack: 99 }) // ★3
+        const poolBefore = fixture.db.prepare("SELECT exp_pool FROM players WHERE id = ?").get(playerId).exp_pool
+        const result = rewardStack.grantCharacterStack({ playerId, characterId: 341003 })
+        assert.equal(result.character.stack, 99, "本体保持 99 不再累加")
+        assert.deepEqual(result.item, { id: 990008, count: 2 }, "★3 溢出重复=500exp+2 星之粒")
+        assert.equal(fixture.item(playerId, 990008), 2)
+        assert.equal(fixture.db.prepare("SELECT exp_pool FROM players WHERE id = ?").get(playerId).exp_pool,
+            poolBefore + 500)
+        assert.equal(fixture.item(playerId, 14010), null, "突破结晶不再发放(溢出重复无突破用途)")
+    } finally {
+        fixture.cleanup()
+    }
+})
+
+test("over-limit crystal must match the character rarity (client rule)", () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    try {
+        const playerId = fixture.createPlayer()
+        const star3Id = 341003 // ★3(内容层实测 rarity=3)
+        const at = new Date("2026-01-01T00:00:00.000Z")
+
+        fixture.addCharacter(playerId, 211003, { stack: 0 }) // ★4
+        fixture.giveItem(playerId, 10001, 1)
+        assert.throws(
+            () => overLimit.executeOverLimit({
+                playerId, characterId: 211003, overLimitCount: 1,
+                useStack: false, itemId: 10001, evaluationTime: at,
+            }),
+            /invalid item for this character rarity/,
+            "★4 不得被 ★3 结晶突破(修复目标)",
+        )
+
+        fixture.giveItem(playerId, 10002, 1)
+        const ok = overLimit.executeOverLimit({
+            playerId, characterId: 211003, overLimitCount: 1,
+            useStack: false, itemId: 10002, evaluationTime: at,
+        })
+        assert.equal(ok.itemId, 10002)
+
+        fixture.addCharacter(playerId, star3Id, { stack: 0 }) // ★3
+        fixture.giveItem(playerId, 10002, 1)
+        assert.throws(
+            () => overLimit.executeOverLimit({
+                playerId, characterId: star3Id, overLimitCount: 1,
+                useStack: false, itemId: 10002, evaluationTime: at,
+            }),
+            /invalid item for this character rarity/,
+            "★3 不得用 ★4 结晶(严格同稀有度)",
+        )
+        fixture.giveItem(playerId, 10001, 1)
+        const ok3 = overLimit.executeOverLimit({
+            playerId, characterId: star3Id, overLimitCount: 1,
+            useStack: false, itemId: 10001, evaluationTime: at,
+        })
+        assert.equal(ok3.itemId, 10001)
     } finally {
         fixture.cleanup()
     }

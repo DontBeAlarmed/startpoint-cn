@@ -1,11 +1,18 @@
 import { getDb } from "../../../data/db"
 import { getPlayerCharacterSync } from "../../../data/domains/character"
+import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import type { PlayerCharacter } from "../../../data/types"
 import { getCharacterFacts } from "../../character-content"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { Element, GivePlayerCharacterResult } from "../../types"
 import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
 import { settleDirectItemOverflowsWithinTransactionSync } from "../../item-overflow"
+import {
+    CHARACTER_STACK_CONVERSION_EXP,
+    CHARACTER_STACK_CONVERSION_ITEM,
+    CHARACTER_STACK_MAX,
+    STACK_CONVERSION_REWARD_ITEM_ID,
+} from "../limits"
 import { addSafeInteger, assertInsideTransaction, updateCharacterGrowthRowsSync, validateGrowthCommandIds } from "../mutation-support"
 import {
     STACK_CHARACTER_GROWTH_FIELDS,
@@ -52,6 +59,20 @@ export interface GrantCharacterStackCommand {
     readonly characterId: number
 }
 
+export interface CharacterStackOverflowConversion {
+    readonly exp: number
+    readonly grainItemId: number
+    readonly grainCount: number
+}
+
+/** 溢出重复的转换口径:与手动重复转换同表(exp+星之粒,按稀有度)。 */
+export function getCharacterStackOverflowConversion(rarity: number): CharacterStackOverflowConversion | undefined {
+    const exp = CHARACTER_STACK_CONVERSION_EXP[rarity]
+    const grainCount = CHARACTER_STACK_CONVERSION_ITEM[rarity]
+    if (exp === undefined || grainCount === undefined) return undefined
+    return { exp, grainItemId: STACK_CONVERSION_REWARD_ITEM_ID, grainCount }
+}
+
 export type CharacterStackCompensationGrant = (
     playerId: number,
     itemId: number,
@@ -70,6 +91,12 @@ export function grantCharacterStackWithinTransactionSync(
     if (character === null) return null
     const asset = getCharacterFacts().get(command.characterId)
     if (asset === null) return null
+    if (character.stack >= CHARACTER_STACK_MAX) {
+        // 官方语义(帮助 L67):重复数达 99 后,超出部分的角色自动转换为
+        // 经验值——本体保持 99 不变,按稀有度折 exp+星之粒;元素结晶
+        // (突破材料)不再发放(溢出重复已无突破用途)。
+        return convertOverflowDuplicateWithinTransactionSync(command, character, asset, grantCompensation)
+    }
     const compensation = getCharacterStackCompensation(asset.rarity, asset.element as Element)
     const stack = addSafeInteger(character.stack, 1, "character.stack")
 
@@ -118,6 +145,62 @@ export function grantCharacterStackWithinTransactionSync(
             : null
         return {
             ...updateStack(),
+            itemAfterAmount: grant.afterAmount,
+            ...(overflowSettlement === null ? {} : {
+                itemOverflowDispositions: overflowSettlement.dispositions,
+                overflowFreeManaAfter: overflowSettlement.freeManaAfter,
+            }),
+        }
+    })
+}
+
+function convertOverflowDuplicateWithinTransactionSync(
+    command: GrantCharacterStackCommand,
+    character: PlayerCharacter,
+    asset: { rarity: number },
+    grantCompensation?: CharacterStackCompensationGrant,
+): GivePlayerCharacterResult {
+    const conversion = getCharacterStackOverflowConversion(asset.rarity)
+    if (conversion === undefined) throw new Error(`character rarity ${asset.rarity} cannot convert stack.`)
+    const player = getPlayerSync(command.playerId)
+    if (player === null) throw new Error("character stack player disappeared")
+    const afterPool = addSafeInteger(player.expPool, conversion.exp, "player.expPool")
+    updatePlayerSync({ id: command.playerId, expPool: afterPool })
+    const projected = projectCharacterGrowthEntry({
+        characterId: command.characterId,
+        character,
+        state: characterGrowthProjectionStateFromPlayerCharacter(command.characterId, character),
+        fields: STACK_CHARACTER_GROWTH_FIELDS,
+    })
+    if (grantCompensation !== undefined) {
+        // 批量路径(扭蛋获得计划):星之粒经 result.item 由批次统一入账
+        return {
+            isNew: false,
+            character: projected,
+            item: { id: conversion.grainItemId, count: conversion.grainCount },
+        }
+    }
+    return withInventoryBatchContextWithinTransactionSync({
+        playerId: command.playerId,
+        preloadItemIds: [conversion.grainItemId],
+    }, inventory => {
+        const overflowPolicy = createRewardGrantItemOverflowPolicy(command.playerId)
+        const grant = inventory.grantWithCapacity(
+            conversion.grainItemId,
+            conversion.grainCount,
+            overflowPolicy.maxCount(conversion.grainItemId),
+        )
+        inventory.flush()
+        const overflowSettlement = grant.overflowAmount > 0
+            ? settleDirectItemOverflowsWithinTransactionSync({
+                playerId: command.playerId,
+                overflows: [{ itemId: conversion.grainItemId, amount: grant.overflowAmount }],
+            })
+            : null
+        return {
+            isNew: false,
+            character: projected,
+            item: { id: conversion.grainItemId, count: conversion.grainCount },
             itemAfterAmount: grant.afterAmount,
             ...(overflowSettlement === null ? {} : {
                 itemOverflowDispositions: overflowSettlement.dispositions,

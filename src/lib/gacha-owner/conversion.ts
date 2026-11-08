@@ -6,9 +6,11 @@ import {
     recordPlayerGachaConversionSync,
 } from "../../data/domains/gacha-lifecycle-state"
 import { getPlayerGachaInfoListSync, updatePlayerGachaInfoSync } from "../../data/domains/gacha"
-import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import { getPlayerSync } from "../../data/domains/player"
 import type { Player } from "../../data/types"
-import { insertStarCrumbOverflowMailWithinTransactionSync } from "../mail-overflow"
+import { createRewardGrantItemOverflowPolicy } from "../reward-grant-item-overflow"
+import { settleDirectItemOverflowsWithinTransactionSync } from "../item-overflow"
+import { STACK_CONVERSION_REWARD_ITEM_ID } from "../character-growth/limits"
 import { withDeferredInventoryBatchContextWithinTransactionSync } from "../inventory"
 import { getGachaCatalog } from "../gacha-catalog"
 import { getGachaExtensionTicketIds, hasRemainingGachaPathSync } from "./availability"
@@ -16,28 +18,25 @@ import { getGachaExtensionTicketIds, hasRemainingGachaPathSync } from "./availab
 export interface GachaPointConversionEntry {
     readonly gachaId: number
     readonly requestedPoint: number
-    readonly acceptedStarCrumb: number
-    readonly starCrumbAfter: number
-    readonly overflowStarCrumb: number
-    readonly overflowMailId: number | null
+    readonly starGrainAfter: number
+    readonly overflowStarGrain: number
 }
 
 export type GachaPointConversionSettlement = Readonly<{
     status: "none" | "converted"
     entries: readonly GachaPointConversionEntry[]
-    starCrumbAfter: number
+    /** 转换后的星之粒(990008)持有数;none 时为 null。 */
+    starGrainAfter: number | null
 }>
 
 export function settleExpiredGachaPointsOnLoadSync(input: {
     readonly playerId: number
     readonly nowMs: number
-    readonly maxStarCrumb: number
     /** Current player row when the caller already holds it (same synchronous request). */
     readonly player?: Player
 }): GachaPointConversionSettlement {
     if (!Number.isSafeInteger(input.playerId) || input.playerId <= 0
-        || !Number.isSafeInteger(input.nowMs) || input.nowMs < 0
-        || !Number.isSafeInteger(input.maxStarCrumb) || input.maxStarCrumb < 0) {
+        || !Number.isSafeInteger(input.nowMs) || input.nowMs < 0) {
         throw new TypeError("Gacha conversion input is invalid")
     }
     return getDb().transaction(() => {
@@ -49,7 +48,7 @@ export function settleExpiredGachaPointsOnLoadSync(input: {
         if (infos.length === 0) return deepFreeze({
             status: "none" as const,
             entries: [],
-            starCrumbAfter: player.starCrumb,
+            starGrainAfter: null,
         })
         const catalog = getGachaCatalog()
         return withDeferredInventoryBatchContextWithinTransactionSync({
@@ -60,8 +59,9 @@ export function settleExpiredGachaPointsOnLoadSync(input: {
                 const banner = catalog.banners[String(info.gachaId)]
                 return banner === undefined ? [] : getGachaExtensionTicketIds(banner)
             }))]
-            inventory.readMany(ticketIds)
-            let starCrumbAfter = player.starCrumb
+            inventory.readMany([...ticketIds, STACK_CONVERSION_REWARD_ITEM_ID])
+            const overflowPolicy = createRewardGrantItemOverflowPolicy(input.playerId)
+            let starGrainAfter: number | null = null
             const entries: GachaPointConversionEntry[] = []
             for (const info of infos) {
                 const banner = catalog.banners[String(info.gachaId)]
@@ -75,19 +75,21 @@ export function settleExpiredGachaPointsOnLoadSync(input: {
                     getTicketCount: itemId => inventory.read(itemId).afterAmount,
                 })) continue
                 const requestedPoint = info.gachaExchangePoint as number
-                const acceptedStarCrumb = Math.min(
+                // 官方语义(客户端 HomeScene converted_exchange_point_dialog):
+                // 剩余兑换点 1:1 转为星之粒道具 990008 入包——不再计入
+                // star_crumb(星之碎片)余额,那是另一货币(付费石 75:1 累计)。
+                const grant = inventory.grantWithCapacity(
+                    STACK_CONVERSION_REWARD_ITEM_ID,
                     requestedPoint,
-                    Math.max(0, input.maxStarCrumb - starCrumbAfter),
+                    overflowPolicy.maxCount(STACK_CONVERSION_REWARD_ITEM_ID),
                 )
-                const overflowStarCrumb = requestedPoint - acceptedStarCrumb
-                starCrumbAfter += acceptedStarCrumb
-                const overflowMail = overflowStarCrumb === 0
-                    ? null
-                    : insertStarCrumbOverflowMailWithinTransactionSync(
-                        input.playerId,
-                        overflowStarCrumb,
-                        new Date(input.nowMs),
-                    )
+                const overflowStarGrain = grant.overflowAmount
+                const overflowSettlement = overflowStarGrain > 0
+                    ? settleDirectItemOverflowsWithinTransactionSync({
+                        playerId: input.playerId,
+                        overflows: [{ itemId: STACK_CONVERSION_REWARD_ITEM_ID, amount: overflowStarGrain }],
+                    })
+                    : null
                 updatePlayerGachaInfoSync(input.playerId, {
                     gachaId: info.gachaId,
                     gachaExchangePoint: 0,
@@ -98,22 +100,20 @@ export function settleExpiredGachaPointsOnLoadSync(input: {
                     point: requestedPoint,
                     convertedAt: Math.floor(input.nowMs / 1000),
                 })
+                starGrainAfter = grant.afterAmount
                 entries.push({
                     gachaId: info.gachaId,
                     requestedPoint,
-                    acceptedStarCrumb,
-                    starCrumbAfter,
-                    overflowStarCrumb,
-                    overflowMailId: overflowMail?.mailId ?? null,
+                    starGrainAfter: grant.afterAmount,
+                    overflowStarGrain,
                 })
+                void overflowSettlement
             }
-            if (entries.length > 0 && starCrumbAfter !== player.starCrumb) {
-                updatePlayerSync({ id: input.playerId, starCrumb: starCrumbAfter })
-            }
+            inventory.flush() // deferred 批次:入包增量在返回前落库(load 序列化要读到)
             return deepFreeze({
                 status: entries.length === 0 ? "none" as const : "converted" as const,
                 entries,
-                starCrumbAfter,
+                starGrainAfter,
             })
         })
     })()

@@ -29,3 +29,7 @@ export const CHARACTER_STACK_CONVERSION_ITEM: Readonly<Record<number, number>> =
 })
 
 export const STACK_CONVERSION_REWARD_ITEM_ID = 990008
+
+// 帮助 Character_Character L67「重复数的上限为 99。如果超过持有上限，
+// 超出部分的角色会自动转换为经验值」——溢出重复按本文件转换表折算。
+export const CHARACTER_STACK_MAX = 99

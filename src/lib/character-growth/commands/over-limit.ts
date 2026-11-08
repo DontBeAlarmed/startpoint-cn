@@ -35,12 +35,28 @@ export interface OverLimitResult {
     readonly replayed: false
 }
 
+// 破星结晶适用规则(客户端 OwnedOverLimitLogic.as:126-128 同款):
+// crystal.target == 角色稀有度,或 crystal.allow_below 且角色稀有度更低。
+// CN 主数据:10001=★3(allow_below → ≤3★ 可用)、10002=★4、10003=★5
+// (严格同稀有度)——帮助 Character_Strengthen L45「不同的破星结晶适用于
+// 不同稀有度的角色」。旧实现允许 ≤4★ 混用 10001/10002(★4 可被 ★3 结晶
+// 突破,绕过高档结晶消耗),本表按客户端规则收紧。
+const overLimitCrystalRules: Readonly<Record<number, {
+    readonly targetRarity: number
+    readonly allowsBelowRarity: boolean
+}>> = Object.freeze({
+    10001: { targetRarity: 3, allowsBelowRarity: true },
+    10002: { targetRarity: 4, allowsBelowRarity: false },
+    10003: { targetRarity: 5, allowsBelowRarity: false },
+})
+
 function validateItemId(rarity: number, itemId: number | undefined): number {
     if (itemId === undefined) throw growthError("INVALID_REQUEST", "itemId is required when useStack is false.")
-    if (rarity === 5 && itemId !== 10003) {
-        throw growthError("INVALID_REQUEST", "invalid item for a 5-star character.")
-    }
-    if (rarity <= 4 && itemId !== 10001 && itemId !== 10002) {
+    const rule = overLimitCrystalRules[itemId]
+    const usable = rule !== undefined
+        && (rarity === rule.targetRarity
+            || (rule.allowsBelowRarity && rarity < rule.targetRarity))
+    if (!usable) {
         throw growthError("INVALID_REQUEST", "invalid item for this character rarity.")
     }
     return itemId

@@ -8,11 +8,14 @@ import {
 import type { PlayerCharacter, PlayerEquipment } from "../../data/types"
 import { getRealNow } from "../../runtime/time/game-time"
 import { getCharacterFacts } from "../character-content"
+import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { clientSerializeEquipment } from "../equipment"
 import {
     getCharacterStackCompensation,
     getCharacterStackCompensationItemId,
+    getCharacterStackOverflowConversion,
 } from "../character-growth/commands/grant-character-stack"
+import { CHARACTER_STACK_MAX } from "../character-growth/limits"
 import {
     STACK_CHARACTER_GROWTH_FIELDS,
     characterGrowthProjectionStateFromPlayerCharacter,
@@ -159,23 +162,47 @@ export function prepareGachaAcquisitionBatchSync(
             }
             const asset = getCharacterFacts().get(characterId)
             if (asset === null) return null
-            const compensation = getCharacterStackCompensation(
-                asset.rarity,
-                asset.element as Element,
-            )
+            // 重复数 99 上限(帮助 L67):溢出重复自动转经验+星之粒,本体
+            // 保持 99;元素结晶(突破材料)不再发放。exp 直入 exp_pool
+            // (与 stack-to-exp 同表同账户)。
+            const stackAtCap = current.character.stack >= CHARACTER_STACK_MAX
+            const overflowConversion = stackAtCap
+                ? getCharacterStackOverflowConversion(asset.rarity)
+                : undefined
+            if (stackAtCap && overflowConversion === undefined) {
+                throw new Error(`character rarity ${asset.rarity} cannot convert stack.`)
+            }
+            const compensation = stackAtCap
+                ? undefined
+                : getCharacterStackCompensation(
+                    asset.rarity,
+                    asset.element as Element,
+                )
             if (compensation !== undefined) grantCompensation(compensation.id, compensation.count)
-            const character = {
-                ...current.character,
-                stack: addSafeInteger(current.character.stack, 1, "character.stack"),
-                updateTime: evaluationTime,
+            const character = stackAtCap
+                ? current.character
+                : {
+                    ...current.character,
+                    stack: addSafeInteger(current.character.stack, 1, "character.stack"),
+                    updateTime: evaluationTime,
+                }
+            if (overflowConversion !== undefined) {
+                const player = getPlayerSync(playerId)
+                if (player === null) throw new Error("acquisition batch player disappeared")
+                updatePlayerSync({
+                    id: playerId,
+                    expPool: addSafeInteger(player.expPool, overflowConversion.exp, "player.expPool"),
+                })
             }
             current.character = character
             return {
                 isNew: false,
                 character: stackProjection(characterId, character),
-                ...(compensation === undefined ? {} : {
-                    item: { id: compensation.id, count: compensation.count },
-                }),
+                ...(overflowConversion !== undefined
+                    ? { item: { id: overflowConversion.grainItemId, count: overflowConversion.grainCount } }
+                    : compensation === undefined ? {} : {
+                        item: { id: compensation.id, count: compensation.count },
+                    }),
             }
         },
         grantEquipment(equipmentId, amount) {
