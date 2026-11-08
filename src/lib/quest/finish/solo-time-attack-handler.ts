@@ -1,4 +1,5 @@
 import type { PlayerQuestProgress } from "../../../data/types"
+import { givePlayerDegreeSync } from "../../../data/domains/degree"
 import { QuestCategory, type PlayerRewardResult } from "../../types"
 import { buildScoreAttackMainCharacterIds } from "./score-attack-handler"
 import type { SoloTimeAttackTimelineTier } from "../solo-time-attack-content"
@@ -33,11 +34,13 @@ export interface SoloTimeAttackFinishDependencies {
     readonly insertProgress: (playerId: number, category: number, progress: PlayerQuestProgress) => void
     readonly updateProgress: (playerId: number, category: number, progress: PlayerQuestProgress) => void
     readonly deleteActiveQuest: (playerId: number) => void
-    /** 时间线奖励的官方发放形态:按行内 reason_id 发 FREE_VMONEY 邮件(最快时间更新奖励)。 */
+    /** Stone 档:按行内 reason_id 发 FREE_VMONEY 邮件(最快时间更新奖励)。 */
     readonly insertRewardMail: (
         playerId: number,
         mail: { readonly reasonId: number, readonly stoneCount: number, readonly createdAt: Date },
     ) => void
+    /** Degree 档(称号):直接授予(carnival 同款域函数;邮件链无 DEGREE 接收实现)。 */
+    readonly grantDegree: (playerId: number, degreeId: number) => void
 }
 
 /**
@@ -93,11 +96,17 @@ export function handleSoloTimeAttackEventFinish(
         }
 
         for (const tier of crossedTiers) {
-            dependencies.insertRewardMail(input.playerId, {
-                reasonId: tier.mailReasonId,
-                stoneCount: tier.stoneCount,
-                createdAt: new Date(),
-            })
+            for (const reward of tier.rewards) {
+                if (reward.kind === "stone") {
+                    dependencies.insertRewardMail(input.playerId, {
+                        reasonId: tier.mailReasonId,
+                        stoneCount: reward.count,
+                        createdAt: new Date(),
+                    })
+                } else {
+                    dependencies.grantDegree(input.playerId, reward.degreeId)
+                }
+            }
         }
 
         dependencies.deleteActiveQuest(input.playerId)

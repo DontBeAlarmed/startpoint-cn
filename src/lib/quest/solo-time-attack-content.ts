@@ -10,6 +10,10 @@ import type { ReadonlyContentRepository } from "../../content/runtime/content-sn
  *   col6=reward1_kind("2"=Stone) / col7=reward1_id / col8=reward1_number ...
  * CN 1.4.54:全 222 行奖励均为 Stone(星导石),单奖励槽。
  */
+export type SoloTimeAttackTierReward =
+    | Readonly<{ kind: "stone", count: number }>
+    | Readonly<{ kind: "degree", degreeId: number, count: number }>
+
 export interface SoloTimeAttackTimelineTier {
     readonly id: number
     readonly eventId: number
@@ -17,7 +21,7 @@ export interface SoloTimeAttackTimelineTier {
     readonly name: string
     readonly clearTimeSeconds: number
     readonly mailReasonId: number
-    readonly stoneCount: number
+    readonly rewards: readonly SoloTimeAttackTierReward[]
 }
 
 const tiersByRepository = new WeakMap<ReadonlyContentRepository, readonly SoloTimeAttackTimelineTier[]>()
@@ -51,10 +55,23 @@ export function getSoloTimeAttackTimelineTiers(
     const tiers: SoloTimeAttackTimelineTier[] = []
     for (const rows of Object.values(raw)) {
         for (const row of parseRows(rows)) {
-            const kind = row[6]
-            if (kind !== "2") {
-                // CN 1.4.54 数据全部为 Stone;出现其他类别即内容漂移,fail-close
-                throw new Error(`solo_time_attack_clear_time_reward: unsupported reward kind ${String(kind)}`)
+            const rewards: SoloTimeAttackTierReward[] = []
+            // 奖励槽:col6 起每 3 列一组(kind/id/number),CN 数据含 Stone(2)
+            // 与 Degree(7,称号)两类;其余类别 fail-close
+            for (let base = 6; base + 2 < row.length; base += 3) {
+                const kind = row[base]
+                if (!kind || kind === "(None)") continue
+                if (kind === "2") {
+                    rewards.push({ kind: "stone", count: parseInteger("reward.number", row[base + 2], `slot${base}`) })
+                } else if (kind === "7") {
+                    rewards.push({
+                        kind: "degree",
+                        degreeId: parseInteger("reward.id", row[base + 1], `slot${base}`),
+                        count: parseInteger("reward.number", row[base + 2], `slot${base}`),
+                    })
+                } else {
+                    throw new Error(`solo_time_attack_clear_time_reward: unsupported reward kind ${String(kind)}`)
+                }
             }
             tiers.push({
                 id: parseInteger("display_order", row[0], "display_order"),
@@ -63,7 +80,7 @@ export function getSoloTimeAttackTimelineTiers(
                 name: String(row[3] ?? ""),
                 clearTimeSeconds: parseInteger("clear_time_seconds", row[4], "clear_time_seconds"),
                 mailReasonId: parseInteger("reason_id", row[5], "reason_id"),
-                stoneCount: parseInteger("reward1_number", row[8], "reward1_number"),
+                rewards: Object.freeze(rewards),
             })
         }
     }

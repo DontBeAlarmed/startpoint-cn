@@ -229,6 +229,7 @@ export function settleSingleBuiltInEvent(
                 reward_period_limited: 0,
                 reward_limit_time: null,
             }),
+            grantDegree: (pid, degreeId) => givePlayerDegreeSync(pid, degreeId),
         }),
     })
     const rush = builtIn.kind === "rush"

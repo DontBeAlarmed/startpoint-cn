@@ -16,18 +16,21 @@ const { handleSoloTimeAttackEventFinish } = require("../src/lib/quest/finish/sol
 const { createEventSettlementDescriptor } = require("../src/lib/quest/finish/event-settlement-descriptor")
 const { QuestCategory } = require("../src/lib/types")
 
-// 内容层真值抽验(事件 1 / 任务 3 的前两档):阈值秒数与星导石数
+// 内容层真值抽验(事件 1 / 任务 3 前三档 + 别线一档 + 称号档):
+// CN 222 行=Stone×N 全档 + 12 行 Degree(称号)+Stone 组合档
 const TIERS = [
-    { id: 111, eventId: 1, questId: 3, name: "7分以内通关", clearTimeSeconds: 420, mailReasonId: 15007, stoneCount: 10 },
-    { id: 110, eventId: 1, questId: 3, name: "6分50秒以内通关", clearTimeSeconds: 410, mailReasonId: 15007, stoneCount: 10 },
-    { id: 109, eventId: 1, questId: 3, name: "6分40秒以内通关", clearTimeSeconds: 400, mailReasonId: 15007, stoneCount: 10 },
-    { id: 75, eventId: 1, questId: 2, name: "别的任务线", clearTimeSeconds: 420, mailReasonId: 15007, stoneCount: 10 },
+    { id: 111, eventId: 1, questId: 3, name: "7分以内通关", clearTimeSeconds: 420, mailReasonId: 15007, rewards: [{ kind: "stone", count: 10 }] },
+    { id: 110, eventId: 1, questId: 3, name: "6分50秒以内通关", clearTimeSeconds: 410, mailReasonId: 15007, rewards: [{ kind: "stone", count: 10 }] },
+    { id: 109, eventId: 1, questId: 3, name: "6分40秒以内通关", clearTimeSeconds: 400, mailReasonId: 15007, rewards: [{ kind: "stone", count: 10 }] },
+    { id: 87, eventId: 1, questId: 3, name: "6分30秒以内通关+称号", clearTimeSeconds: 390, mailReasonId: 15007, rewards: [{ kind: "degree", degreeId: 54550, count: 1 }, { kind: "stone", count: 40 }] },
+    { id: 75, eventId: 1, questId: 2, name: "别的任务线", clearTimeSeconds: 420, mailReasonId: 15007, rewards: [{ kind: "stone", count: 10 }] },
 ]
 
 const PARTY = { characters: [{ id: 211003 }, { id: 221003 }, { id: 231003 }] }
 
 function runHandler(t, { elapsedMs, previous, isAccomplished = true }) {
     const mails = []
+    const degrees = []
     let progress = previous ?? null
     const deleted = []
     const result = handleSoloTimeAttackEventFinish({
@@ -49,8 +52,9 @@ function runHandler(t, { elapsedMs, previous, isAccomplished = true }) {
         updateProgress: (pid, category, row) => { progress = row },
         deleteActiveQuest: pid => deleted.push(pid),
         insertRewardMail: (pid, mail) => mails.push(mail),
+        grantDegree: (pid, degreeId) => degrees.push(degreeId),
     })
-    return { result, mails, progress, deleted }
+    return { result, mails, degrees, progress, deleted }
 }
 
 test("descriptor: solo time attack quests resolve the soloTimeAttack kind", () => {
@@ -78,6 +82,21 @@ test("first clear grants every crossed tier as reward mails and reports the resp
     assert.equal(progress.bestElapsedTimeMs, 405_000)
     assert.equal(progress.finished, true)
     assert.deepEqual(result.rewardResult, null)
+})
+
+test("degree rewards grant directly and stone rewards via mail", t => {
+    const { result, mails, degrees } = runHandler(t, {
+        elapsedMs: 385_000,
+        previous: {
+            questId: 1003, finished: true, highScore: 0, clearRank: 3,
+            bestElapsedTimeMs: 405_000, leaderCharacterId: 211003,
+        },
+    })
+    // 385s:新跨 400/390 两档 → 390 档=称号(直授)+石 40(邮件);400 档=石 10
+    assert.deepEqual(result.soloTimeAttackEvent.reward_ids, [109, 87])
+    assert.deepEqual(degrees, [54550])
+    assert.equal(mails.length, 2)
+    assert.deepEqual(mails.map(mail => mail.stoneCount), [10, 40])
 })
 
 test("repeat finish only grants newly crossed tiers and never regresses the best", t => {
