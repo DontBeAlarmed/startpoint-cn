@@ -264,10 +264,10 @@ function checkAllReadyAndStart(roomNumber: string): void {
     // 重新广播倒计时(此前集合只在 StartBattle 删除——取消/离开/房号复用
     // 后倒计时不重发,真机 2026-11-01 报告)。失效判断必须在集合守卫之前:
     // 守卫命中即 return,失效删除放在守卫之后永远走不到。
-    // 2026-11-08 语义收敛:倒计时只与"全员就绪"挂钩,成员数无关(1 成员
-    // 就绪→房主准备→倒计时,用户裁定)——下界从 3 放宽到 2(canStartBattle
-    // 同款下界,单人无共斗)。
-    const allReady = hostClient.mates.length >= 2
+    // 2026-11-08 语义收敛(用户补充裁定):倒计时=**满员专属**——3 人房全
+    // 就绪才武装;2 人房全就绪=房主准备、可手动开始、无倒计时。房主准备
+    // 本身仍与成员数无关(1 成员全就绪→房主准备)。
+    const allReady = hostClient.mates.length >= 3
         && hostClient.mates.every(m => m.state?.[0] === 1)
     if (!allReady) {
         autoStartingRooms.delete(roomNumber)

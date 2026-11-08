@@ -919,18 +919,18 @@ test("lobby mutations are gated while the room battle is occupied", async t => {
     assert.equal(room.raising_state, 1)
 })
 
-test("倒计时中未就绪新成员进入→房主回翻+倒计时失效", async t => {
+test("2 人房全就绪→房主准备无倒计时;未就绪新成员进入→房主回翻", async t => {
     const { room, host, guests } = createLobbyRoom(t, 8101, [8102])
     const guest1 = guests[0]
     handleMessage(host.socket, [0, [0, { party: {} }]])
     handleMessage(guest1.socket, [0, [0, { party: {} }]])
     handleMessage(guest1.socket, [0, [3, [1]]])
     let hostMate = host.client.mates.find(m => m.viewerId === 8101)
-    assert.deepEqual(hostMate.state, [1], "前置:唯一成员就绪→房主自动准备")
-    assert.ok(host.socket.writes.some(f => Array.isArray(f) && f[0] === 1
-        && Array.isArray(f[1]) && f[1][0] === 10 && f[1][1] === 2), "前置:倒计时已武装(2 人房)")
+    assert.deepEqual(hostMate.state, [1], "唯一成员就绪→房主准备(成员数无关)")
+    assert.equal(host.socket.writes.filter(f => Array.isArray(f) && f[0] === 1
+        && Array.isArray(f[1]) && f[1][0] === 10).length, 0, "补充语义:2 人房不武装倒计时")
 
-    // 边界情况:新成员未就绪进入 → 房主回翻+倒计时失效(官方语义)
+    // 未就绪新成员进入 → 房主回翻(准备不变量维护;倒计时本就未武装)
     const guest2 = createLobbyClient(room, 8103, "guest-8103")
     t.after(() => sessionManager.removeClientBySocket(guest2.socket))
     handleMessage(guest2.socket, [0, [0, { party: {} }]])
@@ -939,12 +939,10 @@ test("倒计时中未就绪新成员进入→房主回翻+倒计时失效", asyn
     const cancelled = host.socket.writes.some(f => Array.isArray(f) && f[0] === 1
         && Array.isArray(f[1]) && f[1][0] === 2 && f[1][1] === hostMate.connectionId
         && Array.isArray(f[1][2]) && f[1][2][0] === 0)
-    assert.ok(cancelled, "房主回翻 [2] 帧必须广播(客户端倒计时停止信号)")
-    assert.equal(host.socket.writes.filter(f => Array.isArray(f) && f[0] === 1
-        && Array.isArray(f[1]) && f[1][0] === 10).length, 1, "倒计时不重武装(未全就绪)")
+    assert.ok(cancelled, "房主回翻 [2] 帧必须广播")
 })
 
-test("就绪成员离席→剩余全就绪房主保持,独房回翻", async t => {
+test("满员全就绪武装倒计时;离席后未满员→房主保持但倒计时失效;独房回翻", async t => {
     const { room, host, guests } = createLobbyRoom(t, 8111, [8112, 8113])
     const [g1, g2] = guests
     handleMessage(host.socket, [0, [0, { party: {} }]])
@@ -953,19 +951,23 @@ test("就绪成员离席→剩余全就绪房主保持,独房回翻", async t =>
     handleMessage(g1.socket, [0, [3, [1]]])
     handleMessage(g2.socket, [0, [3, [1]]])
     let hostMate = host.client.mates.find(m => m.viewerId === 8111)
-    assert.deepEqual(hostMate.state, [1], "前置:全就绪→房主准备+倒计时")
+    assert.deepEqual(hostMate.state, [1], "前置:满员全就绪→房主准备")
+    assert.equal(host.socket.writes.filter(f => Array.isArray(f) && f[0] === 1
+        && Array.isArray(f[1]) && f[1][0] === 10).length, 1, "前置:满员倒计时已武装")
 
-    // 就绪成员 g2 断线离席 → 剩余(房主+g1)全就绪 → 房主保持准备
+    // 就绪成员 g2 断线离席 → 剩余(房主+g1)全就绪但未满员 → 房主保持、倒计时失效
     handleSocketDisconnect(g2.socket)
     hostMate = host.client.mates.find(m => m.viewerId === 8111)
     assert.deepEqual(hostMate.state, [1], "剩余全就绪→房主保持准备")
+    assert.equal(host.socket.writes.filter(f => Array.isArray(f) && f[0] === 1
+        && Array.isArray(f[1]) && f[1][0] === 10).length, 1, "未满员不重武装(倒计时失效)")
 
-    // g1(就绪)也离席 → 仅剩房主 → 回翻+倒计时不重武装
+    // g1(就绪)也离席 → 仅剩房主 → 回翻
     handleSocketDisconnect(g1.socket)
     hostMate = host.client.mates.find(m => m.viewerId === 8111)
     assert.deepEqual(hostMate.state, [0], "仅剩房主→回翻")
     assert.equal(host.socket.writes.filter(f => Array.isArray(f) && f[0] === 1
-        && Array.isArray(f[1]) && f[1][0] === 10).length, 1, "倒计时不重武装(独房)")
+        && Array.isArray(f[1]) && f[1][0] === 10).length, 1, "独房不武装倒计时")
 })
 
 test("an abandoned battle room is recycled once every participant is gone", async t => {
