@@ -692,8 +692,9 @@ const definitionInputs: TableSourceInput[] = [
             "master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap",
         ],
         converterId: "shop",
-        converterVersion: 2,
-        outputShapeVersion: 2,
+        // v3:releaseRank(col24)入转换输出(#11 等级门)——bump 触发 store 重建
+        converterVersion: 3,
+        outputShapeVersion: 3,
     },
     {
         tableName: "special_pack_shop.json",

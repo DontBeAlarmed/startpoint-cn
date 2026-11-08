@@ -104,6 +104,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/gacha_catalog.test.cjs",
             "tools/gacha_crazy_conversion.test.cjs",
+            "tools/shop_purchase_rank_gate.test.cjs",
             "tools/solo_time_attack_settlement.test.cjs",
             "tools/gacha_draw_weights.test.cjs",
             "tools/gacha_equipment_movie.test.cjs",

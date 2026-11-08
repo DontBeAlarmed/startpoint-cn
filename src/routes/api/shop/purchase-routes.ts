@@ -190,6 +190,9 @@ export function registerShopPurchaseRoutes(
         }
         const playerId = await resolvePurchasePlayerId(body.viewer_id, reply)
         if (playerId === null) return
+        const bulkPlayer = getPlayerSync(playerId)
+        if (bulkPlayer === null) return badRequest(reply, "Player not found.")
+        const bulkPlayerRank = getPlayerRankLevel(bulkPlayer.rankPoint)
         const gameTime = getGameTimeContext()
         const catalog = getShopCatalog()
         try {
@@ -201,6 +204,7 @@ export function registerShopPurchaseRoutes(
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
                 catalog,
+                playerRank: bulkPlayerRank,
                 rushOverride: resolveRushFinalOperationOverrideForPurchase(
                     catalog,
                     body.shop_type,

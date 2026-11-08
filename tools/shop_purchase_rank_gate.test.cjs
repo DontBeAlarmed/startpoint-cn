@@ -35,7 +35,7 @@ const CATALOG = {
             item: GOOD,
             periods: [{ availableFrom: "2020-01-01 00:00:00", availableUntil: null }],
             listed: true,
-            scope: { kind: "equipment", shopCategoryId: 1 },
+            scope: { kind: "equipmentEnhancement", categoryId: 1, groupId: 1, equipmentId: 14001 },
         },
     },
 }
@@ -61,4 +61,6 @@ test("release_rank gate lets equal-or-higher ranks through and omits undefined g
     assert.equal(prepared.entries[0].shopItemId, 9001)
     assert.equal(prepared.entries[0].offer.item.releaseRank, 90)
     assert.ok(plan(162).entries.length === 1)
+    // undefined playerRank=门省略(旧调用方兼容;双审 P3:生产路由已全部传参)
+    assert.ok(plan(undefined).entries.length === 1)
 })
