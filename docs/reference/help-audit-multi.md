@@ -47,7 +47,7 @@
 | 官方条款短引 | 实现 file:line | 判定 | 说明 |
 |---|---|---|---|
 | 「领主币在领主出现的主线关卡、高难关卡以及领主战中可以获得」(L53) | 通用掉落管道：`src/multi/settlement/orchestrator.ts:384-424`（score rewards + additional rewards） | 不可对照 | 具体掉哪枚币由内容表（score_reward / additional_reward）驱动 |
-| 「响应救援请求而加入合作战斗时，作为任务奖励可获得领主币碎片」(L57) | `src/multi/rescue-fragment-reward.ts:9-43`（胜利时发放，`orchestrator.ts:425-430`）；资格判定 `src/multi/http/battle.ts:272-276` → `resolveLocalRescueFragmentEligibility`（**所有 guest**，房主可由设置放开）；默认全开 `src/data/initializers/wdfpData.ts:46`（DEFAULT 1） | **偏差** | 官方语义=「响应救援请求者」；本服默认向**所有多人客机**（含房号直进者）发放碎片（见 P2-1）。碎片物品种类按降临档位派生 `src/lib/rescue-fragment-content.ts:3-5,19-30`（49000 银/49001 金/49002 紫） |
+| 「响应救援请求而加入合作战斗时，作为任务奖励可获得领主币碎片」(L57) | `src/multi/rescue-fragment-reward.ts:9-52`（胜利时发放，`orchestrator.ts:425-430`）；资格判定 `src/multi/http/battle.ts:272-284` → `resolveLocalRescueFragmentEligibility`（**双模式**：开关 OFF=严格官服仅铃铛响应者；ON=特化放宽所有 guest+房主自救开关，2026-11-08 实现）；默认全开 `src/data/initializers/wdfpData.ts:46`（DEFAULT 1） | **设计特性(复核改判)** | 见 P2-1 复核注记：开关=单人部署放宽设计，非缺陷。碎片物品种类按降临档位派生 `src/lib/rescue-fragment-content.ts:3-5,19-30`（49000 银/49001 金/49002 紫） |
 
 ### 5. 战斗内共斗表现（技能连锁 / Fever / 其他玩家 / 棺柩 / 得分）
 
@@ -88,11 +88,12 @@
 - 证据：官方客户端 `wf-cn-client-as3-20261014/scripts/pinball/common/data/quest/cost/StaminaCostCalculator.as:55-59`——`attentionKey` 为 Some（或 isNewbie）时恒 `TemporaryReducedStaminaCostKind.Zero`；且加成窗口内铃铛响应者在加入确认框看到的就是 0 消耗。本服 UI（search_room/verify_access_token/铃铛横幅）下发真实 follow 关系（`src/multi/http/lobby.ts:211-227`、`src/multi/http/social.ts:46-79`、`src/routes/api/attention.ts:97-103`），互关横幅 + 非互关扣 1/2 的组合会让响应者被扣费——直接违反帮助明文。
 - 影响：所有非互关的铃铛响应者被多扣体力；新手救援（is_newbie 横幅）同样被扣（该条帮助未写，但客户端同分支亦为 0）。
 
-### P2-1 — 领主币碎片发放范围大于官方口径
+### P2-1 → 复核改判「设计特性」(2026-11-08, 用户裁定) — 领主币碎片发放范围
 
 - 条款：帮助 Battle_Boss.md L57「**响应救援请求**而加入合作战斗时，作为任务奖励可获得领主币碎片」。
-- 实现：`src/multi/rescue-fragment-reward.ts:20-27`（`resolveLocalRescueFragmentEligibility` = 全部 guest，房主由 `multiRescueHostRewardsEnabled` 放开）+ `src/multi/http/battle.ts:272-276`；默认全开：`src/data/initializers/wdfpData.ts:46`（`multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1`）。
-- 影响：房号直进、好友大厅进入的客机（非救援响应）也拿碎片；属服务方有意放宽（设置开关存在），但与帮助明文不符。若要对齐官方，资格应收敛到「start 携有效 attention_key（T2 持票）」——该判定已存在（`resolveBellRecruitmentForStart`，`battle.ts:97-115`），复用即可。
+- **设计背景（用户裁定）**：该道具官服取物路径=响应他人救援铃铛完成战斗——单人部署不可创建该场景。开关1 默认 ON=**有意放宽**，为单人开服玩家提供取物路径（房主带 NPC 战即可得，房主自救由开关2 单独控制）；OFF=严格官服。
+- **实现（2026-11-08 落地）**：`resolveLocalRescueFragmentEligibility` 双模式——OFF 分支=仅「响应救援铃铛而参战」的客机（`battle.ts` 铃铛响应解析上移，attention_key→`resolveBellRecruitmentForStart` 判定传入资格函数；房主=救援发起方不适用）；ON 分支=原放宽行为不变。
+- **非缺陷，移出缺口清单**；本条保留作设计记录，防未来复审再误报。
 
 ### P2-2 — 关注奖励的授予/增长/冻结语义偏差
 
