@@ -52,6 +52,7 @@ const reviewedRawTableCalls = new Map([
     ["src/lib/player-rank-content.ts", ["cdndata/player_rank_full.json"]], // Rank catalogs (unified full-table owner)
     ["src/lib/quest/daily-challenge.ts", ["daily_challenge_point_lookup.json", "event_challenge_point_map.json"]], // Daily Challenge catalog
     ["src/lib/quest/finish/raid-overall-rewards.ts", ["raid_event_overall_reward.json", "raid_event.json"]], // Raid reward catalog
+    ["src/lib/quest/solo-time-attack-content.ts", ["solo_time_attack_clear_time_reward.json"]], // 极时试炼时间线奖励 catalog
     ["src/lib/quest/periodic-reward-content.ts", ["hard_multi_event.json", "periodic_reward_point.json", "periodic_reward.json", "hard_multi_event_quest.json"]], // Periodic reward catalog
     ["src/lib/quest/score-reward-selection.ts", ["reward_element_map.json"]], // Score reward adapter
     ["src/lib/quest-content.ts", ["tableName", "quest_lookup.json", "clear_reward.json", "rare_score_reward.json", "score_reward.json"]], // finite Quest/reward queries

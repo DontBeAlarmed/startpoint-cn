@@ -708,6 +708,7 @@ test("challenge point derivatives come from their authoritative master rows", ()
         dailyChallengePoint: "master/quest/event/daily_challenge_point.orderedmap",
         expertSingleEvent: "master/quest/event/expert_single_event.orderedmap",
         soloTimeAttackEvent: "master/quest/event/solo_time_attack_event.orderedmap",
+        soloTimeAttackClearTimeReward: "master/quest/event/solo_time_attack_clear_time_reward.orderedmap",
         practiceQuest: "master/quest/practice/practice_quest.orderedmap",
         mainStageNode: "master/quest/main_stage_node.orderedmap",
         exStageNode: "master/quest/ex_stage_node.orderedmap",

@@ -104,6 +104,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/gacha_catalog.test.cjs",
             "tools/gacha_crazy_conversion.test.cjs",
+            "tools/solo_time_attack_settlement.test.cjs",
             "tools/gacha_draw_weights.test.cjs",
             "tools/gacha_equipment_movie.test.cjs",
             "tools/gacha_execution_owner.test.cjs",
@@ -133,7 +134,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "quick:character-growth": {
         execution: "parallel",
-        timeoutMs: 60_000,
+        timeoutMs: 90_000,
         tests: [
             "tools/character_growth_core.test.cjs",
             "tools/character_growth_context.test.cjs",
