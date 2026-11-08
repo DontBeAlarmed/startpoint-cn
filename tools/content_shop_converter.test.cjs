@@ -192,6 +192,7 @@ function createFixture() {
             17: 1,
             22: "2024-06-01 12:00:00",
             23: "(None)",
+            24: "70",
             25: "",
             29: 5020042,
             30: 70,
@@ -428,6 +429,7 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
             equipmentId: 5020042,
             enhancementMaxLevel: 70,
             requireAwakeningLevel: 5,
+            releaseRank: 70,
         },
     })
     assert.deepEqual(output["special_pack_shop.json"], {
