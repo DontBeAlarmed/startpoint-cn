@@ -105,6 +105,32 @@ test.after(async () => {
     else process.env.DATA_DIR = previousDataDirectory
 })
 
+test("stack-99 duplicate claim converts to star grain instead of failing (dual-review P1)", async () => {
+    const { givePlayerCharacterSync } = require("../src/lib/character")
+    const { CHARACTER_STACK_MAX, CHARACTER_STACK_CONVERSION_ITEM } = require("../src/lib/character-growth/limits")
+    const { getCharacterFacts } = require("../src/lib/character-content")
+    const { playerId, viewerId } = await createPlayer("capped-dupe")
+    givePlayerCharacterSync(playerId, CHARACTER_ID)
+    database.prepare("UPDATE players_characters SET stack = ? WHERE player_id = ? AND id = ?")
+        .run(CHARACTER_STACK_MAX, playerId, CHARACTER_ID)
+    const rarity = getCharacterFacts().get(CHARACTER_ID).rarity
+    const expectedGrain = CHARACTER_STACK_CONVERSION_ITEM[rarity]
+
+    const mailId = addMail(playerId, MailType.CHARACTER, CHARACTER_ID, 1)
+    const claimed = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: mailId },
+    })
+    assert.equal(claimed.statusCode, 200, claimed.body)
+    assert.equal(getPlayerItemSync(playerId, 990008), expectedGrain,
+        "满仓重复必须转星之粒入包(引擎路径)")
+    const stackAfter = database.prepare(
+        "SELECT stack FROM players_characters WHERE player_id = ? AND id = ?",
+    ).get(playerId, CHARACTER_ID).stack
+    assert.equal(stackAfter, CHARACTER_STACK_MAX, "本体保持 99")
+})
+
 test("single receive response fixture covers every standard and dedicated mail type", async () => {
     const fixtures = [
         { type: MailType.ITEM, typeId: ITEM_ID, field: "item_list", amount: 2 },

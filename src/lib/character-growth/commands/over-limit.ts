@@ -37,16 +37,16 @@ export interface OverLimitResult {
 
 // 破星结晶适用规则(客户端 OwnedOverLimitLogic.as:126-128 同款):
 // crystal.target == 角色稀有度,或 crystal.allow_below 且角色稀有度更低。
-// CN 主数据:10001=★3(allow_below → ≤3★ 可用)、10002=★4、10003=★5
+// CN 主数据(item.json col9/col11 + 描述):10001=★3(allow_below→≤3★)、
+// 10002=★4(allow_below→≤4★,「可用于稀有度★4以下的角色」)、10003=★5
 // (严格同稀有度)——帮助 Character_Strengthen L45「不同的破星结晶适用于
-// 不同稀有度的角色」。旧实现允许 ≤4★ 混用 10001/10002(★4 可被 ★3 结晶
-// 突破,绕过高档结晶消耗),本表按客户端规则收紧。
+// 不同稀有度的角色」。旧实现 ≤4★ 混用 10001(★4 可被 ★3 结晶突破)已收紧。
 const overLimitCrystalRules: Readonly<Record<number, {
     readonly targetRarity: number
     readonly allowsBelowRarity: boolean
 }>> = Object.freeze({
     10001: { targetRarity: 3, allowsBelowRarity: true },
-    10002: { targetRarity: 4, allowsBelowRarity: false },
+    10002: { targetRarity: 4, allowsBelowRarity: true },
     10003: { targetRarity: 5, allowsBelowRarity: false },
 })
 

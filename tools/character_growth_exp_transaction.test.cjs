@@ -508,15 +508,13 @@ test("over-limit crystal must match the character rarity (client rule)", () => {
         assert.equal(ok.itemId, 10002)
 
         fixture.addCharacter(playerId, star3Id, { stack: 0 }) // ★3
+        // 10002 allow_below=true(CN 主数据 col11):★3 可用 ★4 结晶(双审 P2 修正)
         fixture.giveItem(playerId, 10002, 1)
-        assert.throws(
-            () => overLimit.executeOverLimit({
-                playerId, characterId: star3Id, overLimitCount: 1,
-                useStack: false, itemId: 10002, evaluationTime: at,
-            }),
-            /invalid item for this character rarity/,
-            "★3 不得用 ★4 结晶(严格同稀有度)",
-        )
+        const okLow = overLimit.executeOverLimit({
+            playerId, characterId: star3Id, overLimitCount: 1,
+            useStack: false, itemId: 10002, evaluationTime: at,
+        })
+        assert.equal(okLow.itemId, 10002)
         fixture.giveItem(playerId, 10001, 1)
         const ok3 = overLimit.executeOverLimit({
             playerId, characterId: star3Id, overLimitCount: 1,

@@ -565,6 +565,16 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         if (hostClient) {
             sessionManager.broadcastToRoom(room.room_number, [1, [1, hostClient.mates]])
         }
+        // 双审 P2-2:成员撤销是 mates 变异点——不就绪成员被撤销后房主须按
+        // 不变量翻转(否则挑战恒灰,569e0799 同款病灶换入口);就绪者被撤销
+        // 则反向回翻+倒计时失效。settle 双向安全;lazy require 消加载环
+        // (rematch.ts 同款)。
+        try {
+            const { checkHostAutoReady } = require("../tcp/lobby") as typeof import("../tcp/lobby")
+            checkHostAutoReady(room.room_number)
+        } catch (error) {
+            console.warn(`[MULTI] node cleanup settle failed: room=${room.room_number}`, describeError(error))
+        }
         try {
             syncRoomShareRow(room.room_number)
         } catch (error) {

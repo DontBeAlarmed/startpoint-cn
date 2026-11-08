@@ -474,4 +474,57 @@ test("rematch 回房:房主重入 settle 翻转房主并武装倒计时", async 
     assert.ok(countdownArmed, "倒计时 [10,2] 必须武装")
 }, 15000)
 
+// ---- 双审 F1 回归:≥2 真人 + 铃铛补 NPC → 满员全就绪必须武装倒计时 ----
+// 旧守卫 countRealPlayers===1 使该流不武装(countRealPlayers 残留语义);
+// settle 无条件化后,满员全就绪即武装(用户裁定:倒计时=满员专属)。
+test("双真人+铃铛补 NPC:满员全就绪武装倒计时(双审 F1)", async () => {
+    const { startLobbyLifecycle: start } = require("../src/multi/tcp/lobby-lifecycle")
+    start()
+    updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        multiRandomRecruitmentPublishEnabled: true,
+        multiNpcCloseRecruitmentAfterFill: true,
+    })
+    const hostViewer = HOST_VIEWER + 14
+    const { room, host } = setupHostRoom(test, hostViewer)
+    const live = getRoom(room.room_number)
+    live.npc_count = 0
+    live.is_npc_mode = true
+    live.mates = [{ viewer_id: hostViewer, com_id: 0 }]
+
+    // 房主首入 + 客机加入(2 人房)
+    handleLobbyMessage(host.socket, [0, [0, { party: {} }]])
+    const guestSocket = new FakeSocket()
+    const guest = sessionManager.createClient(
+        guestSocket, hostViewer + 1, room.room_number, `${room.room_number}-guest-cid`,
+    )
+    guest.participant = { nodeSessionId: "embedded", viewerId: hostViewer + 1 }
+    guest.yourself = {
+        viewerId: hostViewer + 1, connectionId: guest.connectionId,
+        party: { characters: [] }, state: [0],
+    }
+    guest.mates = [guest.yourself]
+    sessionManager.addClientToRoom(guest)
+    roomManager.addRoomMember(room.room_number, guest.participant)
+    // 内核 joiner 记录(生产:握手留票)——缺此 enter 会被内核拒
+    const { lifecycleRegistry: registry } = require("../src/multi/lifecycle")
+    const guestIdentity = `viewer:${hostViewer + 1}`
+    registry.dispatch(room.room_number, g => ({ type: "admit", generation: g, identity: guestIdentity }))
+    registry.dispatch(room.room_number, g => ({ type: "handshake", generation: g, identity: guestIdentity }))
+    handleLobbyMessage(guestSocket, [0, [0, { party: {} }]])
+    handleLobbyMessage(guestSocket, [0, [3, [1]]]) // 客机就绪(2 人房:房主准备、无倒计时)
+
+    const hostMate = host.mates.find(m => m.viewerId === hostViewer)
+    assert.deepEqual(hostMate.state, [1], "前置:2 人房全就绪→房主准备")
+
+    // 铃铛补 NPC:满员 3 人,NPC 就绪后必须武装(修复前 countRealPlayers===1 守卫漏掉)
+    const lifecycle = require("../src/multi/tcp/lobby-lifecycle").getLobbyLifecycleGuard()
+    handleEnterComs(host, lifecycle).catch(() => {})
+    await wait(2800)
+    assert.ok(npcCount(host.mates) >= 1, "前置:NPC 已填充")
+    assert.equal(host.socket.writes.some(f => Array.isArray(f) && f[0] === 1
+        && Array.isArray(f[1]) && f[1][0] === 10 && f[1][1] === 2), true,
+        "满员全就绪必须武装 [10,2] 倒计时")
+}, 15000)
+
 console.log("multi npc release: all assertions passed")

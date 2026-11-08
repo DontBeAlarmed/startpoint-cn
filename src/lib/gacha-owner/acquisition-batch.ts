@@ -15,7 +15,7 @@ import {
     getCharacterStackCompensationItemId,
     getCharacterStackOverflowConversion,
 } from "../character-growth/commands/grant-character-stack"
-import { CHARACTER_STACK_MAX } from "../character-growth/limits"
+import { CHARACTER_STACK_MAX, STACK_CONVERSION_REWARD_ITEM_ID } from "../character-growth/limits"
 import {
     STACK_CHARACTER_GROWTH_FIELDS,
     characterGrowthProjectionStateFromPlayerCharacter,
@@ -132,6 +132,11 @@ export function prepareGachaAcquisitionBatchSync(
     for (const characterId of characterIds) {
         const key = String(characterId)
         if (initiallyAvailableCharacters.has(key)) {
+            const existing = existingCharacters[key]
+            if ((existing?.stack ?? 0) >= CHARACTER_STACK_MAX) {
+                // 满仓角色:溢出重复转星之粒(grantCompensation 入账目标),预载
+                compensationItemIds.add(STACK_CONVERSION_REWARD_ITEM_ID)
+            }
             const asset = getCharacterFacts().get(characterId)
             if (asset !== null) {
                 const itemId = getCharacterStackCompensationItemId(
@@ -193,6 +198,8 @@ export function prepareGachaAcquisitionBatchSync(
                     id: playerId,
                     expPool: addSafeInteger(player.expPool, overflowConversion.exp, "player.expPool"),
                 })
+                // 引擎不变式:result.item 必须经 grantCompensation 真实入账
+                grantCompensation(overflowConversion.grainItemId, overflowConversion.grainCount)
             }
             current.character = character
             return {

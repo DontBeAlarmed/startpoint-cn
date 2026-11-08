@@ -173,7 +173,10 @@ function convertOverflowDuplicateWithinTransactionSync(
         fields: STACK_CHARACTER_GROWTH_FIELDS,
     })
     if (grantCompensation !== undefined) {
-        // 批量路径(扭蛋获得计划):星之粒经 result.item 由批次统一入账
+        // 引擎路径(扭蛋/邮件/任务 RewardGrant):星之粒必须经
+        // grantCompensation 回调真实入账——引擎不变式要求 result.item 与
+        // Inventory 变动一一对应,只挂 item 不入账会整单回滚(双审 P1)
+        grantCompensation(command.playerId, conversion.grainItemId, conversion.grainCount)
         return {
             isNew: false,
             character: projected,

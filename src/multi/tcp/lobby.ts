@@ -202,6 +202,10 @@ export function commitRoomMates(client: SessionClient, room: MultiRoom, mates: a
 export function checkHostAutoReady(roomNumber: string): void {
     const room = getRoom(roomNumber)
     if (!room) return
+    // 双审 P3:战斗相位(phase 4)冻结名单——preserveActiveBattle 通道的
+    // 移除会用开战冻结名单触发 settle,重武装 [10,2] 且压制 rematch 的
+    // 倒计时;战斗中一律跳过。
+    if (room.raising_state !== 1) return
     const hostClient = findHostClient(roomNumber)
     if (!hostClient) return
     const hostMate = hostClient.mates.find(m => m.viewerId === hostClient.viewerId)
@@ -259,6 +263,8 @@ function checkAllReadyAndStart(roomNumber: string): void {
     if (!hostClient) return
     const room = getRoom(roomNumber)
     if (!room) return
+    // 双审 P3:同 checkHostAutoReady——战斗相位不武装/不广播
+    if (room.raising_state !== 1) return
 
     // 倒计时失效语义:未满员或有人取消准备 → 清集合,让下次全员就绪能
     // 重新广播倒计时(此前集合只在 StartBattle 删除——取消/离开/房号复用
@@ -491,7 +497,9 @@ export async function handleEnterComs(
                     if (!currentHostClient) return
                     // rebuild 后同样以 helper 再确认全部就绪 NPC 的 [2] 帧
                     broadcastReadyFramesForSeatedNpcs(client.roomNumber, currentHostClient.mates)
-                    if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
+                    // settle 无条件:≥2 真人+铃铛补 NPC 的满员流也要武装倒计时
+                    // (countRealPlayers===1 守卫是旧"单人自动准备"语义残留)
+                    checkHostAutoReady(client.roomNumber)
                 } catch { console.error("[LOBBY] EnterComs rebuild npc-ready failed") }
             }, npcRecruitmentTiming.readyDelayMs)
         }
@@ -649,7 +657,8 @@ export async function handleEnterComs(
                 }
             }
             broadcastReadyFramesForSeatedNpcs(client.roomNumber, currentHostClient.mates)
-            if (countRealPlayers(currentHostClient.mates) === 1) checkHostAutoReady(client.roomNumber)
+            // settle 无条件(同上):满员全就绪必须武装,≥2 真人时也不例外
+            checkHostAutoReady(client.roomNumber)
         } catch { console.error("[LOBBY] EnterComs npc-ready failed") }
     }, joinDelayMs + npcRecruitmentTiming.readyDelayMs)
 }

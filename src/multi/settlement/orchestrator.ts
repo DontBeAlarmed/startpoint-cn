@@ -416,7 +416,8 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                         )?.finished === true
                     ),
                     rewardCampaignRates,
-                    boostPointUsed: useBoostPoint,
+                    // #14 同门(双审 P2):collect_item 通道不吃加成点数
+                    boostPointUsed: false,
                     serverDropMultiplier,
                 },
                 { grantRewards: rewards => rewardGranter.grantRewards(rewards) },
