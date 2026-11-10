@@ -271,6 +271,7 @@ function getQuestSync(
         sRankScore: quest.sRankScore,
         ssRankScore: quest.ssRankScore,
         scoreAttackQuestId: quest.scoreAttackQuestId,
+        soloTimeAttackQuestId: quest.soloTimeAttackQuestId,
         rankPointReward: quest.rankPointReward ?? 0,
         characterExpReward: quest.characterExpReward ?? 0,
         manaReward: quest.manaReward ?? 0,

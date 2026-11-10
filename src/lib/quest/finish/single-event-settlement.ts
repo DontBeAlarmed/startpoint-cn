@@ -26,7 +26,7 @@ import {
     updatePlayerRushEventSync,
 } from "../../../data/domains/rushEvent"
 import { deletePlayerActiveQuestSync } from "../../../data/domains/quest_active"
-import { insertMailSync, MailType } from "../../../data/domains/mail"
+
 import { insertPlayerScoreAttackBattleHistorySync } from "../../../data/domains/score-attack-history"
 import { getDb } from "../../../data/db"
 import { createModeTransactionHost } from "../../../modes/loader"
@@ -217,18 +217,7 @@ export function settleSingleBuiltInEvent(
             insertProgress: insertPlayerQuestProgressSync,
             updateProgress: updatePlayerQuestProgressSync,
             deleteActiveQuest: deletePlayerActiveQuestSync,
-            insertRewardMail: (pid, mail) => insertMailSync(pid, {
-                reason_id: mail.reasonId,
-                subject: null,
-                description: null,
-                type: MailType.FREE_VMONEY,
-                type_id: null,
-                number: mail.stoneCount,
-                receive_time: "0000-00-00 00:00:00",
-                create_time: mail.createdAt.toISOString().replace("T", " ").substring(0, 19),
-                reward_period_limited: 0,
-                reward_limit_time: null,
-            }),
+            grantRewards: input.grantRewards,
             grantDegree: (pid, degreeId) => givePlayerDegreeSync(pid, degreeId),
         }),
     })

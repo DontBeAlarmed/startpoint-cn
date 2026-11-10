@@ -58,6 +58,7 @@ const QUEST_TABLE_NAMES = [
     "story_event_single_quest.json",
     "ranking_event_single_quest.json",
     "solo_time_attack_event_quest.json",
+    "solo_time_attack_clear_time_reward.json",
     "tower_dungeon_event_quest.json",
     "expert_single_event_quest.json",
     "carnival_event_quest.json",

@@ -73,7 +73,7 @@ test("rejects a different node session for the same room and viewer", () => {
     assert.equal(registry.consume("123456", 101)?.participant.nodeSessionId, "node-a")
 })
 
-test("repeated prepare for the same participant is idempotent", () => {
+test("repeated prepare refreshes the ticket (snapshot/expiresAt) without a new seat", () => {
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const first = issue(registry)
     const second = issue(registry, {
@@ -83,8 +83,12 @@ test("repeated prepare for the same participant is idempotent", () => {
 
     assert.equal(first.ok, true)
     assert.equal(second.ok, true)
-    assert.equal(second.value, first.value)
-    assert.equal(registry.consume("123456", 101)?.snapshot.name, "Host")
+    // 2026-11-10 B.1 语义修正：重签必须刷新票面（快照/有效期）——
+    // 旧实现返回原票对象导致战斗等待期的旧票无法携带新快照续期
+    assert.notEqual(second.value, first.value)
+    assert.equal(second.value.snapshot.name, "Changed")
+    assert.equal(second.value.expiresAt, 7_000)
+    assert.equal(registry.consume("123456", 101)?.snapshot.name, "Changed")
     assert.equal(registry.consume("123456", 101), null)
 })
 
@@ -186,7 +190,8 @@ test("repeating the same participant does not consume another seat", () => {
     const first = issue(registry)
     const second = issue(registry, { snapshot: snapshotFixture(101, "Changed") })
     assert.equal(second.ok, true)
-    assert.equal(second.value, first.value)
+    assert.notEqual(second.value, first.value)
+    assert.equal(second.value.snapshot.name, "Changed")
 })
 
 test("an admission for an already occupied room member does not reserve another seat", () => {

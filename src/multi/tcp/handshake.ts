@@ -97,6 +97,10 @@ function kernelHandshakeDenialReason(rejected: string, phase: string): string {
         case "ROOM_CLOSED":
         case "ROOM_NOT_JOINABLE":
             return phase === "battle" ? "room_state_4" : "room_state_9"
+        // 票在手但内核不认识该身份（hostReturn 清 joiners 后的孤儿票窗口，
+        // registry consume 已自愈重记；落到这里说明票已彻底失效）
+        case "ADMISSION_REQUIRED":
+            return "admission_unavailable"
         default:
             return "admission_unavailable"
     }
@@ -304,6 +308,12 @@ export async function handleHandshake(
         // 回滚本段全部外壳写入再优雅拒绝——外壳成员账不得越过内核账。
         if (handshakeDecision?.rejected) {
             recordEntryStage("handshakeRejected")
+            // 原始内核拒绝码单独成行：denyGracefully 只打映射后的 reason，
+            // 2026-11-10 B.1 排障时 ADMISSION_REQUIRED 被映射成
+            // admission_unavailable，误导根因定位方向
+            console.log(`[TCP] handshake kernel-rejected: room=${normalizedRoomNumber}`
+                + ` viewer=${normalizedViewerId} code=${handshakeDecision.rejected}`
+                + ` phase=${handshakeDecision.state.phase}`)
             removeRoomMember(normalizedRoomNumber, admission.participant)
             sessionManager.removeClient(client)
             releaseAdmission()

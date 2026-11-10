@@ -96,28 +96,32 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
             if (existing.participant.nodeSessionId !== input.participant.nodeSessionId) {
                 return { ok: false, error: "VIEWER_ID_CONFLICT" }
             }
-            if (lifecycleGeneration !== undefined
-                && existing.lifecycleGeneration !== lifecycleGeneration) {
-                // 重发票刷新代次（及随票快照/有效期），避免房号复用后旧票
-                // 把旧代次、过期快照带进新房间。
-                const refreshed = Object.freeze({
-                    ...existing,
-                    snapshot: input.snapshot,
-                    expiresAt: input.expiresAt,
-                    lifecycleGeneration,
-                }) as RoomAdmission
-                const refreshReject = this.recordAdmissionIntent(roomNumber, refreshed.participant)
-                if (refreshReject !== null
-                    && !this.isOccupiedMember(roomNumber, input.participant.viewerId)) {
-                    recordEntryStage("issueRejected")
-                    this.admissions.delete(admissionKey)
-                    return { ok: false, error: refreshReject }
-                }
-                recordEntryStage("issued")
-                this.admissions.set(admissionKey, refreshed)
-                return { ok: true, value: refreshed }
+            // 重发票刷新代次（及随票快照/有效期），避免房号复用后旧票
+            // 把旧代次、过期快照带进新房间。
+            const refreshed = Object.freeze({
+                ...existing,
+                snapshot: input.snapshot,
+                expiresAt: input.expiresAt,
+                ...(lifecycleGeneration !== undefined
+                    ? { lifecycleGeneration }
+                    : {}),
+            }) as RoomAdmission
+            // 每次 ok 发票都必须携带当下的内核 admit 意图（幂等：seats/
+            // joiners 已含该身份时是 no-op）。hostReturn 的 4→1 会清空
+            // joiners，而战斗等待期签发的票仍在册——同代次重签若跳过本步，
+            // 票就与内核脱钩成孤儿票：握手消费成功但内核 handshake 以
+            // ADMISSION_REQUIRED 拒绝（2026-11-10 真机 B.1：客机续战返回，
+            // 房主回房后客机握手必拒）。
+            const kernelReject = this.recordAdmissionIntent(roomNumber, refreshed.participant)
+            if (kernelReject !== null
+                && !this.isOccupiedMember(roomNumber, input.participant.viewerId)) {
+                recordEntryStage("issueRejected")
+                this.admissions.delete(admissionKey)
+                return { ok: false, error: kernelReject }
             }
-            return { ok: true, value: existing }
+            recordEntryStage("issued")
+            this.admissions.set(admissionKey, refreshed)
+            return { ok: true, value: refreshed }
         }
 
         const pendingMemberCount = [...this.admissions.values()]
@@ -193,6 +197,19 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         const admission = this.admissions.get(admissionKey)
         if (!admission) return null
         if (admission.expiresAt <= this.now()) {
+            this.admissions.delete(admissionKey)
+            return null
+        }
+        // 消费前同样保持内核 admit 意图现状（幂等）：签发后的 4→1（hostReturn）
+        // 会清空 joiners，而 select_room 与 TCP 握手之间存在窗口——票在册但
+        // 内核已不认识该身份，直接消费会把孤儿票放行到内核 handshake 必拒。
+        // 内核拒绝且非占座成员 → 票作废（房间满员/相位不可进，与 issue 同判）。
+        const kernelReject = this.recordAdmissionIntent(
+            normalizedRoomNumber,
+            admission.participant,
+        )
+        if (kernelReject !== null
+            && !this.isOccupiedMember(normalizedRoomNumber, viewerId)) {
             this.admissions.delete(admissionKey)
             return null
         }

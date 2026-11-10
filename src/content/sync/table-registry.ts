@@ -338,8 +338,11 @@ function questDefinition(tableName: QuestTableName): TableSourceInput {
         scope: "cdn",
         sourceOrderedMaps: [QUEST_TABLE_SOURCES[tableName].logicalPath],
         converterId: "quest",
-        converterVersion: 5,
-        outputShapeVersion: 5,
+        // v6 (2026-11-11):soloTimeAttackQuestId 解析落库(c8d5d69b 加字段未
+        // bump 版本 → 物化滞后,极时试炼 descriptor 全走 NO_EVENT、结算零发放,
+        // 真机 D2/D3 根因)。版本必须与 converter 输出字段同步推进。
+        converterVersion: 6,
+        outputShapeVersion: 6,
     }
 }
 

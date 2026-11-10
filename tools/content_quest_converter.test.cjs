@@ -67,7 +67,7 @@ test("quest converter closes the 20 authoritative quest tables", () => {
     })
 })
 
-test("all authoritative quest tables publish converter contract v5", () => {
+test("all authoritative quest tables publish converter contract v6", () => {
     const questDefinitions = TABLE_SOURCES.filter(definition => (
         definition.converterId === "quest"
         && definition.tableName in QUEST_TABLE_SOURCES
@@ -75,8 +75,10 @@ test("all authoritative quest tables publish converter contract v5", () => {
 
     assert.equal(questDefinitions.length, 20)
     for (const definition of questDefinitions) {
-        assert.equal(definition.converterVersion, 5, definition.tableName)
-        assert.equal(definition.outputShapeVersion, 5, definition.tableName)
+        // v6 (2026-11-11):soloTimeAttackQuestId 落库(c8d5d69b 加字段漏 bump
+        // → 物化滞后,极时试炼 descriptor 全走 NO_EVENT,真机 D2/D3 根因)
+        assert.equal(definition.converterVersion, 6, definition.tableName)
+        assert.equal(definition.outputShapeVersion, 6, definition.tableName)
     }
 })
 

@@ -25,10 +25,11 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
-const { addRoomMember, createRoom, disbandRoom, updateRoomState } = require("../src/multi/room/manager")
+const { addRoomMember, createRoom, disbandRoom, reconcileHostReturn, updateRoomState } = require("../src/multi/room/manager")
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { embeddedAdmissionRegistry } = require("../src/multi/admission/registry")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
+const { lifecycleRegistry } = require("../src/multi/lifecycle")
 
 initializeDatabase()
 
@@ -158,4 +159,126 @@ test("拒绝分级：准入缺失（未签发/已消费）→ 优雅 [1, DENIED]
     })
     assert.deepEqual(socket.frames[0], [1, "multibattle_room_not_found"],
         "准入缺失必须走优雅 Denied（合法 UI 文案 key，可经 restore_room 补票重试）")
+})
+
+// ---------------------------------------------------------------------------
+// 2026-11-10 真机 B.1：客机续战返回失败（1 NPC+1 客机，房主回房后客机握手
+// 被 admission_unavailable 拒）。根因：hostReturn 4→1 清空内核 joiners，
+// 而战斗等待期（select_room 轮询）签发的票仍在册；客机同代次重签走
+// "返回原票"捷径、不重记内核 admit 意图 → 孤儿票：consume 成功但内核
+// handshake 以 ADMISSION_REQUIRED 拒绝（被默认映射成 admission_unavailable）。
+// ---------------------------------------------------------------------------
+
+function setupRematchBattleRoom(t, room) {
+    // 双双入内核（admit→handshake→enter 落座）→ 内核 startBattle → 全员 finish
+    for (const viewerId of [HOST.viewerId, GUEST.viewerId]) {
+        const identity = `viewer:${viewerId}`
+        lifecycleRegistry.dispatch(room.room_number, generation => ({ type: "admit", generation, identity }))
+        lifecycleRegistry.dispatch(room.room_number, generation => ({ type: "handshake", generation, identity }))
+        lifecycleRegistry.dispatch(room.room_number, generation => ({ type: "enter", generation, identity, nowMs: 1_000 }))
+    }
+    const battleSessionId = "rematch-b1"
+    const started = lifecycleRegistry.dispatch(room.room_number, generation => ({
+        type: "startBattle", generation, identity: `viewer:${HOST.viewerId}`, battleSessionId,
+    }))
+    assert.equal(started?.rejected, undefined, "战斗必须能开局")
+    const battleState = lifecycleRegistry.get(room.room_number)
+    assert.equal(battleState.phase, "battle")
+    for (const identity of battleState.battleParticipants) {
+        lifecycleRegistry.dispatch(room.room_number, generation => ({
+            type: "finish", generation, identity, nowMs: 2_000,
+            battleDeadlineMs: 900_000, battleSessionId,
+        }))
+    }
+    assert.equal(lifecycleRegistry.get(room.room_number).battleFinalized, true)
+}
+
+function issueGuestTicket(room) {
+    return embeddedAdmissionRegistry.issue({
+        roomNumber: room.room_number,
+        participant: { ...GUEST },
+        snapshot: {
+            viewerId: GUEST.viewerId,
+            name: "rematch-guest",
+            rank: 1,
+            degreeId: 1,
+            mainCharacterId: 393,
+            playerRoleKind: 1,
+            isNewbie: false,
+            currentPartyId: 1,
+            party: {},
+            npcParties: [],
+        },
+        expiresAt: Date.now() + 15_000,
+        lifecycleGeneration: lifecycleRegistry.get(room.room_number)?.generation,
+    })
+}
+
+function hostReturnAfterBattle(room) {
+    lifecycleRegistry.dispatchHostReturnIfInBattle(room.room_number, `viewer:${HOST.viewerId}`)
+    reconcileHostReturn(room.room_number)
+    const state = lifecycleRegistry.get(room.room_number)
+    assert.equal(state.phase, "ready", "hostReturn 后必须回到 ready 相位")
+    assert.equal(state.joiners[`viewer:${GUEST.viewerId}`], undefined,
+        "前置：hostReturn 必须已清空客机 joiner（孤儿票成因）")
+}
+
+test("续战回房：hostReturn 清 joiners 后同代次重签票必须自愈重记内核 admit", async t => {
+    const room = createRoom(HOST.viewerId, HOST.viewerId + 1000, 1, 1, 5104, 0, 1, false, HOST)
+    addRoomMember(room.room_number, GUEST)
+    t.after(() => disbandRoom(room.room_number))
+
+    setupRematchBattleRoom(t, room)
+
+    // 战斗等待期：客机 select_room 轮询签发票（内核 joiner 随票建立）
+    assert.equal(issueGuestTicket(room).ok, true)
+
+    hostReturnAfterBattle(room)
+
+    // 客机再次 select_room（同代次重签）：必须刷新票面并重记内核 admit
+    const reIssued = issueGuestTicket(room)
+    assert.equal(reIssued.ok, true, `同代次重签必须成功: ${JSON.stringify(reIssued)}`)
+    const healed = lifecycleRegistry.get(room.room_number)
+    assert.equal(healed.joiners[`viewer:${GUEST.viewerId}`], "admitted",
+        "重签必须重记内核 admit 意图（孤儿票自愈）")
+
+    // 客机握手消费 → Accept
+    const socket = new RecordingSocket()
+    await handleHandshake(socket, {
+        socklet: "cooperation_room",
+        viewerId: GUEST.viewerId,
+        room_number: room.room_number,
+        questCategory: room.category,
+        questId: room.quest_id,
+    })
+    assert.deepEqual(socket.frames[0], [0, socket.frames[0][1], room.room_number],
+        "续战回房握手必须收到 Accept 帧（B.1 主修复）")
+})
+
+test("续战回房竞态：select 与握手之间发生 hostReturn，握手消费时自愈", async t => {
+    const room = createRoom(HOST.viewerId, HOST.viewerId + 1000, 1, 1, 5105, 0, 1, false, HOST)
+    addRoomMember(room.room_number, GUEST)
+    t.after(() => disbandRoom(room.room_number))
+
+    setupRematchBattleRoom(t, room)
+    assert.equal(issueGuestTicket(room).ok, true)
+    hostReturnAfterBattle(room)
+
+    // 客机不重签、直接握手（select 与 connect 之间夹入 hostReturn 的竞态窗口）：
+    // consume 必须自愈重记 admit 意图，握手走到 Accept
+    const socket = new RecordingSocket()
+    await handleHandshake(socket, {
+        socklet: "cooperation_room",
+        viewerId: GUEST.viewerId,
+        room_number: room.room_number,
+        questCategory: room.category,
+        questId: room.quest_id,
+    })
+    assert.deepEqual(socket.frames[0], [0, socket.frames[0][1], room.room_number],
+        "竞态窗口内的握手必须经 consume 自愈后 Accept")
+    assert.equal(
+        lifecycleRegistry.get(room.room_number).joiners[`viewer:${GUEST.viewerId}`],
+        "handshaked",
+        "自愈后内核必须持有该客机的 handshaked joiner",
+    )
 })
