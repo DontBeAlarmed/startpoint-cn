@@ -1037,27 +1037,27 @@ test("normal sync rebuilds when the registered table contract changes", async t 
     }
 })
 
-test("normal sync rebuilds all quest tables when converter contract advances from v4 to v5", async t => {
+test("normal sync rebuilds all quest tables when converter contract advances from v5 to v6", async t => {
     const questDefinitions = TABLE_SOURCES.filter(definition => (
         definition.converterId === "quest"
         && definition.tableName in QUEST_TABLE_SOURCES
     ))
     assert.equal(questDefinitions.length, 20)
     assert.ok(questDefinitions.every(definition => (
-        definition.converterVersion === 5 && definition.outputShapeVersion === 5
+        definition.converterVersion === 6 && definition.outputShapeVersion === 6
     )))
     const legacyDefinitions = questDefinitions.map(definition => ({
         ...definition,
-        converterVersion: 4,
-        outputShapeVersion: 4,
+        converterVersion: 5,
+        outputShapeVersion: 5,
     }))
     const fixture = engineFixture(t, {
         tableSources: legacyDefinitions,
-        builderValues: tableValues("legacy-v4", legacyDefinitions),
+        builderValues: tableValues("legacy-v5", legacyDefinitions),
     })
     await sync(fixture)
     fixture.dependencies.tableSources = questDefinitions
-    fixture.setBuilderValues(tableValues("current-v5", questDefinitions))
+    fixture.setBuilderValues(tableValues("current-v6", questDefinitions))
 
     const result = await sync(fixture)
     const manifest = await readCurrentRelease(fixture.store)
@@ -1066,7 +1066,7 @@ test("normal sync rebuilds all quest tables when converter contract advances fro
     assert.equal(result.reason, "table-registry")
     assert.equal(fixture.calls.builder, 2)
     for (const definition of questDefinitions) {
-        assert.equal(manifest.tables[definition.tableName].converterVersion, 5)
+        assert.equal(manifest.tables[definition.tableName].converterVersion, 6)
     }
 })
 
