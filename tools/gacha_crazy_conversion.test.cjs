@@ -187,7 +187,8 @@ test("Crazy candidate, save, redraw, load recovery and select form one reachable
     const firstData = decode(first).data
     assert.equal(firstData.draw.length, 10)
     assert.equal(firstData.gacha_info_list[0].crazy_draw_count, 1)
-    assert.equal(firstData.item_list[CRAZY_TICKET_ID], 0)
+    // 重抽期间不扣券，定案时才扣
+    assert.equal(firstData.item_list[CRAZY_TICKET_ID], 1)
     assert.equal(firstData.crazy_gacha_result_list[0].length, 10)
     assert.deepEqual(getPlayerCharactersSync(playerId), charactersBefore)
     assert.equal(historyCount(playerId), 0)
@@ -202,14 +203,14 @@ test("Crazy candidate, save, redraw, load recovery and select form one reachable
     const savedSlot = [...decode(saved).data.crazy_gacha_result_list[1]]
     assert.equal(savedSlot.length, 10)
 
-    grantInventoryFixtureItemSync(playerId, CRAZY_TICKET_ID, 1)
     const second = await crazyExec(viewerId)
     assert.equal(second.statusCode, 200, second.body)
     const secondData = decode(second).data
     assert.equal(secondData.gacha_info_list[0].crazy_draw_count, 2)
     assert.deepEqual(secondData.crazy_gacha_result_list[1], savedSlot)
     assert.equal(secondData.crazy_gacha_result_list[0].length, 10)
-    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 0)
+    assert.equal(secondData.item_list[CRAZY_TICKET_ID], 1)
+    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 1)
 
     const loaded = projectCrazyGachaLoadStateSync(playerId)
     assert.deepEqual(loaded.crazyGachaResultList[1], savedSlot)
@@ -223,7 +224,12 @@ test("Crazy candidate, save, redraw, load recovery and select form one reachable
         payload: { viewer_id: viewerId, gacha_id: CRAZY_GACHA_ID, index: 1 },
     })
     assert.equal(selected.statusCode, 200, selected.body)
-    assert.equal(decode(selected).data.character_list.length > 0, true)
+    const selectedData = decode(selected).data
+    assert.equal(selectedData.character_list.length > 0, true)
+    assert.equal(selectedData.item_list[CRAZY_TICKET_ID], 0)
+    assert.equal(selectedData.gacha_info_list[0].crazy_draw_count, 0)
+    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 0)
+    assert.equal(getPlayerGachaInfoSync(playerId, CRAZY_GACHA_ID).crazyDrawCount, 0)
     assert.equal(historyCount(playerId), 10)
     assert.equal(getPlayerCrazyGachaResultsSync(playerId, CRAZY_GACHA_ID).length, 0)
     assert.deepEqual(projectCrazyGachaLoadStateSync(playerId), {
@@ -237,8 +243,14 @@ test("Crazy candidate, save, redraw, load recovery and select form one reachable
         url: "/gacha/crazy_gacha_select",
         payload: { viewer_id: viewerId, gacha_id: CRAZY_GACHA_ID, index: 1 },
     })
-    assert.equal(repeated.statusCode, 400)
+    // 定案成功后客户端重发：按成功返回空结果，不重复发放也不重复扣券（避免 H400 回标题）
+    assert.equal(repeated.statusCode, 200, repeated.body)
+    const repeatedData = decode(repeated).data
+    assert.deepEqual(repeatedData.character_list, [])
+    assert.equal(repeatedData.item_list[CRAZY_TICKET_ID], 0)
+    assert.equal(repeatedData.gacha_info_list[0].crazy_draw_count, 0)
     assert.deepEqual(getPlayerCharactersSync(playerId), charactersAfter)
+    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 0)
     assert.equal(historyCount(playerId), 10)
 })
 
@@ -530,6 +542,7 @@ test("Crazy select ignores stored candidate display metadata for acquisition", a
     const owned = new Set(Object.keys(getCharacterAcquisitionStatesSync(playerId, allIds)).map(Number))
     const characterIds = allIds.filter(id => !owned.has(id)).slice(0, 10)
     assert.equal(characterIds.length, 10)
+    grantInventoryFixtureItemSync(playerId, CRAZY_TICKET_ID, 1)
 
     insertPlayerGachaInfoSync(playerId, {
         gachaId: CRAZY_GACHA_ID,
@@ -584,8 +597,16 @@ test("Crazy save and select fail closed on repeats, empty slots, wrong gacha and
     assert.equal(candidate.statusCode, 200, candidate.body)
     const saved = await requestSave(1)
     assert.equal(saved.statusCode, 200, saved.body)
+    // 同一保存请求重发（目标槽已是当前结果）按成功返回
     const repeatedSave = await requestSave(1)
-    assert.equal(repeatedSave.statusCode, 400)
+    assert.equal(repeatedSave.statusCode, 200, repeatedSave.body)
+    assert.deepEqual(decode(repeatedSave).data.crazy_gacha_result_list[1],
+        decode(saved).data.crazy_gacha_result_list[1])
+    // 槽 1 已存了旧结果、槽 0 换成新结果后，再存槽 1 仍然拒绝
+    const redraw = await crazyExec(viewerId)
+    assert.equal(redraw.statusCode, 200, redraw.body)
+    const overwrite = await requestSave(1)
+    assert.equal(overwrite.statusCode, 400)
     assert.equal(getPlayerCrazyGachaResultsSync(playerId, CRAZY_GACHA_ID)
         .filter(row => row.slotIndex === 1).length, 10)
 
@@ -631,8 +652,8 @@ test("Crazy draw limit comes from config gacha_crazy_ten_max_count", async () =>
     const rejected = await crazyExec(viewerId)
     assert.equal(rejected.statusCode, 400)
     assert.equal(decode(allowed).data.crazy_gacha_result_list[0].length, 10)
-    // 拒绝路径不扣票：2 - 1(成功抽) + 1(补发) = 2
-    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 2)
+    // 抽卡与拒绝路径都不扣票（定案时才扣）：2 + 1(补发) = 3
+    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 3)
 })
 
 test("points on a banner missing from the content snapshot convert and do not block save export", async () => {
@@ -779,4 +800,40 @@ test("Crazy candidate draw, load projection, and select award 3 Sublime Starston
         overflowMails.reduce((sum, mail) => sum + mail.number, 0),
         expectedOverflowTotal,
     )
+})
+
+test("Crazy redraws keep the ticket until select, and select needs a ticket", async () => {
+    const { playerId, viewerId } = await createPlayer("crazy-ticket-at-select")
+    const requestSelect = index => app.inject({
+        method: "POST",
+        url: "/gacha/crazy_gacha_select",
+        payload: { viewer_id: viewerId, gacha_id: CRAZY_GACHA_ID, index },
+    })
+    grantInventoryFixtureItemSync(playerId, CRAZY_TICKET_ID, 1)
+    // 一张券可以连续重抽（含客户端超时重发的 exec），券数始终为 1
+    for (let round = 1; round <= 3; round += 1) {
+        const drawn = await crazyExec(viewerId)
+        assert.equal(drawn.statusCode, 200, drawn.body)
+        assert.equal(decode(drawn).data.item_list[CRAZY_TICKET_ID], 1)
+        assert.equal(decode(drawn).data.gacha_info_list[0].crazy_draw_count, round)
+    }
+    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 1)
+
+    // 定案前券被别处消耗：拒绝且不发放
+    setInventoryFixtureItemExactSync(playerId, CRAZY_TICKET_ID, 0)
+    const noTicket = await requestSelect(0)
+    assert.equal(noTicket.statusCode, 400)
+    assert.equal(historyCount(playerId), 0)
+    assert.equal(getPlayerCrazyGachaResultsSync(playerId, CRAZY_GACHA_ID).length, 10)
+
+    setInventoryFixtureItemExactSync(playerId, CRAZY_TICKET_ID, 1)
+    const selected = await requestSelect(0)
+    assert.equal(selected.statusCode, 200, selected.body)
+    assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 0)
+    assert.equal(getPlayerGachaInfoSync(playerId, CRAZY_GACHA_ID).crazyDrawCount, 0)
+    assert.equal(historyCount(playerId), 10)
+
+    // 没有券时不能开始新一轮
+    const blocked = await crazyExec(viewerId)
+    assert.equal(blocked.statusCode, 400)
 })

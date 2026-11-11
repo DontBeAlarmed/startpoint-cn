@@ -89,6 +89,15 @@ export function projectCrazyGachaSelectResponse(input: {
         data: {
             ...responseData,
             active_mission_list: input.result.activeMissionList,
+            ...(input.result.gachaInfo === undefined ? {} : {
+                gacha_info_list: [{
+                    gacha_id: input.result.gachaId,
+                    is_account_first: input.result.gachaInfo.isAccountFirst,
+                    is_daily_first: input.result.gachaInfo.isDailyFirst,
+                    gacha_exchange_point: input.result.gachaInfo.exchangePoint,
+                    crazy_draw_count: input.result.gachaInfo.crazyDrawCount,
+                }],
+            }),
             crazy_gacha_result_list: {},
         },
     }

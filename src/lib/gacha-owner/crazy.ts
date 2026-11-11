@@ -31,6 +31,8 @@ import {
     prepareGachaExecRequest,
 } from "../gacha-catalog"
 import { planCharacterGachaMovies } from "../gacha"
+import { GACHA_EXEC_TYPES } from "../gacha-rules"
+import { getGachaTicketCost } from "../gacha-ticket"
 import {
     grantGachaRewardPlanInTransactionOwnerWithInventorySync,
 } from "../gacha-reward-grant"
@@ -191,10 +193,10 @@ export function executeCrazyGachaCandidateSync(
                         }),
                     }
                 })
-                const ticketAfter = inventory.deduct(
-                    prepared.ticket.itemId,
-                    prepared.ticket.useTicketCount,
-                ).afterAmount
+                // 乐享券在 crazy_gacha_select 定案时才扣：重抽期间券数不变。
+                // 客户端券数归零会隐藏重抽按钮，若每轮都扣，持 1 张券的玩家第一轮后就无法重抽；
+                // 客户端超时重发 exec 也不会多扣券（只多消耗一次重抽次数）。
+                const ticketAfter = inventory.read(prepared.ticket.itemId).afterAmount
                 const nextInfo = {
                     gachaId: command.gachaId,
                     isDailyFirst: info?.isDailyFirst ?? true,
@@ -274,7 +276,15 @@ export function saveCrazyGachaCandidateSync(input: {
             }
         }
         if (!savePlayerCrazyGachaSlotSync(input.playerId, gachaId, input.targetSlot)) {
-            return badRequest("Crazy Gacha result cannot be saved.")
+            // 客户端重发同一个保存请求时，目标槽已经是当前槽 0 的内容：按成功返回，
+            // 否则客户端收到 400 会弹 H400 回标题。
+            const current = slots(input.playerId, gachaId)
+            const source = current[0] ?? []
+            const target = current[input.targetSlot] ?? []
+            if (source.length === 0 || target.length !== source.length
+                || target.some((characterId, index) => characterId !== source[index])) {
+                return badRequest("Crazy Gacha result cannot be saved.")
+            }
         }
         return deepFreeze({
             ok: true as const,
@@ -309,10 +319,46 @@ export function selectCrazyGachaCandidateSync(input: {
     }, inventory => {
         const player = getPlayerSync(input.playerId)
         if (player === null) throw new Error("Crazy Gacha player disappeared")
-        const rows = getPlayerCrazyGachaResultsSync(input.playerId, input.gachaId)
-            .filter(row => row.slotIndex === input.slot)
+        const info = getPlayerGachaInfoSync(input.playerId, input.gachaId)
+        const ticket = getGachaTicketCost(
+            GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET,
+            1,
+            banner.definition,
+        )
+        if (ticket === null) return badRequest("Crazy Gacha ticket is not configured.")
+        const allRows = getPlayerCrazyGachaResultsSync(input.playerId, input.gachaId)
+        if (allRows.length === 0 && info !== null && info.crazyDrawCount === 0) {
+            // 定案成功后客户端重发：槽位已清空、重抽次数已归零，不再发放，按成功返回空结果。
+            return deepFreeze({
+                ok: true as const,
+                kind: "crazySelect" as const,
+                playerId: input.playerId,
+                gachaId: input.gachaId,
+                characters: [],
+                rewardItems: { [ticket.itemId]: inventory.read(ticket.itemId).afterAmount },
+                itemOverflowDispositions: [],
+                mailArrived: getMailArrivedSync(input.playerId),
+                postCommitEffects: [],
+                missionSettlement: null,
+                activeMissionList: publishActiveMissionOwnerStateWithinTransaction({
+                    playerId: input.playerId,
+                    now: new Date(input.nowMs),
+                    source: "gacha/crazy_select",
+                }).activeMissionList,
+                gachaInfo: {
+                    exchangePoint: info.gachaExchangePoint ?? 0,
+                    isDailyFirst: info.isDailyFirst ?? false,
+                    isAccountFirst: info.isAccountFirst ?? false,
+                    crazyDrawCount: 0,
+                },
+            })
+        }
+        const rows = allRows.filter(row => row.slotIndex === input.slot)
         if (rows.length !== 10 || rows.some((row, index) => row.position !== index)) {
             return badRequest("Crazy Gacha result is incomplete.")
+        }
+        if (inventory.read(ticket.itemId).afterAmount < ticket.useTicketCount) {
+            return badRequest("Not enough Gacha tickets.")
         }
         const allowed = new Set(Object.values(banner.poolsByRank).flatMap(pool => (
             pool.items.map(item => item.id)
@@ -321,6 +367,8 @@ export function selectCrazyGachaCandidateSync(input: {
         if (characterIds.some(characterId => !allowed.has(characterId))) {
             return badRequest("Crazy Gacha result contains an invalid Character.")
         }
+        // 定案时扣一张乐享券（必须在发放前扣：发放会 flush 库存批次）。
+        const ticketAfter = inventory.deduct(ticket.itemId, ticket.useTicketCount).afterAmount
         const plan = createRewardGrantExecutionPlan(characterIds.map(characterId => ({
             type: RewardType.CHARACTER,
             id: characterId,
@@ -354,6 +402,17 @@ export function selectCrazyGachaCandidateSync(input: {
             number: 1,
         })))
         clearPlayerCrazyGachaResultsSync(input.playerId, input.gachaId)
+        // 定案时重抽次数归零，下一张券重新获得完整的重抽次数。
+        rewardItems[ticket.itemId] = ticketAfter
+        const nextInfo = {
+            gachaId: input.gachaId,
+            isDailyFirst: info?.isDailyFirst ?? true,
+            isAccountFirst: info?.isAccountFirst ?? true,
+            gachaExchangePoint: info?.gachaExchangePoint ?? 0,
+            crazyDrawCount: 0,
+        }
+        if (info === null) insertPlayerGachaInfoSync(input.playerId, nextInfo)
+        else updatePlayerGachaInfoSync(input.playerId, nextInfo)
         const activeMission = publishActiveMissionOwnerStateWithinTransaction({
             playerId: input.playerId,
             now: new Date(input.nowMs),
@@ -383,6 +442,12 @@ export function selectCrazyGachaCandidateSync(input: {
             }],
             missionSettlement: grant.missionSettlement ?? null,
             activeMissionList: activeMission.activeMissionList,
+            gachaInfo: {
+                exchangePoint: nextInfo.gachaExchangePoint,
+                isDailyFirst: nextInfo.isDailyFirst,
+                isAccountFirst: nextInfo.isAccountFirst,
+                crazyDrawCount: 0,
+            },
         })
     }))()
 }
