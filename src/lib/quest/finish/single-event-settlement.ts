@@ -12,6 +12,7 @@ import {
     getPlayerSingleQuestProgressSync,
     insertPlayerQuestProgressSync,
     updatePlayerQuestProgressSync,
+    upsertPlayerQuestProgressSync,
 } from "../../../data/domains/quest"
 import {
     getRaidEventBossStateSync,
@@ -58,6 +59,7 @@ import {
     type SoloTimeAttackFinishResult,
 } from "./solo-time-attack-handler"
 import { resolveSoloTimeAttackTimelineTiers } from "../solo-time-attack-content"
+import type { PlayerQuestProgress } from "../../../data/types"
 import type { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
@@ -78,6 +80,14 @@ export interface SingleBuiltInEventSettlementInput {
         rewards: readonly Reward[],
     ) => PlayerRewardResult
     readonly standardRewardGrant: ReturnType<typeof createSingleSettlementStandardRewardGrant>
+    /**
+     * 结算事务开场读到的 pre-write 进度快照（写入发生前的真实旧进度）。
+     * 事件结算必须用它判"旧最佳"——通用进度写入（writeSingleQuestProgress
+     * WithinTransactionSync）先于事件派发执行，实时 DB 读会把本次 clearTime
+     * 当成旧最佳（2026-11-11 真机：极时首通 oldBest=本次用时 → crossed=0
+     * → 零发放/无弹窗/TRY AGAIN）。
+     */
+    readonly questProgress: PlayerQuestProgress | null
 }
 
 export function settleSingleBuiltInEvent(
@@ -213,8 +223,11 @@ export function settleSingleBuiltInEvent(
             tiers: resolveSoloTimeAttackTimelineTiers(current.eventId, current.soloQuestId),
         }, {
             transaction: operation => operation(),
-            getProgress: getPlayerSingleQuestProgressSync,
-            insertProgress: insertPlayerQuestProgressSync,
+            // pre-write 快照：通用进度写入先于本派发，实时读会把本次用时
+            // 当成旧最佳（2026-11-11 真机根因，见 input.questProgress 注释）
+            getProgress: () => input.questProgress,
+            // 首通时通用写入已 INSERT 本行，insert 必须走 upsert 防唯一键冲突
+            insertProgress: (pid, cat, row) => upsertPlayerQuestProgressSync(pid, cat, row),
             updateProgress: updatePlayerQuestProgressSync,
             deleteActiveQuest: deletePlayerActiveQuestSync,
             grantRewards: input.grantRewards,

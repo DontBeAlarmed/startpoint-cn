@@ -71,6 +71,10 @@ export function handleSoloTimeAttackEventFinish(
             ? input.tiers.filter(tier => elapsedSeconds <= tier.clearTimeSeconds
                 && (oldBestMs === null || oldBestMs / 1000 > tier.clearTimeSeconds))
             : []
+        // 2026-11-11 真机诊断:79.7s 通关零发放,一句日志钉住派发输入与跨档结果
+        console.log(`[SOLO_TA] settle: quest=${input.questId} elapsed=${input.elapsedTimeMs}ms`
+            + ` accomplished=${input.isAccomplished} oldBest=${oldBestMs}`
+            + ` tiers=${input.tiers.length} crossed=${crossedTiers.length}`)
         const leaderCharacterId = input.party.characters[0]?.id ?? undefined
 
         if (input.isAccomplished) {
@@ -113,6 +117,8 @@ export function handleSoloTimeAttackEventFinish(
         const rewardResult = stoneRewards.length > 0
             ? dependencies.grantRewards(input.playerId, stoneRewards)
             : null
+        console.log(`[SOLO_TA] grants: stones=${stoneCount}`
+            + ` degrees=[${newDegreeIds.join(",")}] granted=${rewardResult !== null}`)
 
         dependencies.deleteActiveQuest(input.playerId)
 

@@ -190,6 +190,13 @@ export function executeSingleSettlementWrites(
         quest: questData,
         activeEventId: settlementActiveQuest.eventId ?? undefined,
     })
+    if (questCategory === QuestCategory.SOLO_TIME_ATTACK_EVENT) {
+        // 2026-11-11 真机诊断:79.7s 通关零发放——kind=none 即 descriptor 未走通
+        console.log(`[SOLO_TA] descriptor: quest=${questId} kind=${eventDescriptor.kind}`
+            + (eventDescriptor.kind === "soloTimeAttack"
+                ? ` event=${eventDescriptor.eventId} soloQuest=${eventDescriptor.soloQuestId}`
+                : ""))
+    }
     const gameplaySettings = questAccomplished || eventDescriptor.kind === "rush"
         ? getServerGameplaySettingsSync()
         : null
@@ -262,6 +269,7 @@ export function executeSingleSettlementWrites(
             : null,
         grantRewards: grantDirectRewards,
         standardRewardGrant,
+        questProgress,
     })
     responseState.observeItems(carnivalRewardResult?.item_list)
     if (questCategory === QuestCategory.PRACTICE) insertPlayerPracticeBattleHistorySync(buildPracticeBattleHistoryRecord({

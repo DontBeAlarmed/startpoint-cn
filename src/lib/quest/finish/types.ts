@@ -1,6 +1,6 @@
 // Finish context — pass-through data shared by all finish trackers
 
-import type { Player } from "../../../data/types"
+import type { Player, PlayerQuestProgress } from "../../../data/types"
 import type { QuestRewardEligibility } from "../first-clear-reward"
 import type { BattleQuest } from "../../types"
 import type { ScoreAttackBorderTier } from "./score-attack-handler"
@@ -57,7 +57,8 @@ export interface FinishContext {
     equipmentElements?: readonly number[]
     player: Player
     questPreviouslyCompleted: boolean
-    questProgress: { bestElapsedTimeMs?: number | null; highScore?: number; clearRank?: number } | null
+    /** 结算事务开场（写入前）读到的完整进度快照；事件结算判"旧最佳"必须用它。 */
+    questProgress: PlayerQuestProgress | null
     isMulti?: boolean
     isMultiHost?: boolean
 }

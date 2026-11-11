@@ -235,6 +235,44 @@ export function insertPlayerQuestProgressSync(
 }
 
 /**
+ * Upsert:行不存在则插入,存在则更新本调用给出的字段(不触碰 clear 计数列——
+ * 计数由通用进度写入管理)。用于同一事务内通用写入已建行、事件结算再写
+ * 同一行的场景(极时处理器持 pre-write 快照判首通,首次会走插入分支)。
+ */
+export function upsertPlayerQuestProgressSync(
+    playerId: number,
+    section: number | string,
+    data: PlayerQuestProgressWrite
+) {
+    getDb().prepare(`
+    INSERT INTO players_quest_progress (section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, leader_character_id, host_finished, player_id)
+    VALUES (
+        @section, @quest_id, @finished, @unlocked, @high_score, @clear_rank,
+        @best_elapsed_time_ms, @leader_character_id, @host_finished, @player_id
+    )
+    ON CONFLICT(section, quest_id, player_id) DO UPDATE SET
+        finished = excluded.finished,
+        unlocked = excluded.unlocked,
+        high_score = excluded.high_score,
+        clear_rank = excluded.clear_rank,
+        best_elapsed_time_ms = excluded.best_elapsed_time_ms,
+        leader_character_id = excluded.leader_character_id,
+        host_finished = excluded.host_finished
+    `).run({
+        section: Number(section),
+        quest_id: data.questId,
+        finished: serializeBoolean(data.finished),
+        unlocked: serializeBoolean(data.unlocked ?? false),
+        high_score: data.highScore ?? null,
+        clear_rank: data.clearRank ?? null,
+        best_elapsed_time_ms: data.bestElapsedTimeMs ?? null,
+        leader_character_id: data.leaderCharacterId ?? null,
+        host_finished: data.hostFinished === undefined ? null : serializeBoolean(data.hostFinished),
+        player_id: playerId,
+    })
+}
+
+/**
  * Batch inserts a record of quest progress into the database.
  * 
  * @param playerId The player's ID.

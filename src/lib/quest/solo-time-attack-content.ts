@@ -94,7 +94,15 @@ export function resolveSoloTimeAttackTimelineTiers(
     soloQuestId: number,
     repository: ReadonlyContentRepository = getContentSnapshot().repository,
 ): readonly SoloTimeAttackTimelineTier[] {
-    return getSoloTimeAttackTimelineTiers(repository)
+    const all = getSoloTimeAttackTimelineTiers(repository)
+    const resolved = all
         .filter(tier => tier.eventId === eventId && tier.questId === soloQuestId)
         .sort((left, right) => left.clearTimeSeconds - right.clearTimeSeconds)
+    if (resolved.length === 0) {
+        // 2026-11-11 真机诊断:79.7s 通关零发放——tableRows>0 且仍空=(event,quest)
+        // 过滤口径问题;tableRows=0=表缺失/解析空(优雅降级吞错后的可见性)
+        console.log(`[SOLO_TA] tiers empty: event=${eventId} quest=${soloQuestId}`
+            + ` tableRows=${all.length}`)
+    }
+    return resolved
 }
