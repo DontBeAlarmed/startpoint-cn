@@ -11,8 +11,13 @@ import {
 import { getPlayerCharacterSync } from "../../data/domains/character"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
-import { executeRewardGrantExecutionPlanAsTransactionOwnerSync } from "../../lib/reward-grant"
+import {
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+} from "../../lib/reward-grant"
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow"
+import { getPlayerItemsByIdsSync } from "../../data/domains/item"
+import { RewardType } from "../../lib/types"
 import { projectCharacterPatch } from "../../lib/common-response/entities"
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
@@ -54,6 +59,12 @@ interface FinishTriggerBody {
 }
 
 const freeTutorialCharacterId = 243001
+
+// 教程 present 步（有效步 16）与亚里沙同批发放的乐享扭蛋券——APK 步表硬约束
+// （start_tutorial_step present 行：`6,,0,243001,999012,1`）。客户端乐享池
+// 入口门控即 hasItem(999012)；present 响应 item_list 走 SET 语义，券必须发
+// 绝对余额（growth-fund 同款，客户端 applyCommonResponseItemList ≤0 删条目）。
+const tutorialPresentCrazyTicketItemId = 999012
 
 function serializeTutorialReplayCharacter(
     viewerId: number,
@@ -133,6 +144,8 @@ function buildTutorialPresentReplayData(
     const player = getPlayerSync(playerId)
     if (player === null) throw new Error("Tutorial player disappeared during replay")
     const character = getPlayerCharacterSync(playerId, freeTutorialCharacterId)
+    // 回执重放与首发响应同构：券的绝对余额（present 步已发过，重放不重复发放）
+    const ticketBalance = getPlayerItemsByIdsSync(playerId, [tutorialPresentCrazyTicketItemId])
 
     return {
         "step": effectiveNextStep,
@@ -145,7 +158,9 @@ function buildTutorialPresentReplayData(
                 : [projectCharacterPatch(
                     serializeTutorialReplayCharacter(0, freeTutorialCharacterId, character),
                 )],
-            "item_list": {},
+            "item_list": {
+                [tutorialPresentCrazyTicketItemId]: ticketBalance[String(tutorialPresentCrazyTicketItemId)] ?? 0,
+            },
             "mail_arrived": getMailArrivedSync(playerId),
         }]),
         "encyclopedia_info": {
@@ -451,12 +466,44 @@ const routes = async (fastify: FastifyInstance) => {
                 const existingCharacterList: Record<string, unknown>[] = giveResult?.character
                     ? [giveResult.character as Record<string, unknown>]
                     : []
-                const itemList = giveResult?.item
-                    ? { [giveResult.item.id]: giveResult.item.count }
-                    : {}
+                // 乐享扭蛋券与亚里沙同批（APK 步表 present 行）；同一事务、
+                // 同一 deferred 库存批次。券是 50 次重抽的会话钥匙，与 PR #31
+                // 的 select 扣券/per-session 计数语义衔接。
+                const ticketGrant = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+                    playerId,
+                    createRewardGrantExecutionPlan([{
+                        type: RewardType.ITEM,
+                        id: tutorialPresentCrazyTicketItemId,
+                        count: 1,
+                    }]),
+                    {
+                        playerId: currentPlayer.id,
+                        freeMana: currentPlayer.freeMana,
+                        freeVmoney: currentPlayer.freeVmoney,
+                        expPool: currentPlayer.expPool,
+                    },
+                    { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
+                )
+                const ticketAfter = ticketGrant.assets.items.find(
+                    item => item.itemId === tutorialPresentCrazyTicketItemId,
+                )?.afterAmount
+                    ?? getPlayerItemsByIdsSync(playerId, [tutorialPresentCrazyTicketItemId])[String(tutorialPresentCrazyTicketItemId)]
+                    ?? 0
+                const itemList = {
+                    ...(giveResult?.item
+                        ? { [giveResult.item.id]: giveResult.item.count }
+                        : {}),
+                    // SET 语义：值=发放后绝对余额
+                    [tutorialPresentCrazyTicketItemId]: ticketAfter,
+                }
                 insertReceiveHistorySync(playerId, {
                     type: MailType.CHARACTER,
                     type_id: freeTutorialCharacterId,
+                    number: 1,
+                })
+                insertReceiveHistorySync(playerId, {
+                    type: MailType.ITEM,
+                    type_id: tutorialPresentCrazyTicketItemId,
                     number: 1,
                 })
 

@@ -195,6 +195,10 @@ async function main() {
         assert.equal(getPlayerSync(playerId).tutorialStep, 15)
         assert.equal(getPlayerSync(playerId).freeVmoney, 850)
         assert.equal(getPlayerMailCountSync(playerId), 0)
+        // 整批回滚：乐享券不得在邮件失败时残留
+        assert.equal(db.prepare(
+            "SELECT amount FROM players_items WHERE player_id = ? AND id = 999012",
+        ).get(playerId)?.amount ?? 0, 0)
         assert.equal(db.prepare(`
             SELECT COUNT(*) AS count
             FROM players_characters
@@ -208,6 +212,15 @@ async function main() {
         assert.equal(getPlayerSync(playerId).tutorialStep, 16)
         assert.equal(getPlayerSync(playerId).freeVmoney, 2350)
         assert.equal(getPlayerMailCountSync(playerId), 1)
+        // present 步与亚里沙同批发放乐享扭蛋券（SET 语义：值=发放后绝对余额）
+        assert.equal(presentData.item_list["999012"], 1)
+        assert.equal(db.prepare(
+            "SELECT amount FROM players_items WHERE player_id = ? AND id = 999012",
+        ).get(playerId)?.amount ?? 0, 1)
+        assert.equal(db.prepare(`
+            SELECT COUNT(*) AS count FROM players_receive_history
+            WHERE player_id = ? AND type = 1 AND type_id = 999012 AND number = 1
+        `).get(playerId).count, 1)
 
         const repeatedPresent = await updateStep(fastify, viewerId, { step: 15 })
         assert.equal(repeatedPresent.statusCode, 200, repeatedPresent.body)
@@ -215,11 +228,19 @@ async function main() {
         assert.equal(getPlayerSync(playerId).tutorialStep, 16)
         assert.equal(getPlayerSync(playerId).freeVmoney, 2350)
         assert.equal(getPlayerMailCountSync(playerId), 1)
+        // 回执重放不重复发放
+        assert.equal(db.prepare(
+            "SELECT amount FROM players_items WHERE player_id = ? AND id = 999012",
+        ).get(playerId)?.amount ?? 0, 1)
 
         const finish = await updateStep(fastify, viewerId, { step: 16 })
         assert.equal(finish.statusCode, 200, finish.body)
         const finishData = decodeResponse(finish).data
         assert.equal(getPlayerSync(playerId).tutorialStep, null)
+        // 教程完成后券在手（乐享池入口门控 hasItem(999012)）
+        assert.equal(db.prepare(
+            "SELECT amount FROM players_items WHERE player_id = ? AND id = 999012",
+        ).get(playerId)?.amount ?? 0, 1)
 
         const repeatedFinish = await updateStep(fastify, viewerId, { step: 16 })
         assert.equal(repeatedFinish.statusCode, 200, repeatedFinish.body)
