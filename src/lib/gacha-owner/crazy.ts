@@ -391,7 +391,6 @@ export function selectCrazyGachaCandidateSync(input: {
         for (let index = 0; index < grant.entries.length; index += 1) {
             const outcome = grant.entries[index].outcome
             if (outcome.kind !== "character") throw new TypeError("Crazy Gacha grant kind mismatch")
-            characters.set(characterIds[index], outcome.after)
             if (outcome.compensationItem !== null) {
                 rewardItems[outcome.compensationItem.itemId] = outcome.compensationItem.afterAmount
             }
@@ -418,6 +417,13 @@ export function selectCrazyGachaCandidateSync(input: {
             now: new Date(input.nowMs),
             source: "gacha/crazy_select",
         })
+        // 按角色聚合用引擎 assets——同 id 多次出现已在 execution-assets 按键
+        // 并集合并（首次 NEW 投影带 entry_count）。此前逐条 Map.set 会让批内
+        // 重复以最后一次的 stack 窄快照覆盖完整快照，客户端对未持有角色强制
+        // entry_count → C2274（2026-11-12 新号真机）。
+        for (const asset of grant.assets.characters) {
+            characters.set(asset.characterId, asset.after)
+        }
         const characterSnapshots = [...characters.values()]
         return deepFreeze({
             ok: true as const,
