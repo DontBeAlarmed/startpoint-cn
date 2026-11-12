@@ -194,7 +194,7 @@ test("crazy select projection applies the character whitelist and canonical iden
     assert.deepEqual(response.character_list, [{ character_id: 111001, stack: 0 }])
     assert.deepEqual(response.item_list, { 49001: 1 })
     assert.deepEqual(response.user_info, { free_mana: 5, free_vmoney: 6 })
-    assert.deepEqual(response.crazy_gacha_result_list, {})
+    assert.deepEqual(response.crazy_gacha_result_list, { 0: [], 1: [], 2: [] })
     assert.throws(() => projectCrazyGachaSelectResponse({
         dataHeaders: { viewer_id: 900, result_code: 1 },
         result: crazySelectSuccess(),
