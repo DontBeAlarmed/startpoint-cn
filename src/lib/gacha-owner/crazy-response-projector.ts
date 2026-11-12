@@ -98,7 +98,16 @@ export function projectCrazyGachaSelectResponse(input: {
                     crazy_draw_count: input.result.gachaInfo.crazyDrawCount,
                 }],
             }),
-            crazy_gacha_result_list: {},
+            crazy_gacha_result_list: {
+                // 定案后三槽全空（0=当前,1/2=保存）。客户端
+                // applyCommonResponseCrazyGachaResultList 是按键合并——只覆盖
+                // 响应里出现的槽位键，回 {} 等于不清，上一会话的保存槽会残留
+                // 显示（2026-11-12 真机）。空数组在客户端解析层合法
+                // （crazy_gacha_result_list[k] 的 Array 型检查对空数组空转）。
+                0: [],
+                1: [],
+                2: [],
+            },
         },
     }
 }

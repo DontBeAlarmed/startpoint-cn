@@ -228,6 +228,8 @@ test("Crazy candidate, save, redraw, load recovery and select form one reachable
     assert.equal(selectedData.character_list.length > 0, true)
     assert.equal(selectedData.item_list[CRAZY_TICKET_ID], 0)
     assert.equal(selectedData.gacha_info_list[0].crazy_draw_count, 0)
+    // 定案响应显式清三槽：客户端按键合并，回 {} 不清会残留上一会话保存槽
+    assert.deepEqual(selectedData.crazy_gacha_result_list, { 0: [], 1: [], 2: [] })
     assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 0)
     assert.equal(getPlayerGachaInfoSync(playerId, CRAZY_GACHA_ID).crazyDrawCount, 0)
     assert.equal(historyCount(playerId), 10)
@@ -249,6 +251,7 @@ test("Crazy candidate, save, redraw, load recovery and select form one reachable
     assert.deepEqual(repeatedData.character_list, [])
     assert.equal(repeatedData.item_list[CRAZY_TICKET_ID], 0)
     assert.equal(repeatedData.gacha_info_list[0].crazy_draw_count, 0)
+    assert.deepEqual(repeatedData.crazy_gacha_result_list, { 0: [], 1: [], 2: [] })
     assert.deepEqual(getPlayerCharactersSync(playerId), charactersAfter)
     assert.equal(getPlayerItemSync(playerId, CRAZY_TICKET_ID), 0)
     assert.equal(historyCount(playerId), 10)
